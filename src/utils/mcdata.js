@@ -49,6 +49,8 @@ export const WOOL_COLORS = [
 
 
 export function initBot(username) {
+
+    
     let bot = createBot({
         username: username,
 

@@ -1,17 +1,16 @@
-export default 
-{
-    "minecraft_version": "1.20.4", // supports up to 1.20.4
-    "host": "127.0.0.1", // or "localhost", "your.ip.address.here"
-    "port": 55916,
-    "auth": "offline", // or "microsoft"
-    
+const settings = {
+    "minecraft_version": "1.20.4",
+    "host": "10.0.0.235",
+    "port": 25565,
+    "auth": "offline",
+    "player_username": "WhosMaCreeper",
     "profiles": [
-        "./andy.json",
-        // add more profiles here, check ./profiles/ for more
-        // more than 1 profile will require you to /msg each bot indivually
+        "./ethan.json",
     ],
-    "load_memory": false, // load memory from previous session
-    "init_message": "Say hello world and your name", // sends to all on spawn
-    "allow_insecure_coding": false, // disable at own risk
-    "code_timeout_mins": 10, // -1 for no timeout
-}
+    "load_memory": false,
+    "init_message": "Say hello world and your name",
+    "allow_insecure_coding": false,
+    "code_timeout_mins": 10,
+};
+
+export default settings;

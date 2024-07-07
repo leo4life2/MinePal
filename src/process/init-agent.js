@@ -1,5 +1,6 @@
 import { Agent } from '../agent/agent.js';
 import yargs from 'yargs';
+import settings from '../../settings.js';
 
 const args = process.argv.slice(2);
 if (args.length < 1) {
@@ -24,4 +25,12 @@ const argv = yargs(args)
         description: 'automatically prompt the agent on startup'
     }).argv
 
-new Agent().start(argv.profile, argv.load_memory, argv.init_message);
+const agent = new Agent();
+agent.start(argv.profile, argv.load_memory, argv.init_message);
+    
+process.on('message', (message) => {
+    if (message.type === 'transcription') {
+        // Handle the transcription message
+        agent.handleMessage(settings.player_username, message.data);
+    }
+});

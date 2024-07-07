@@ -8,9 +8,18 @@ import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import settings from '../../settings.js';
 
-
+/**
+ * Represents an AI agent that can interact with a Minecraft world.
+ */
 export class Agent {
+    /**
+     * Initializes and starts the agent.
+     * @param {string} profile_fp - File path to the agent's profile.
+     * @param {boolean} load_mem - Whether to load memory from previous sessions.
+     * @param {string|null} init_message - Initial message to send to the agent.
+     */
     async start(profile_fp, load_mem=false, init_message=null) {
+        // Initialize agent components
         this.prompter = new Prompter(this, profile_fp);
         this.name = this.prompter.getName();
         this.history = new History(this);
@@ -29,12 +38,13 @@ export class Agent {
             this.history.load();
 
         this.bot.once('spawn', async () => {
-            // wait for a bit so stats are not undefined
+            // Wait for a bit so stats are not undefined
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             console.log(`${this.name} spawned.`);
             this.coder.clear();
             
+            // Define messages to ignore
             const ignore_messages = [
                 "Set own game mode to",
                 "Set the time to",
@@ -44,6 +54,8 @@ export class Agent {
                 "Gamerule "
             ];
             const eventname = settings.profiles.length > 1 ? 'whisper' : 'chat';
+            
+            // Set up chat event listener
             this.bot.on(eventname, (username, message) => {
                 if (username === this.name) return;
                 
@@ -54,13 +66,14 @@ export class Agent {
                 this.handleMessage(username, message);
             });
 
-            // set the bot to automatically eat food when hungry
+            // Configure auto-eat settings
             this.bot.autoEat.options = {
                 priority: 'foodPoints',
                 startAt: 14,
                 bannedFood: ["rotten_flesh", "spider_eye", "poisonous_potato", "pufferfish", "chicken"]
             };
 
+            // Handle initial message or send a greeting
             if (init_message) {
                 this.handleMessage('system', init_message);
             } else {
@@ -72,12 +85,21 @@ export class Agent {
         });
     }
 
+    /**
+     * Cleans and sends a chat message.
+     * @param {string} message - The message to send.
+     */
     cleanChat(message) {
-        // newlines are interpreted as separate chats, which triggers spam filters. replace them with spaces
+        // Replace newlines with spaces to avoid spam filters
         message = message.replaceAll('\n', '  ');
         return this.bot.chat(message);
     }
 
+    /**
+     * Handles incoming messages and executes appropriate actions.
+     * @param {string} source - The source of the message.
+     * @param {string} message - The content of the message.
+     */
     async handleMessage(source, message) {
         const user_command_name = containsCommand(message);
         if (user_command_name) {
@@ -87,8 +109,7 @@ export class Agent {
             }
             this.bot.chat(`*${source} used ${user_command_name.substring(1)}*`);
             if (user_command_name === '!newAction') {
-                // all user initiated commands are ignored by the bot except for this one
-                // add the preceding message to the history to give context for newAction
+                // Add context for newAction command
                 this.history.add(source, message);
             }
             let execute_res = await executeCommand(this, message);
@@ -99,15 +120,16 @@ export class Agent {
 
         await this.history.add(source, message);
 
+        // Process the message and generate responses
         for (let i=0; i<5; i++) {
             let history = this.history.getHistory();
             let res = await this.prompter.promptConvo(history);
 
             let command_name = containsCommand(res);
 
-            if (command_name) { // contains query or command
+            if (command_name) {
                 console.log(`Full response: ""${res}""`)
-                res = truncCommandMessage(res); // everything after the command is ignored
+                res = truncCommandMessage(res);
                 this.history.add(this.name, res);
                 if (!commandExists(command_name)) {
                     this.history.add('system', `Command ${command_name} does not exist. Use !newAction to perform custom actions.`);
@@ -129,7 +151,7 @@ export class Agent {
                 else
                     break;
             }
-            else { // conversation response
+            else {
                 this.history.add(this.name, res);
                 this.cleanChat(res);
                 console.log('Purely conversational response:', res);
@@ -141,19 +163,23 @@ export class Agent {
         this.bot.emit('finished_executing');
     }
 
+    /**
+     * Initializes and starts various event listeners for the agent.
+     */
     startEvents() {
-        // Custom events
+        // Custom time-based events
         this.bot.on('time', () => {
             if (this.bot.time.timeOfDay == 0)
-            this.bot.emit('sunrise');
+                this.bot.emit('sunrise');
             else if (this.bot.time.timeOfDay == 6000)
-            this.bot.emit('noon');
+                this.bot.emit('noon');
             else if (this.bot.time.timeOfDay == 12000)
-            this.bot.emit('sunset');
+                this.bot.emit('sunset');
             else if (this.bot.time.timeOfDay == 18000)
-            this.bot.emit('midnight');
+                this.bot.emit('midnight');
         });
 
+        // Health tracking
         let prev_health = this.bot.health;
         this.bot.lastDamageTime = 0;
         this.bot.lastDamageTaken = 0;
@@ -164,7 +190,8 @@ export class Agent {
             }
             prev_health = this.bot.health;
         });
-        // Logging callbacks
+
+        // Error handling and logging
         this.bot.on('error' , (err) => {
             console.error('Error event!', err);
         });
@@ -188,15 +215,15 @@ export class Agent {
         });
         this.bot.on('idle', () => {
             this.bot.clearControlStates();
-            this.bot.pathfinder.stop(); // clear any lingering pathfinder
+            this.bot.pathfinder.stop(); // Clear any lingering pathfinder
             this.bot.modes.unPauseAll();
             this.coder.executeResume();
         });
 
-        // Init NPC controller
+        // Initialize NPC controller
         this.npc.init();
 
-        // This update loop ensures that each update() is called one at a time, even if it takes longer than the interval
+        // Set up update loop for modes
         const INTERVAL = 300;
         setTimeout(async () => {
             while (true) {
@@ -212,10 +239,18 @@ export class Agent {
         this.bot.emit('idle');
     }
 
+    /**
+     * Checks if the agent is currently idle.
+     * @returns {boolean} True if the agent is idle, false otherwise.
+     */
     isIdle() {
         return !this.coder.executing && !this.coder.generating;
     }
     
+    /**
+     * Performs a clean shutdown of the agent.
+     * @param {string} msg - Message to log before shutting down.
+     */
     cleanKill(msg='Killing agent process...') {
         this.history.add('system', msg);
         this.bot.chat('Goodbye world.')
