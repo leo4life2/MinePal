@@ -1,5 +1,5 @@
 import { writeFile, readFile, mkdirSync } from 'fs';
-import settings from '../../settings.js';
+import settings from '../../settings.json' assert { type: 'json' };
 
 export class Coder {
     constructor(agent) {

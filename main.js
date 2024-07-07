@@ -1,5 +1,5 @@
 import { AgentProcess } from './src/process/agent-process.js';
-import settings from './settings.js';
+import settings from './settings.json' assert { type: 'json' };
 import express from 'express';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
@@ -7,6 +7,7 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import { getKey } from './src/utils/keys.js';
+import fs from 'fs';
 
 const argv = yargs(hideBin(process.argv)).argv;
 
@@ -110,7 +111,8 @@ if (argv.mode === 'server') {
         }
 
         const newSettings = req.body;
-        // TODO: set settings json so all processes use new settings.
+        Object.assign(settings, newSettings);
+        fs.writeFileSync('settings.json', JSON.stringify(settings, null, 4));
 
         profiles = settings.profiles;
         load_memory = settings.load_memory;

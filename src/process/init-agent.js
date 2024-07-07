@@ -1,6 +1,6 @@
 import { Agent } from '../agent/agent.js';
 import yargs from 'yargs';
-import settings from '../../settings.js';
+import settings from '../../settings.json' assert { type: 'json' };
 
 const args = process.argv.slice(2);
 if (args.length < 1) {

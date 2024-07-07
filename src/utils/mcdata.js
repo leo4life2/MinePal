@@ -1,5 +1,5 @@
 import minecraftData from 'minecraft-data';
-import settings from '../../settings.js';
+import settings from '../../settings.json' assert { type: 'json' };
 import { createBot } from 'mineflayer';
 import prismarine_items from 'prismarine-item';
 import { pathfinder } from 'mineflayer-pathfinder';
@@ -48,9 +48,7 @@ export const WOOL_COLORS = [
 ]
 
 
-export function initBot(username) {
-
-    
+export function initBot(username) {    
     let bot = createBot({
         username: username,
 
