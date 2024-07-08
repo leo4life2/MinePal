@@ -11,6 +11,10 @@ import fs from 'fs';
 import basicAuth from 'express-basic-auth';
 import cors from 'cors';
 
+const PROD_BE_HOST = 'http://';
+const TEST_BE_HOST = 'http://10.0.0.235:19999';
+const LOCAL_BE_HOST = 'http://localhost:19999';
+
 const argv = yargs(hideBin(process.argv)).argv;
 
 let profiles = settings.profiles;
@@ -24,6 +28,12 @@ if (argv.mode === 'server') {
     const port = 19999;
     const server = http.createServer(app);
     const wss = new WebSocketServer({ server });
+
+    // Configure CORS to allow credentials
+    app.use(cors({
+        origin: TEST_BE_HOST,
+        credentials: true
+    }));
 
     // Add HTTP Basic Auth
     app.use(basicAuth({
