@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
   },
   define: {
-    PROD_BE_HOST: JSON.stringify('https://backend.minepal.net'),
+    PROD_BE_HOST: JSON.stringify('http://backend.minepal.net'),
     TEST_BE_HOST: JSON.stringify('http://10.0.0.235:443'),
     LOCAL_BE_HOST: JSON.stringify('http://localhost:443')
   },
