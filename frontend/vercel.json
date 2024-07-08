@@ -3,10 +3,6 @@
       {
         "source": "/api/(.*)",
         "destination": "http://backend.minepal.net:19999/$1"
-      },
-      {
-        "source": "/ws/(.*)",
-        "destination": "ws://backend.minepal.net:19999/$1"
       }
     ]
   }

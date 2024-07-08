@@ -9,10 +9,6 @@ export default defineConfig({
         target: 'http://backend.minepal.net:19999',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
-      },
-      '/ws': {
-        target: 'ws://backend.minepal.net:19999',
-        ws: true
       }
     }
   },

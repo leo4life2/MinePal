@@ -191,7 +191,7 @@ function App() {
       setMicrophone(null);
       setIsRecording(false);
     } else {
-      const newSocket = new WebSocket('/ws');
+      const newSocket = new WebSocket(PROD_BE_HOST.replace(/^(http|https):\/\//, 'ws://'));
       setSocket(newSocket);
 
       newSocket.addEventListener("open", async () => {
@@ -249,93 +249,62 @@ function App() {
     <div className="container">
       <h1>Minepal Control Panel</h1>
       <div className="settings">
-        {Object.entries(settings).map(([key, value]) => {
-          if (key !== 'load_memory' && key !== 'allow_insecure_coding' && key !== 'code_timeout_mins') {
-            if (key === 'host' || key === 'port' || key === 'player_username') {
-              return (
-                <div key={key} className="setting-item inline">
-                  <label htmlFor={key}>
-                    {key.replace(/_/g, ' ')}:
-                    {settingNotes[key] && <span className="setting-note"> ({settingNotes[key]})</span>}
-                  </label>
-                  <input
-                    id={key}
-                    type={key === 'port' ? 'number' : 'text'}
-                    value={value}
-                    onChange={(e) => handleSettingChange(key, e.target.value)}
-                  />
-                </div>
-              )
-            } else {
-              return (
-                <div key={key} className="setting-item">
-                  <label htmlFor={key}>
-                    {key.replace(/_/g, ' ')}:
-                    {settingNotes[key] && <span className="setting-note"> ({settingNotes[key]})</span>}
-                  </label>
-                  {typeof value === 'boolean' ? (
-                    <label className="switch">
-                      <input
-                        type="checkbox"
-                        id={key}
-                        checked={value}
-                        onChange={(e) => handleSettingChange(key, e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  ) : Array.isArray(value) ? (
-                    <input
-                      id={key}
-                      type="text"
-                      value={value.join(', ')}
-                      onChange={(e) => handleSettingChange(key, e.target.value.split(', '))}
-                    />
-                  ) : (
-                    <input
-                      id={key}
-                      type={key === 'port' || key === 'code_timeout_mins' ? 'number' : 'text'}
-                      value={value}
-                      onChange={(e) => handleSettingChange(key, e.target.value)}
-                    />
-                  )}
-                </div>
-              )
-            }
-          }
-          return null;
-        })}
+        <div className="setting-item">
+          <label htmlFor="player_username">
+            player username:
+            {settingNotes.player_username && <span className="setting-note"> ({settingNotes.player_username})</span>}
+          </label>
+          <input
+            id="player_username"
+            type="text"
+            value={settings.player_username}
+            onChange={(e) => handleSettingChange('player_username', e.target.value)}
+          />
+        </div>
         <div className="advanced-settings">
           <button onClick={() => setShowAdvanced(!showAdvanced)}>
             {showAdvanced ? 'Hide Advanced Settings' : 'Show Advanced Settings'}
           </button>
           {showAdvanced && (
             <div className="advanced-settings-content">
-              {['load_memory', 'allow_insecure_coding', 'code_timeout_mins'].map(key => (
-                <div key={key} className="setting-item">
-                  <label htmlFor={key}>
-                    {key.replace(/_/g, ' ')}:
-                    {settingNotes[key] && <span className="setting-note"> ({settingNotes[key]})</span>}
-                  </label>
-                  {typeof settings[key] === 'boolean' ? (
-                    <label className="switch">
-                      <input
-                        type="checkbox"
-                        id={key}
-                        checked={settings[key]}
-                        onChange={(e) => handleSettingChange(key, e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  ) : (
-                    <input
-                      id={key}
-                      type={key === 'code_timeout_mins' ? 'number' : 'text'}
-                      value={settings[key]}
-                      onChange={(e) => handleSettingChange(key, e.target.value)}
-                    />
-                  )}
-                </div>
-              ))}
+              {Object.entries(settings).map(([key, value]) => {
+                if (key !== 'player_username') {
+                  return (
+                    <div key={key} className="setting-item">
+                      <label htmlFor={key}>
+                        {key.replace(/_/g, ' ')}:
+                        {settingNotes[key] && <span className="setting-note"> ({settingNotes[key]})</span>}
+                      </label>
+                      {typeof value === 'boolean' ? (
+                        <label className="switch">
+                          <input
+                            type="checkbox"
+                            id={key}
+                            checked={value}
+                            onChange={(e) => handleSettingChange(key, e.target.checked)}
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      ) : Array.isArray(value) ? (
+                        <input
+                          id={key}
+                          type="text"
+                          value={value.join(', ')}
+                          onChange={(e) => handleSettingChange(key, e.target.value.split(', '))}
+                        />
+                      ) : (
+                        <input
+                          id={key}
+                          type={key === 'port' || key === 'code_timeout_mins' ? 'number' : 'text'}
+                          value={value}
+                          onChange={(e) => handleSettingChange(key, e.target.value)}
+                        />
+                      )}
+                    </div>
+                  )
+                }
+                return null;
+              })}
             </div>
           )}
         </div>
