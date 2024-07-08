@@ -31,7 +31,7 @@ if (argv.mode === 'server') {
 
     // Configure CORS to allow credentials
     app.use(cors({
-        origin: TEST_BE_HOST,
+        origin: TEST_FE_HOST,
         credentials: true
     }));
 
