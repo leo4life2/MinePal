@@ -30,6 +30,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [newProfile, setNewProfile] = useState("")
 
   useEffect(() => {
     const checkCredentials = () => {
@@ -126,6 +127,7 @@ function App() {
       // Check for empty fields
       const emptyFields = Object.entries(settings)
         .filter(([key, value]) => {
+          if (key === 'profiles') return value.length === 0;
           if (typeof value === 'string') return value.trim() === '';
           if (Array.isArray(value)) return value.length === 0;
           return value === null || value === undefined;
@@ -237,6 +239,23 @@ function App() {
     }
   }
 
+  const addProfile = () => {
+    if (newProfile.trim() !== "") {
+      setSettings(prev => ({
+        ...prev,
+        profiles: [...prev.profiles, newProfile.trim()]
+      }));
+      setNewProfile("");
+    }
+  }
+
+  const removeProfile = (index) => {
+    setSettings(prev => ({
+      ...prev,
+      profiles: prev.profiles.filter((_, i) => i !== index)
+    }));
+  }
+
   if (!isLoggedIn) {
     return (
       <div className="login-container">
@@ -285,7 +304,7 @@ function App() {
           {showAdvanced && (
             <div className="advanced-settings-content">
               {Object.entries(settings).map(([key, value]) => {
-                if (key !== 'player_username') {
+                if (key !== 'player_username' && key !== 'profiles') {
                   return (
                     <div key={key} className="setting-item">
                       <label htmlFor={key}>
@@ -302,13 +321,6 @@ function App() {
                           />
                           <span className="slider"></span>
                         </label>
-                      ) : Array.isArray(value) ? (
-                        <input
-                          id={key}
-                          type="text"
-                          value={value.join(', ')}
-                          onChange={(e) => handleSettingChange(key, e.target.value.split(', '))}
-                        />
                       ) : (
                         <input
                           id={key}
@@ -322,6 +334,29 @@ function App() {
                 }
                 return null;
               })}
+              <div className="setting-item">
+                <label htmlFor="profiles">
+                  Profiles:
+                  {settingNotes.profiles && <span className="setting-note"> ({settingNotes.profiles})</span>}
+                </label>
+                <div className="profiles-list">
+                  {settings.profiles.map((profile, index) => (
+                    <div key={index} className="profile-item">
+                      <span>{profile}</span>
+                      <button onClick={() => removeProfile(index)}>Remove</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="add-profile">
+                  <input
+                    type="text"
+                    value={newProfile}
+                    onChange={(e) => setNewProfile(e.target.value)}
+                    placeholder="Enter new profile"
+                  />
+                  <button onClick={addProfile}>Add Profile</button>
+                </div>
+              </div>
             </div>
           )}
         </div>

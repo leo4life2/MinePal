@@ -156,10 +156,12 @@ if (argv.mode === 'server') {
         }
 
         const newSettings = req.body;
-        
         // Check for empty fields in newSettings
         const emptyFields = Object.entries(newSettings)
-            .filter(([key, value]) => value === "" || value === null || value === undefined)
+            .filter(([key, value]) => {
+                if (key === 'profiles') return !Array.isArray(value) || value.length === 0;
+                return value === "" || value === null || value === undefined;
+            })
             .map(([key]) => key);
         
         if (emptyFields.length > 0) {
