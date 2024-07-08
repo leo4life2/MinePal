@@ -49,7 +49,7 @@ function App() {
 
   const fetchSettings = async (user, pass) => {
     try {
-      const response = await api.get('/api/settings', {
+      const response = await api.get('/settings', {
         auth: {
           username: user,
           password: pass
@@ -68,7 +68,7 @@ function App() {
 
   const fetchAgentStatus = async (user, pass) => {
     try {
-      const response = await api.get('/api/agent-status', {
+      const response = await api.get('/agent-status', {
         auth: {
           username: user,
           password: pass
@@ -110,7 +110,7 @@ function App() {
   const toggleAgent = async () => {
     if (agentStarted) {
       try {
-        const response = await api.post('/api/stop', {}, {
+        const response = await api.post('/stop', {}, {
           auth: {
             username,
             password
@@ -124,7 +124,7 @@ function App() {
       }
     } else {
       try {
-        const response = await api.post('/api/start', settings, {
+        const response = await api.post('/start', settings, {
           auth: {
             username,
             password
@@ -193,7 +193,8 @@ function App() {
       setMicrophone(null);
       setIsRecording(false);
     } else {
-      const newSocket = new WebSocket('/ws');
+      const wsUrl = LOCAL_BE_HOST.replace(/^http/, 'ws');
+      const newSocket = new WebSocket(`${wsUrl}`);
       setSocket(newSocket);
 
       newSocket.addEventListener("open", async () => {
