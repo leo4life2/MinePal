@@ -25,12 +25,6 @@ if (argv.mode === 'server') {
     const server = http.createServer(app);
     const wss = new WebSocketServer({ server });
 
-    // Configure CORS to allow credentials
-    app.use(cors({
-        origin: 'http://localhost:5173', // Replace with your frontend origin
-        credentials: true
-    }));
-
     // Add HTTP Basic Auth
     app.use(basicAuth({
         users: { 'alphatest': 'MinePalAlphaTester123!@#123' },
