@@ -2,10 +2,8 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
-const TEST_BE_HOST = import.meta.env.VITE_TEST_BE_HOST || 'http://10.0.0.235:19999';
-
 const api = axios.create({
-  baseURL: TEST_BE_HOST,
+  baseURL: PROD_BE_HOST,
 });
 
 function App() {
@@ -178,7 +176,7 @@ function App() {
       setMicrophone(null);
       setIsRecording(false);
     } else {
-      const wsUrl = TEST_BE_HOST.replace(/^http/, 'ws');
+      const wsUrl = PROD_BE_HOST.replace(/^http/, 'ws');
       const newSocket = new WebSocket(wsUrl);
       setSocket(newSocket);
 
