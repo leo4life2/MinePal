@@ -121,15 +121,19 @@ if (argv.mode === 'server') {
     });
 
     app.get('/settings', (req, res) => {
+        console.log('API: GET /settings called');
         res.json(settings);
     });
 
     app.get('/agent-status', (req, res) => {
+        console.log('API: GET /agent-status called');
         res.json({ agentStarted: agentProcessStarted });
     });
     
     app.post('/stop', (req, res) => {
+        console.log('API: POST /stop called');
         if (!agentProcessStarted) {
+            console.log('API: No agent processes running');
             return res.status(404).send('No agent processes are currently running.');
         }
 
@@ -140,11 +144,14 @@ if (argv.mode === 'server') {
         agentProcesses = [];
         agentProcessStarted = false;
 
+        console.log('API: All agent processes stopped');
         res.send('All agent processes have been stopped.');
     });
 
     app.post('/start', express.json(), (req, res) => {
+        console.log('API: POST /start called');
         if (agentProcessStarted) {
+            console.log('API: Agent process already started');
             return res.status(409).send('Agent process already started. Restart not allowed.');
         }
 
@@ -162,6 +169,7 @@ if (argv.mode === 'server') {
             agentProcesses.push(agentProcess);
         }
         agentProcessStarted = true;
+        console.log('API: Settings updated and AgentProcess started for all profiles');
         res.send('Settings updated and AgentProcess started for all profiles');
     });
 
