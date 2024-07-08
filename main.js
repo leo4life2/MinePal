@@ -123,6 +123,10 @@ if (argv.mode === 'server') {
     app.get('/settings', (req, res) => {
         res.json(settings);
     });
+
+    app.get('/agent-status', (req, res) => {
+        res.json({ agentStarted: agentProcessStarted });
+    });
     
     app.post('/stop', (req, res) => {
         if (!agentProcessStarted) {

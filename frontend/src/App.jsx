@@ -38,6 +38,7 @@ function App() {
         setPassword(storedPassword)
         setIsLoggedIn(true)
         fetchSettings(storedUsername, storedPassword)
+        fetchAgentStatus(storedUsername, storedPassword)
       }
     }
 
@@ -63,12 +64,28 @@ function App() {
     }
   }
 
+  const fetchAgentStatus = async (user, pass) => {
+    try {
+      const response = await api.get('/api/agent-status', {
+        auth: {
+          username: user,
+          password: pass
+        }
+      })
+      setAgentStarted(response.data.agentStarted)
+    } catch (err) {
+      console.error("Failed to fetch agent status:", err)
+      setError("Failed to load agent status. Is main.js running?")
+    }
+  }
+
   const handleLogin = (e) => {
     e.preventDefault()
     localStorage.setItem('username', username)
     localStorage.setItem('password', password)
     setIsLoggedIn(true)
     fetchSettings(username, password)
+    fetchAgentStatus(username, password)
   }
 
   const settingNotes = {
