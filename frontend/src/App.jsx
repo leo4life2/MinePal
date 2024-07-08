@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
+const TEST_BE_HOST = import.meta.env.VITE_TEST_BE_HOST || 'http://10.0.0.235:19999';
+
+const api = axios.create({
+  baseURL: TEST_BE_HOST,
+});
+
 function App() {
   const [settings, setSettings] = useState({
     minecraft_version: "",
@@ -44,7 +50,7 @@ function App() {
 
   const fetchSettings = async (user, pass) => {
     try {
-      const response = await axios.get(`${TEST_BE_HOST}/settings`, {
+      const response = await api.get('/settings', {
         auth: {
           username: user,
           password: pass
@@ -89,7 +95,7 @@ function App() {
   const toggleAgent = async () => {
     if (agentStarted) {
       try {
-        const response = await axios.post(`${TEST_BE_HOST}/stop`, {}, {
+        const response = await api.post('/stop', {}, {
           auth: {
             username,
             password
@@ -103,7 +109,7 @@ function App() {
       }
     } else {
       try {
-        const response = await axios.post(`${TEST_BE_HOST}/start`, settings, {
+        const response = await api.post('/start', settings, {
           auth: {
             username,
             password
@@ -172,7 +178,8 @@ function App() {
       setMicrophone(null);
       setIsRecording(false);
     } else {
-      const newSocket = new WebSocket("ws://localhost:19999");
+      const wsUrl = TEST_BE_HOST.replace(/^http/, 'ws');
+      const newSocket = new WebSocket(wsUrl);
       setSocket(newSocket);
 
       newSocket.addEventListener("open", async () => {
