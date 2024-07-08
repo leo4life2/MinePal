@@ -25,7 +25,7 @@ let agentProcesses = [];
 
 if (argv.mode === 'server') {
     const app = express();
-    const port = 19999;
+    const port = 443;
     const server = http.createServer(app);
     const wss = new WebSocketServer({ server });
 
