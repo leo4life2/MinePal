@@ -193,7 +193,7 @@ function App() {
       setMicrophone(null);
       setIsRecording(false);
     } else {
-      const wsUrl = LOCAL_BE_HOST.replace(/^http/, 'ws');
+      const wsUrl = api.defaults.baseURL.replace(/^http/, 'ws');
       const newSocket = new WebSocket(`${wsUrl}`);
       setSocket(newSocket);
 
