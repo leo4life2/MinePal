@@ -11,9 +11,9 @@ import fs from 'fs';
 import basicAuth from 'express-basic-auth';
 import cors from 'cors';
 
-const PROD_BE_HOST = 'http://';
-const TEST_BE_HOST = 'http://10.0.0.235:19999';
-const LOCAL_BE_HOST = 'http://localhost:19999';
+const PROD_FE_HOST = 'http://';
+const TEST_FE_HOST = 'http://10.0.0.235:4173';
+const LOCAL_FE_HOST = 'http://localhost:4173';
 
 const argv = yargs(hideBin(process.argv)).argv;
 
