@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
-const api = axios.create();
+const api = axios.create({
+  baseURL: LOCAL_BE_HOST
+});
 
 function App() {
   const [settings, setSettings] = useState({
