@@ -12,8 +12,8 @@ import basicAuth from 'express-basic-auth';
 import cors from 'cors';
 
 const PROD_FE_HOST = 'https://minepal-fe.vercel.app';
-const TEST_FE_HOST = 'http://10.0.0.235:4173';
-const LOCAL_FE_HOST = 'http://localhost:4173';
+const TEST_FE_HOST = 'http://10.0.0.235';
+const LOCAL_FE_HOST = 'http://localhost';
 
 const argv = yargs(hideBin(process.argv)).argv;
 
