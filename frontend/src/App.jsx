@@ -123,6 +123,20 @@ function App() {
         setError(error.response?.data || error.message || "An unknown error occurred while stopping the agent.");
       }
     } else {
+      // Check for empty fields
+      const emptyFields = Object.entries(settings)
+        .filter(([key, value]) => {
+          if (typeof value === 'string') return value.trim() === '';
+          if (Array.isArray(value)) return value.length === 0;
+          return value === null || value === undefined;
+        })
+        .map(([key]) => key);
+
+      if (emptyFields.length > 0) {
+        setError(`Please fill in the following fields: ${emptyFields.join(', ')}`);
+        return;
+      }
+
       try {
         const response = await api.post('/start', settings, {
           auth: {

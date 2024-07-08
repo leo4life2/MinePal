@@ -156,6 +156,19 @@ if (argv.mode === 'server') {
         }
 
         const newSettings = req.body;
+        
+        // Check for empty fields in newSettings
+        const emptyFields = Object.entries(newSettings)
+            .filter(([key, value]) => value === "" || value === null || value === undefined)
+            .map(([key]) => key);
+        
+        if (emptyFields.length > 0) {
+            return res.status(400).json({
+                error: "Empty fields not allowed",
+                emptyFields: emptyFields
+            });
+        }
+        
         Object.assign(settings, newSettings);
         fs.writeFileSync('settings.json', JSON.stringify(settings, null, 4));
 
