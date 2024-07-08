@@ -191,7 +191,7 @@ function App() {
       setMicrophone(null);
       setIsRecording(false);
     } else {
-      const newSocket = new WebSocket(PROD_BE_HOST.replace(/^(http|https):\/\//, 'ws://'));
+      const newSocket = new WebSocket('/ws');
       setSocket(newSocket);
 
       newSocket.addEventListener("open", async () => {
