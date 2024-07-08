@@ -8,6 +8,8 @@ import { WebSocketServer } from 'ws';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import { getKey } from './src/utils/keys.js';
 import fs from 'fs';
+import basicAuth from 'express-basic-auth';
+import cors from 'cors';
 
 const argv = yargs(hideBin(process.argv)).argv;
 
@@ -19,9 +21,22 @@ let agentProcesses = [];
 
 if (argv.mode === 'server') {
     const app = express();
-    const port = 3000;
+    const port = 19999;
     const server = http.createServer(app);
     const wss = new WebSocketServer({ server });
+
+    // Configure CORS to allow credentials
+    app.use(cors({
+        origin: 'http://localhost:5173', // Replace with your frontend origin
+        credentials: true
+    }));
+
+    // Add HTTP Basic Auth
+    app.use(basicAuth({
+        users: { 'alphatest': 'MinePalAlphaTester123!@#123' },
+        challenge: true,
+        realm: 'MinePal'
+    }));
 
     const deepgramClient = createClient(getKey('DEEPGRAM_API_KEY'));
     let keepAlive;
@@ -104,6 +119,21 @@ if (argv.mode === 'server') {
     app.get('/settings', (req, res) => {
         res.json(settings);
     });
+    
+    app.post('/stop', (req, res) => {
+        if (!agentProcessStarted) {
+            return res.status(404).send('No agent processes are currently running.');
+        }
+
+        agentProcesses.forEach(agentProcess => {
+            agentProcess.agentProcess.kill('SIGTERM');;
+        });
+
+        agentProcesses = [];
+        agentProcessStarted = false;
+
+        res.send('All agent processes have been stopped.');
+    });
 
     app.post('/start', express.json(), (req, res) => {
         if (agentProcessStarted) {
@@ -127,8 +157,8 @@ if (argv.mode === 'server') {
         res.send('Settings updated and AgentProcess started for all profiles');
     });
 
-    server.listen(port, () => {
-        console.log(`Server running at http://localhost:${port}`);
+    server.listen(port, '0.0.0.0', () => {
+        console.log(`Server running at http://0.0.0.0:${port}`);
     });
 } else {
     for (let profile of profiles) {

@@ -6,3 +6,24 @@ scratch.js
 bots/**/action-code/**
 bots/**/
 keys.json
+# SSL certificates
+*.pem
+*.csr
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# Build output
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -7,7 +7,7 @@ function App() {
     minecraft_version: "",
     host: "",
     port: "",
-    player_username: "", // Added player username field
+    player_username: "",
     auth: "",
     profiles: [],
     load_memory: false,
@@ -23,24 +23,51 @@ function App() {
   const [microphone, setMicrophone] = useState(null)
   const [transcription, setTranscription] = useState("")
   const [agentStarted, setAgentStarted] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const response = await axios.get('/api/settings')
-        const expectedFields = Object.keys(settings)
-        const filteredSettings = Object.fromEntries(
-          Object.entries(response.data).filter(([key]) => expectedFields.includes(key))
-        )
-        setSettings(prevSettings => ({...prevSettings, ...filteredSettings}))
-      } catch (err) {
-        console.error("Failed to fetch settings:", err)
-        setError("Failed to load settings. Is main.js running?")
+    const checkCredentials = () => {
+      const storedUsername = localStorage.getItem('username')
+      const storedPassword = localStorage.getItem('password')
+      if (storedUsername && storedPassword) {
+        setUsername(storedUsername)
+        setPassword(storedPassword)
+        setIsLoggedIn(true)
+        fetchSettings(storedUsername, storedPassword)
       }
     }
 
-    fetchSettings()
+    checkCredentials()
   }, [])
+
+  const fetchSettings = async (user, pass) => {
+    try {
+      const response = await axios.get(`${TEST_BE_HOST}/settings`, {
+        auth: {
+          username: user,
+          password: pass
+        }
+      })
+      const expectedFields = Object.keys(settings)
+      const filteredSettings = Object.fromEntries(
+        Object.entries(response.data).filter(([key]) => expectedFields.includes(key))
+      )
+      setSettings(prevSettings => ({...prevSettings, ...filteredSettings}))
+    } catch (err) {
+      console.error("Failed to fetch settings:", err)
+      setError("Failed to load settings. Is main.js running?")
+    }
+  }
+
+  const handleLogin = (e) => {
+    e.preventDefault()
+    localStorage.setItem('username', username)
+    localStorage.setItem('password', password)
+    setIsLoggedIn(true)
+    fetchSettings(username, password)
+  }
 
   const settingNotes = {
     minecraft_version: "supports up to 1.20.4",
@@ -59,14 +86,35 @@ function App() {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
-  const startAgent = async () => {
-    try {
-      const response = await axios.post('/api/start', settings);
-      console.log("Agent started successfully:", response.data);
-      setAgentStarted(true);
-    } catch (error) {
-      console.error("Failed to start agent:", error);
-      setError(error.response?.data || error.message || "An unknown error occurred while starting the agent.");
+  const toggleAgent = async () => {
+    if (agentStarted) {
+      try {
+        const response = await axios.post(`${TEST_BE_HOST}/stop`, {}, {
+          auth: {
+            username,
+            password
+          }
+        });
+        console.log("Agent stopped successfully:", response.data);
+        setAgentStarted(false);
+      } catch (error) {
+        console.error("Failed to stop agent:", error);
+        setError(error.response?.data || error.message || "An unknown error occurred while stopping the agent.");
+      }
+    } else {
+      try {
+        const response = await axios.post(`${TEST_BE_HOST}/start`, settings, {
+          auth: {
+            username,
+            password
+          }
+        });
+        console.log("Agent started successfully:", response.data);
+        setAgentStarted(true);
+      } catch (error) {
+        console.error("Failed to start agent:", error);
+        setError(error.response?.data || error.message || "An unknown error occurred while starting the agent.");
+      }
     }
   }
 
@@ -124,7 +172,7 @@ function App() {
       setMicrophone(null);
       setIsRecording(false);
     } else {
-      const newSocket = new WebSocket("ws://localhost:3000");
+      const newSocket = new WebSocket("ws://localhost:19999");
       setSocket(newSocket);
 
       newSocket.addEventListener("open", async () => {
@@ -151,6 +199,31 @@ function App() {
         setIsRecording(false);
       });
     }
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="login-container">
+        <h1>Minepal Login</h1>
+        <form onSubmit={handleLogin}>
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <button type="submit">Login</button>
+        </form>
+      </div>
+    )
   }
 
   return (
@@ -249,7 +322,9 @@ function App() {
         </div>
       </div>
       <div className="actions">
-        <button className="action-button" onClick={startAgent}>Start Agent</button>
+        <button className="action-button" onClick={toggleAgent}>
+          {agentStarted ? 'Stop Agent' : 'Start Agent'}
+        </button>
         <button className="action-button" onClick={toggleMic}>
           {isRecording ? 'Voice Off' : 'Voice On'}
         </button>

@@ -33,7 +33,7 @@ export class AgentProcess {
         this.agentProcess.on('exit', (code, signal) => {
             console.log(`Agent process exited with code ${code} and signal ${signal}`);
             
-            if (code !== 0) {
+            if (code !== 0 && signal !== 'SIGTERM') {
                 // Check if the agent ran for at least 10 seconds before attempting to restart
                 if (Date.now() - last_restart < 10000) {
                     console.error('Agent process exited too quickly. Killing entire process. Goodbye.');
@@ -42,6 +42,8 @@ export class AgentProcess {
                 console.log('Restarting agent...');
                 this.start(profile, true, 'Agent process restarted.');
                 last_restart = Date.now();
+            } else if (signal === 'SIGTERM') {
+                console.log('Agent process terminated by SIGTERM. Not restarting.');
             }
         });
     
