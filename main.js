@@ -11,7 +11,7 @@ import fs from 'fs';
 import basicAuth from 'express-basic-auth';
 import cors from 'cors';
 
-const PROD_FE_HOST = 'https://minepal-ng02gfyru-leo4life2s-projects.vercel.app';
+const PROD_FE_HOST = 'https://minepal-fe.vercel.app';
 const TEST_FE_HOST = 'http://10.0.0.235:4173';
 const LOCAL_FE_HOST = 'http://localhost:4173';
 
