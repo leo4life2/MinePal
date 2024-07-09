@@ -1,4 +1,6 @@
 import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Represents a process for managing and running an agent.
@@ -24,31 +26,60 @@ export class AgentProcess {
         if (init_message)
             args.push('-m', init_message);
 
-        // Spawn the agent process with IPC enabled
+        // Create log directory if it doesn't exist
+        const logDir = 'agent-runlogs';
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir);
+        }
+
+        // Create log file name with datetime and profile
+        const now = new Date();
+        const logFileName = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}_${profile}.log`;
+        const logFilePath = path.join(logDir, logFileName);
+
+        // Log all arguments at the top of the log file
+        fs.writeFileSync(logFilePath, `Arguments: ${args.join(' ')}\n\n`);
+
+        // Spawn the agent process with IPC enabled and redirect output to log file
+        const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
         this.agentProcess = spawn('node', args, {
-            stdio: ['inherit', 'inherit', 'inherit', 'ipc'], // Enable IPC
+            stdio: ['inherit', 'pipe', 'pipe', 'ipc'], // Enable IPC and pipe stdout/stderr
         });
         
+        // Pipe process output to log file and console
+        this.agentProcess.stdout.pipe(logStream);
+        this.agentProcess.stderr.pipe(logStream);
+        this.agentProcess.stdout.pipe(process.stdout);
+        this.agentProcess.stderr.pipe(process.stderr);
+
         let last_restart = Date.now();
         this.agentProcess.on('exit', (code, signal) => {
             console.log(`Agent process exited with code ${code} and signal ${signal}`);
+            logStream.write(`Agent process exited with code ${code} and signal ${signal}\n`);
             
             if (code !== 0 && signal !== 'SIGTERM') {
                 // Check if the agent ran for at least 10 seconds before attempting to restart
                 if (Date.now() - last_restart < 10000) {
                     console.error('Agent process exited too quickly. Killing entire process. Goodbye.');
+                    logStream.write('Agent process exited too quickly. Killing entire process. Goodbye.\n');
+                    logStream.end();
                     process.exit(1);
                 }
                 console.log('Restarting agent...');
+                logStream.write('Restarting agent...\n');
+                logStream.end();
                 this.start(profile, true, 'Agent process restarted.');
                 last_restart = Date.now();
             } else if (signal === 'SIGTERM') {
                 console.log('Agent process terminated by SIGTERM. Not restarting.');
+                logStream.write('Agent process terminated by SIGTERM. Not restarting.\n');
+                logStream.end();
             }
         });
     
         this.agentProcess.on('error', (err) => {
             console.error('Failed to start agent process:', err);
+            logStream.write(`Failed to start agent process: ${err}\n`);
         });
     }
 
