@@ -32,9 +32,10 @@ export class AgentProcess {
             fs.mkdirSync(logDir);
         }
 
-        // Create log file name with datetime and profile
+        // Create log file name with datetime and sanitized profile
         const now = new Date();
-        const logFileName = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}_${profile}.log`;
+        const sanitizedProfile = profile.replace(/[^a-zA-Z0-9-_]/g, '_');
+        const logFileName = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}_${sanitizedProfile}.log`;
         const logFilePath = path.join(logDir, logFileName);
 
         // Log all arguments at the top of the log file
