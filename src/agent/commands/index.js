@@ -87,7 +87,7 @@ export async function executeCommand(agent, message) {
             return `Command ${command.name} was given ${numArgs} args, but requires ${numParams(command)} args.`;
         } else {
             console.log('Executing command:', command.name);
-            console.log('Agent:', JSON.stringify(agent, null, 2));
+            console.log('Agent:', agent.name);
             console.log('Arguments:', JSON.stringify(parsed.args, null, 2));
             
             return await command.perform(agent, ...parsed.args);
