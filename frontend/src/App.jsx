@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react'
-import axios from 'axios'
-import './App.css'
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import './App.css';
+import Login from './components/Login';
+import Settings from './components/Settings';
+import Profiles from './components/Profiles';
+import Actions from './components/Actions';
+import Transcription from './components/Transcription';
 
 const api = axios.create({
-  baseURL: window.location.hostname === 'backend.minepal.net' ? PROD_BE_HOST : TEST_BE_HOST
+  baseURL: LOCAL_BE_HOST
 });
 
 function App() {
@@ -18,78 +23,74 @@ function App() {
     init_message: "",
     allow_insecure_coding: false,
     code_timeout_mins: "",
-  })
+  });
 
-  const [error, setError] = useState(null)
-  const [showAdvanced, setShowAdvanced] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
-  const [socket, setSocket] = useState(null)
-  const [microphone, setMicrophone] = useState(null)
-  const [transcription, setTranscription] = useState("")
-  const [agentStarted, setAgentStarted] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [newProfile, setNewProfile] = useState("")
+  const [error, setError] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [microphone, setMicrophone] = useState(null);
+  const [transcription, setTranscription] = useState("");
+  const [agentStarted, setAgentStarted] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [newProfile, setNewProfile] = useState("");
+
+  const [loading, setLoading] = useState(true);
+
+  const addProfile = () => {
+    if (newProfile.trim() !== "") {
+      setSettings(prev => ({
+        ...prev,
+        profiles: [...prev.profiles, newProfile.trim()]
+      }));
+      setNewProfile("");
+    }
+  };
+
+  const removeProfile = (index) => {
+    setSettings(prev => ({
+      ...prev,
+      profiles: prev.profiles.filter((_, i) => i !== index)
+    }));
+  };
 
   useEffect(() => {
     const checkCredentials = () => {
-      const storedUsername = localStorage.getItem('username')
-      const storedPassword = localStorage.getItem('password')
+      const storedUsername = localStorage.getItem('username');
+      const storedPassword = localStorage.getItem('password');
       if (storedUsername && storedPassword) {
-        setUsername(storedUsername)
-        setPassword(storedPassword)
-        setIsLoggedIn(true)
-        fetchSettings(storedUsername, storedPassword)
-        fetchAgentStatus(storedUsername, storedPassword)
+        setUsername(storedUsername);
+        setPassword(storedPassword);
+        setIsLoggedIn(true);
+        fetchDataWithRetry(storedUsername, storedPassword);
+      } else {
+        setLoading(false);
       }
-    }
+    };
 
-    checkCredentials()
-  }, [])
+    const fetchDataWithRetry = async (user, pass) => {
+      const startTime = Date.now();
+      const timeoutDuration = 5000;
 
-  const fetchSettings = async (user, pass) => {
-    try {
-      const response = await api.get('/settings', {
-        auth: {
-          username: user,
-          password: pass
+      while (Date.now() - startTime < timeoutDuration) {
+        try {
+          await fetchSettings(user, pass);
+          await fetchAgentStatus(user, pass);
+          setError(null);
+          break; // Exit loop if both fetches succeed
+        } catch (err) {
+          console.error("Fetch failed, retrying...", err);
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait before retrying
         }
-      })
-      const expectedFields = Object.keys(settings)
-      const filteredSettings = Object.fromEntries(
-        Object.entries(response.data).filter(([key]) => expectedFields.includes(key))
-      )
-      setSettings(prevSettings => ({...prevSettings, ...filteredSettings}))
-    } catch (err) {
-      console.error("Failed to fetch settings:", err)
-      setError("Failed to load settings. Is main.js running?")
-    }
-  }
+      }
 
-  const fetchAgentStatus = async (user, pass) => {
-    try {
-      const response = await api.get('/agent-status', {
-        auth: {
-          username: user,
-          password: pass
-        }
-      })
-      setAgentStarted(response.data.agentStarted)
-    } catch (err) {
-      console.error("Failed to fetch agent status:", err)
-      setError("Failed to load agent status. Is main.js running?")
-    }
-  }
+      setLoading(false);
+    };
 
-  const handleLogin = (e) => {
-    e.preventDefault()
-    localStorage.setItem('username', username)
-    localStorage.setItem('password', password)
-    setIsLoggedIn(true)
-    fetchSettings(username, password)
-    fetchAgentStatus(username, password)
-  }
+    checkCredentials();
+  }, []);
 
   const settingNotes = {
     minecraft_version: "supports up to 1.20.4",
@@ -104,9 +105,56 @@ function App() {
     code_timeout_mins: "-1 for no timeout",
   }
 
+  const fetchSettings = async (user, pass) => {
+    try {
+      const response = await api.get('/settings', {
+        auth: {
+          username: user,
+          password: pass
+        }
+      });
+      const expectedFields = Object.keys(settings);
+      const filteredSettings = Object.fromEntries(
+        Object.entries(response.data).filter(([key]) => expectedFields.includes(key))
+      );
+      setSettings(prevSettings => ({ ...prevSettings, ...filteredSettings }));
+    } catch (err) {
+      console.error("Failed to fetch settings:", err);
+      setError("Failed to load settings.");
+      throw err;
+    }
+  };
+
+  const fetchAgentStatus = async (user, pass) => {
+    try {
+      const response = await api.get('/agent-status', {
+        auth: {
+          username: user,
+          password: pass
+        }
+      });
+      setAgentStarted(response.data.agentStarted);
+    } catch (err) {
+      console.error("Failed to fetch agent status:", err);
+      setError("Failed to load agent status.");
+      throw err;
+    }
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    localStorage.setItem('username', username);
+    localStorage.setItem('password', password);
+    // TODO: verify credentials
+    setIsLoggedIn(true);
+    setLoading(true);
+    fetchSettings(username, password);
+    fetchAgentStatus(username, password);
+  };
+
   const handleSettingChange = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }))
-  }
+    setSettings(prev => ({ ...prev, [key]: value }));
+  };
 
   const toggleAgent = async () => {
     if (agentStarted) {
@@ -124,7 +172,6 @@ function App() {
         setError(error.response?.data || error.message || "An unknown error occurred while stopping the agent.");
       }
     } else {
-      // Check for empty fields
       const emptyFields = Object.entries(settings)
         .filter(([key, value]) => {
           if (key === 'profiles') return value.length === 0;
@@ -153,7 +200,7 @@ function App() {
         setError(error.response?.data || error.message || "An unknown error occurred while starting the agent.");
       }
     }
-  }
+  };
 
   const getMicrophone = async () => {
     try {
@@ -163,7 +210,7 @@ function App() {
       console.error("Error accessing microphone:", error);
       throw error;
     }
-  }
+  };
 
   const openMicrophone = async (mic, sock) => {
     return new Promise((resolve) => {
@@ -186,13 +233,13 @@ function App() {
 
       mic.start(1000);
     });
-  }
+  };
 
   const closeMicrophone = async (mic) => {
     if (mic && mic.state !== "inactive") {
       mic.stop();
     }
-  }
+  };
 
   const toggleMic = async () => {
     if (!agentStarted) {
@@ -224,7 +271,7 @@ function App() {
           setError("Failed to start recording. Please check your microphone permissions.");
         }
       });
-      
+
       newSocket.addEventListener("message", (event) => {
         const data = JSON.parse(event.data);
         if (data.channel.alternatives[0].transcript !== "") {
@@ -237,145 +284,50 @@ function App() {
         setIsRecording(false);
       });
     }
-  }
+  };
 
-  const addProfile = () => {
-    if (newProfile.trim() !== "") {
-      setSettings(prev => ({
-        ...prev,
-        profiles: [...prev.profiles, newProfile.trim()]
-      }));
-      setNewProfile("");
-    }
-  }
-
-  const removeProfile = (index) => {
-    setSettings(prev => ({
-      ...prev,
-      profiles: prev.profiles.filter((_, i) => i !== index)
-    }));
+  if (loading) {
+    return <div className="spinner">Loading...</div>;
   }
 
   if (!isLoggedIn) {
     return (
-      <div className="login-container">
-        <h1>Minepal Login</h1>
-        <form onSubmit={handleLogin}>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button type="submit">Login</button>
-        </form>
-      </div>
-    )
+      <Login
+        username={username}
+        password={password}
+        setUsername={setUsername}
+        setPassword={setPassword}
+        handleLogin={handleLogin}
+      />
+    );
   }
 
   return (
     <div className="container">
       <h1>Minepal Control Panel</h1>
-      <div className="settings">
-        <div className="setting-item">
-          <label htmlFor="player_username">
-            player username:
-            {settingNotes.player_username && <span className="setting-note"> ({settingNotes.player_username})</span>}
-          </label>
-          <input
-            id="player_username"
-            type="text"
-            value={settings.player_username}
-            onChange={(e) => handleSettingChange('player_username', e.target.value)}
-          />
-        </div>
-        <div className="advanced-settings">
-          <button onClick={() => setShowAdvanced(!showAdvanced)}>
-            {showAdvanced ? 'Hide Advanced Settings' : 'Show Advanced Settings'}
-          </button>
-          {showAdvanced && (
-            <div className="advanced-settings-content">
-              {Object.entries(settings).map(([key, value]) => {
-                if (key !== 'player_username' && key !== 'profiles') {
-                  return (
-                    <div key={key} className="setting-item">
-                      <label htmlFor={key}>
-                        {key.replace(/_/g, ' ')}:
-                        {settingNotes[key] && <span className="setting-note"> ({settingNotes[key]})</span>}
-                      </label>
-                      {typeof value === 'boolean' ? (
-                        <label className="switch">
-                          <input
-                            type="checkbox"
-                            id={key}
-                            checked={value}
-                            onChange={(e) => handleSettingChange(key, e.target.checked)}
-                          />
-                          <span className="slider"></span>
-                        </label>
-                      ) : (
-                        <input
-                          id={key}
-                          type={key === 'port' || key === 'code_timeout_mins' ? 'number' : 'text'}
-                          value={value}
-                          onChange={(e) => handleSettingChange(key, e.target.value)}
-                        />
-                      )}
-                    </div>
-                  )
-                }
-                return null;
-              })}
-              <div className="setting-item">
-                <label htmlFor="profiles">
-                  Profiles:
-                  {settingNotes.profiles && <span className="setting-note"> ({settingNotes.profiles})</span>}
-                </label>
-                <div className="profiles-list">
-                  {settings.profiles.map((profile, index) => (
-                    <div key={index} className="profile-item">
-                      <span>{profile}</span>
-                      <button onClick={() => removeProfile(index)}>Remove</button>
-                    </div>
-                  ))}
-                </div>
-                <div className="add-profile">
-                  <input
-                    type="text"
-                    value={newProfile}
-                    onChange={(e) => setNewProfile(e.target.value)}
-                    placeholder="Enter new profile"
-                  />
-                  <button onClick={addProfile}>Add Profile</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="actions">
-        <button className="action-button" onClick={toggleAgent}>
-          {agentStarted ? 'Stop Agent' : 'Start Agent'}
-        </button>
-        <button className="action-button" onClick={toggleMic}>
-          {isRecording ? 'Voice Off' : 'Voice On'}
-        </button>
-      </div>
+      <Settings
+        {...{
+          settings,
+          handleSettingChange,
+          settingNotes,
+          showAdvanced,
+          setShowAdvanced,
+          newProfile,
+          setNewProfile,
+          addProfile,
+          removeProfile
+        }}
+      />
+      <Actions
+        agentStarted={agentStarted}
+        toggleAgent={toggleAgent}
+        isRecording={isRecording}
+        toggleMic={toggleMic}
+      />
       {error && <div className="error-message">{error}</div>}
-      <div className="transcription-box">
-        <label htmlFor="transcription">Transcription:</label>
-        <span>{transcription}</span>
-      </div>
+      <Transcription transcription={transcription} />
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

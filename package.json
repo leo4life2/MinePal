@@ -25,9 +25,13 @@
         "ws": "^8.18.0",
         "yargs": "^17.7.2"
     },
+    "main": "main.js",
     "scripts": {
         "postinstall": "patch-package",
-        "backend": "node main.js --mode server",
-        "start": "./start.sh"
+        "backend": "node server.js --mode server",
+        "start": "electron ."
+    },
+    "devDependencies": {
+        "electron": "^31.2.0"
     }
 }
