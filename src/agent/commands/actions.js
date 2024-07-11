@@ -33,6 +33,7 @@ export const actionsList = [
         name: '!stop',
         description: 'Force stop all actions and commands that are currently executing.',
         perform: async function (agent) {
+            console.log("[CODERSTOP] Stop command.");
             await agent.coder.stop();
             agent.coder.clear();
             agent.coder.cancelResume();
@@ -45,6 +46,7 @@ export const actionsList = [
         description: 'Restart the agent process.',
         perform: async function (agent) {
             await agent.history.save();
+            console.log('[CLEANKILL] Restart command called.');
             agent.cleanKill();
         }
     },

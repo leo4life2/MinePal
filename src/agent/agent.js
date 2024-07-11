@@ -197,14 +197,17 @@ export class Agent {
         });
         this.bot.on('end', (reason) => {
             console.warn('Bot disconnected! Killing agent process.', reason)
+            console.log('[CLEANKILL] Bot disconnected.');
             this.cleanKill('Bot disconnected! Killing agent process.');
         });
         this.bot.on('death', () => {
             this.coder.cancelResume();
+            console.log("[CODERSTOP] Bot death.");
             this.coder.stop();
         });
         this.bot.on('kicked', (reason) => {
             console.warn('Bot kicked!', reason);
+            console.log('[CLEANKILL] Bot kicked.');
             this.cleanKill('Bot kicked! Killing agent process.');
         });
         this.bot.on('messagestr', async (message, _, jsonMsg) => {

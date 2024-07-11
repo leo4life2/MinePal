@@ -81,6 +81,7 @@ export class Coder {
 
     async generateCode(agent_history) {
         // wrapper to prevent overlapping code generation loops
+        console.log("[CODERSTOP] Generate code.");
         await this.stop();
         this.generating = true;
         let res = await this.generateCodeLoop(agent_history);
@@ -183,7 +184,7 @@ export class Coder {
 
         let TIMEOUT;
         try {
-            console.log('executing code...\n');
+            console.log('[CODERSTOP] executing code...\n');
             await this.stop();
             this.clear();
 
@@ -204,7 +205,8 @@ export class Coder {
             this.executing = false;
             clearTimeout(TIMEOUT);
             this.cancelResume();
-            console.error("Code execution triggered catch: " + err);
+            console.error(`Process ${process.pid}: Code execution triggered catch: ${err}`);
+            console.log("[CODERSTOP] Execute catch.");
             await this.stop();
 
             let message = this.formatOutput(this.agent.bot) + '!!Code threw exception!!  Error: ' + err;
@@ -232,15 +234,18 @@ export class Coder {
     async stop() {
         if (!this.executing) return;
         const start = Date.now();
+        this.agent.bot.interrupt_code = true;
+        this.agent.bot.collectBlock.cancelTask();
+        this.agent.bot.pathfinder.stop();
+        this.agent.bot.pvp.stop();
+        console.log('waiting for code to finish executing...');
+
         while (this.executing) {
-            this.agent.bot.interrupt_code = true;
-            this.agent.bot.collectBlock.cancelTask();
-            this.agent.bot.pathfinder.stop();
-            this.agent.bot.pvp.stop();
-            console.log('waiting for code to finish executing...');
             await new Promise(resolve => setTimeout(resolve, 1000));
-            if (Date.now() - start > 10 * 1000) {
-                this.agent.cleanKill('Code execution refused stop after 10 seconds. Killing process.');
+            if (Date.now() - start > 20 * 1000) { // Increased timeout to 20 seconds
+                console.log('[CLEANKILL] Code execution refused to stop after 20 seconds.');
+                this.agent.cleanKill('Code execution refused to stop after 20 seconds. Killing process.');
+                break;
             }
         }
     }
@@ -256,6 +261,7 @@ export class Coder {
             console.warn(`Code execution timed out after ${TIMEOUT_MINS} minutes. Attempting force stop.`);
             this.timedout = true;
             this.agent.history.add('system', `Code execution timed out after ${TIMEOUT_MINS} minutes. Attempting force stop.`);
+            console.log("[CODERSTOP] Timeout.");
             await this.stop(); // last attempt to stop
         }, TIMEOUT_MINS*60*1000);
     }

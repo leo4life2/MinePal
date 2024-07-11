@@ -3,7 +3,7 @@ import axios from 'axios'
 import './App.css'
 
 const api = axios.create({
-  baseURL: PROD_BE_HOST
+  baseURL: window.location.hostname === 'backend.minepal.net' ? PROD_BE_HOST : TEST_BE_HOST
 });
 
 function App() {

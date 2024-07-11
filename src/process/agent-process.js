@@ -9,6 +9,8 @@ import path from 'path';
 export class AgentProcess {
     constructor() {
         this.agentProcess = null;
+        const now = new Date();
+        this.logFileNamePrefix = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}`;
     }
 
     /**
@@ -33,13 +35,16 @@ export class AgentProcess {
         }
 
         // Create log file name with datetime and sanitized profile
-        const now = new Date();
         const sanitizedProfile = profile.replace(/[^a-zA-Z0-9-_]/g, '_');
-        const logFileName = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}_${sanitizedProfile}.log`;
+        const logFileName = `${this.logFileNamePrefix}_${sanitizedProfile}.log`;
         const logFilePath = path.join(logDir, logFileName);
 
         // Log all arguments at the top of the log file
-        fs.writeFileSync(logFilePath, `Arguments: ${args.join(' ')}\n\n`);
+        if (!fs.existsSync(logFilePath)) {
+            fs.writeFileSync(logFilePath, `Arguments: ${args.join(' ')}\n\n`, { mode: 0o666 });
+        } else {
+            fs.appendFileSync(logFilePath, `\n\nArguments: ${args.join(' ')}\n\n`);
+        }
 
         // Spawn the agent process with IPC enabled and redirect output to log file
         const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
@@ -47,40 +52,41 @@ export class AgentProcess {
             stdio: ['inherit', 'pipe', 'pipe', 'ipc'], // Enable IPC and pipe stdout/stderr
         });
         
-        // Pipe process output to log file and console
+        // Pipe process output to log file
         this.agentProcess.stdout.pipe(logStream);
         this.agentProcess.stderr.pipe(logStream);
-        this.agentProcess.stdout.pipe(process.stdout);
-        this.agentProcess.stderr.pipe(process.stderr);
 
         let last_restart = Date.now();
         this.agentProcess.on('exit', (code, signal) => {
             console.log(`Agent process exited with code ${code} and signal ${signal}`);
-            logStream.write(`Agent process exited with code ${code} and signal ${signal}\n`);
-            
-            if (code !== 0 && signal !== 'SIGTERM') {
-                // Check if the agent ran for at least 10 seconds before attempting to restart
-                if (Date.now() - last_restart < 10000) {
-                    console.error('Agent process exited too quickly. Killing entire process. Goodbye.');
-                    logStream.write('Agent process exited too quickly. Killing entire process. Goodbye.\n');
-                    logStream.end();
-                    process.exit(1);
-                }
-                console.log('Restarting agent...');
-                logStream.write('Restarting agent...\n');
+            if (!logStream.destroyed) {
+                logStream.write(`Agent process exited with code ${code} and signal ${signal}\n`);
                 logStream.end();
+            }
+
+            if (code !== 0 && signal !== 'SIGTERM') {
+                console.log('Restarting agent...');
+                if (!logStream.destroyed) {
+                    logStream.write('Restarting agent...\n');
+                    logStream.end();
+                }
                 this.start(profile, true, 'Agent process restarted.');
                 last_restart = Date.now();
             } else if (signal === 'SIGTERM') {
                 console.log('Agent process terminated by SIGTERM. Not restarting.');
-                logStream.write('Agent process terminated by SIGTERM. Not restarting.\n');
-                logStream.end();
+                if (!logStream.destroyed) {
+                    logStream.write('Agent process terminated by SIGTERM. Not restarting.\n');
+                    logStream.end();
+                }
             }
         });
     
         this.agentProcess.on('error', (err) => {
             console.error('Failed to start agent process:', err);
-            logStream.write(`Failed to start agent process: ${err}\n`);
+            if (!logStream.destroyed) {
+                logStream.write(`Failed to start agent process: ${err}\n`);
+                logStream.end();
+            }
         });
     }
 

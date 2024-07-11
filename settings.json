@@ -3,7 +3,7 @@
     "host": "localhost",
     "port": 25565,
     "auth": "offline",
-    "player_username": "WhosMaCreeper",
+    "player_username": "Sirbutterlocks",
     "profiles": [
         "./ethan.json"
     ],
