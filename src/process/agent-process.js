@@ -95,7 +95,7 @@ export class AgentProcess {
      * @param {string} transcription - The transcription to send.
      */
     sendTranscription(transcription) {
-        if (this.agentProcess && this.agentProcess.connected) {
+        if (this.agentProcess && this.agentProcess.connected && transcription.trim() !== '') {
             this.agentProcess.send({
                 type: 'transcription',
                 data: transcription

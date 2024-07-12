@@ -4,12 +4,12 @@ import express from 'express';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import http from 'http';
-import { WebSocketServer } from 'ws';
-import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
-import { getKey } from './src/utils/keys.js';
+import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'fs';
 import basicAuth from 'express-basic-auth';
 import cors from 'cors';
+
+const BACKEND_HOST = 'ws://localhost:11111';
 
 const argv = yargs(hideBin(process.argv)).argv;
 
@@ -40,85 +40,51 @@ if (argv.mode === 'server') {
 
     // Debugging middleware to log incoming requests
     app.use((req, res, next) => {
-        console.log(`Incoming request: ${req.method} ${req.url}`);
+        // console.log(`Incoming request: ${req.method} ${req.url}`);
         next();
     });
 
-    const deepgramClient = createClient(getKey('DEEPGRAM_API_KEY'));
-    let keepAlive;
-
-    const setupDeepgram = (ws) => {
-        const deepgram = deepgramClient.listen.live({
-            language: "en",
-            punctuate: true,
-            smart_format: true,
-            model: "nova",
-        });
-
-        if (keepAlive) clearInterval(keepAlive);
-        keepAlive = setInterval(() => {
-            deepgram.keepAlive();
-        }, 10 * 1000);
-
-        deepgram.addListener(LiveTranscriptionEvents.Open, async () => {
-            console.log("deepgram: connected");
-
-            deepgram.addListener(LiveTranscriptionEvents.Transcript, (data) => {
-                const transcript = data.channel.alternatives[0].transcript;
-                ws.send(JSON.stringify(data));
-                agentProcesses.forEach(agentProcess => {
-                    if (transcript.trim() !== '') {
-                        agentProcess.sendTranscription(transcript);
-                    }
-                });
-            });
-
-            deepgram.addListener(LiveTranscriptionEvents.Close, async () => {
-                console.log("deepgram: disconnected");
-                clearInterval(keepAlive);
-                deepgram.requestClose();
-            });
-
-            deepgram.addListener(LiveTranscriptionEvents.Error, async (error) => {
-                console.log("deepgram: error received");
-                console.error(error);
-            });
-            deepgram.addListener(LiveTranscriptionEvents.Warning, async (warning) => {
-                console.log("deepgram: warning received");
-                console.warn(warning);
-            });
-
-            deepgram.addListener(LiveTranscriptionEvents.Metadata, (data) => {
-                ws.send(JSON.stringify({ metadata: data }));
-            });
-        });
-
-        return deepgram;
-    };
-
     wss.on("connection", (ws) => {
         console.log("socket: client connected");
-        let deepgram = setupDeepgram(ws);
+        const proxyWs = new WebSocket(BACKEND_HOST);
+
+        proxyWs.on('open', () => {
+            console.log(`proxy: connected to ${BACKEND_HOST}`);
+        });
+
+        proxyWs.on('message', (message) => {
+            // Forward message from backend host to frontend
+            const parsedMessage = message.toString('utf8');
+            ws.send(message);
+
+            // Call sendTranscription for all agents
+            agentProcesses.forEach(agentProcess => {
+                agentProcess.sendTranscription(parsedMessage);
+            });
+        });
+
+        proxyWs.on('close', () => {
+            console.log(`proxy: connection to ${BACKEND_HOST} closed`);
+            ws.close();
+        });
+
+        proxyWs.on('error', (error) => {
+            console.error("proxy: error", error);
+            ws.close();
+        });
 
         ws.on("message", (message) => {
-            if (deepgram.getReadyState() === 1) {
-                deepgram.send(message);
-            } else if (deepgram.getReadyState() >= 2) {
-                console.log("socket: data couldn't be sent to deepgram");
-                console.log("socket: retrying connection to deepgram");
-                deepgram.requestClose();
-                deepgram.removeAllListeners();
-                deepgram = setupDeepgram(ws);
+            // Forward message from frontend to backend host
+            if (proxyWs.readyState === WebSocket.OPEN) {
+                proxyWs.send(message);
             } else {
-                console.log("socket: data couldn't be sent to deepgram");
+                console.log("socket: data couldn't be sent to proxy");
             }
         });
 
         ws.on("close", () => {
             console.log("socket: client disconnected");
-            deepgram.requestClose();
-            deepgram.removeAllListeners();
-            deepgram = null;
+            proxyWs.close();
         });
     });
 

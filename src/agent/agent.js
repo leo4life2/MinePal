@@ -101,6 +101,10 @@ export class Agent {
      * @param {string} message - The content of the message.
      */
     async handleMessage(source, message) {
+        if (!this.bot) {
+            return;
+        }
+
         const user_command_name = containsCommand(message);
         if (user_command_name) {
             if (!commandExists(user_command_name)) {
