@@ -1,16 +1,11 @@
-import { readFileSync, mkdirSync, writeFileSync} from 'fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { Examples } from '../utils/examples.js';
 import { getCommandDocs } from './commands/index.js';
 import { getSkillDocs } from './library/index.js';
 import { stringifyTurns } from '../utils/text.js';
 import { getCommand } from './commands/index.js';
 
-import { Gemini } from '../models/gemini.js';
 import { GPT } from '../models/gpt.js';
-import { Claude } from '../models/claude.js';
-import { ReplicateAPI } from '../models/replicate.js';
-import { Local } from '../models/local.js';
-
 
 export class Prompter {
     constructor(agent, fp) {
@@ -23,60 +18,37 @@ export class Prompter {
         let chat = this.profile.model;
         if (typeof chat === 'string' || chat instanceof String) {
             chat = {model: chat};
-            if (chat.model.includes('gemini'))
-                chat.api = 'google';
-            else if (chat.model.includes('gpt'))
+            if (chat.model.includes('gpt'))
                 chat.api = 'openai';
-            else if (chat.model.includes('claude'))
-                chat.api = 'anthropic';
-            else if (chat.model.includes('meta/') || chat.model.includes('mistralai/') || chat.model.includes('replicate/'))
-                chat.api = 'replicate';
             else
-                chat.api = 'ollama';
+                throw new Error('Unknown model:', chat.model);
         }
 
         console.log('Using chat settings:', chat);
 
-        if (chat.api == 'google')
-            this.chat_model = new Gemini(chat.model, chat.url);
-        else if (chat.api == 'openai')
+        if (chat.api == 'openai')
             this.chat_model = new GPT(chat.model, chat.url);
-        else if (chat.api == 'anthropic')
-            this.chat_model = new Claude(chat.model, chat.url);
-        else if (chat.api == 'replicate')
-            this.chat_model = new ReplicateAPI(chat.model, chat.url);
-        else if (chat.api == 'ollama')
-            this.chat_model = new Local(chat.model, chat.url);
         else
-            throw new Error('Unknown API:', api);
+            throw new Error('Unknown API:', chat.api);
 
         let embedding = this.profile.embedding;
         if (embedding === undefined) {
-            if (chat.api !== 'ollama')
-                embedding = {api: chat.api};
-            else
-                embedding = {api: 'none'};
+            embedding = {api: chat.api};
         }
         else if (typeof embedding === 'string' || embedding instanceof String)
             embedding = {api: embedding};
 
         console.log('Using embedding settings:', embedding);
 
-        if (embedding.api == 'google')
-            this.embedding_model = new Gemini(embedding.model, embedding.url);
-        else if (embedding.api == 'openai')
+        if (embedding.api == 'openai')
             this.embedding_model = new GPT(embedding.model, embedding.url);
-        else if (embedding.api == 'replicate') 
-            this.embedding_model = new ReplicateAPI(embedding.model, embedding.url);
-        else if (embedding.api == 'ollama')
-            this.embedding_model = new Local(embedding.model, embedding.url);
         else {
             this.embedding_model = null;
             console.log('Unknown embedding: ', embedding ? embedding.api : '[NOT SPECIFIED]', '. Using word overlap.');
         }
 
-        mkdirSync(`./bots/${name}`, { recursive: true });
-        writeFileSync(`./bots/${name}/last_profile.json`, JSON.stringify(this.profile, null, 4), (err) => {
+        mkdirSync(`${this.agent.userDataDir}/bots/${name}`, { recursive: true });
+        writeFileSync(`${this.agent.userDataDir}/bots/${name}/last_profile.json`, JSON.stringify(this.profile, null, 4), (err) => {
             if (err) {
                 throw err;
             }

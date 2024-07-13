@@ -1,12 +1,11 @@
 import { writeFileSync, readFileSync } from 'fs';
 import { NPCData } from './npc/data.js';
 
-
 export class History {
     constructor(agent) {
         this.agent = agent;
         this.name = agent.name;
-        this.memory_fp = `./bots/${this.name}/memory.json`;
+        this.memory_fp = `${this.agent.userDataDir}/bots/${this.name}/memory.json`;
         this.turns = [];
 
         // These define an agent's long term memory

@@ -1,14 +1,15 @@
 {
+    "name": "minepal",
+    "version": "0.0.1",
+    "description": "AI minecraft friend",
     "type": "module",
+    "main": "main.js",
+    "author": "NemosAI",
+    "license": "Proprietary",
     "dependencies": {
-        "@anthropic-ai/sdk": "^0.17.1",
-        "@deepgram/sdk": "^3.4.1",
-        "@google/generative-ai": "^0.2.1",
-        "async-mutex": "^0.5.0",
+        "axios": "^1.7.2",
         "cors": "^2.8.5",
-        "cross-fetch": "^4.0.0",
         "express": "^4.19.2",
-        "express-basic-auth": "^1.2.1",
         "mic": "^2.1.2",
         "minecraft-data": "^3.46.2",
         "mineflayer": "^4.20.0",
@@ -17,21 +18,51 @@
         "mineflayer-collectblock": "^1.4.1",
         "mineflayer-pathfinder": "^2.4.4",
         "mineflayer-pvp": "^1.3.2",
-        "openai": "^4.4.0",
         "patch-package": "^8.0.0",
         "prismarine-item": "^1.14.0",
-        "replicate": "^0.29.4",
         "vec3": "^0.1.10",
         "ws": "^8.18.0",
         "yargs": "^17.7.2"
     },
-    "main": "main.js",
     "scripts": {
         "postinstall": "patch-package",
         "backend": "node server.js --mode server",
-        "start": "electron ."
+        "start": "electron .",
+        "build": "electron-builder"
     },
     "devDependencies": {
-        "electron": "^31.2.0"
+        "electron": "^31.2.0",
+        "electron-builder": "^24.13.3"
+    },
+    "build": {
+        "appId": "com.nemosai.minepal",
+        "productName": "Minepal",
+        "directories": {
+            "buildResources": "build"
+        },
+        "files": [
+            "dist/**/*",
+            "node_modules/**/*",
+            "main.js",
+            "server.js",
+            "src/**/*",
+            "frontend/dist/**/*",
+            "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+            "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+            "!**/node_modules/.bin",
+            "!**/node_modules/*/package-lock.json"
+        ],
+        "mac": {
+            "category": "public.app-category.games",
+            "icon": "build/icon.icns"
+        },
+        "win": {
+            "target": "nsis",
+            "icon": "build/icon.ico"
+        },
+        "linux": {
+            "target": "AppImage",
+            "icon": "build"
+        }
     }
 }

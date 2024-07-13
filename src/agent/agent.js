@@ -6,7 +6,7 @@ import { initBot } from '../utils/mcdata.js';
 import { containsCommand, commandExists, executeCommand, truncCommandMessage } from './commands/index.js';
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
-import settings from '../../settings.json' assert { type: 'json' };
+import fs from 'fs/promises';
 
 /**
  * Represents an AI agent that can interact with a Minecraft world.
@@ -15,13 +15,17 @@ export class Agent {
     /**
      * Initializes and starts the agent.
      * @param {string} profile_fp - File path to the agent's profile.
+     * @param {string} userDataDir - Path to the user data directory.
      * @param {boolean} load_mem - Whether to load memory from previous sessions.
      * @param {string|null} init_message - Initial message to send to the agent.
      */
-    async start(profile_fp, load_mem=false, init_message=null) {
+    async start(profile_fp, userDataDir, load_mem=false, init_message=null) {
         // Initialize agent components
         this.prompter = new Prompter(this, profile_fp);
         this.name = this.prompter.getName();
+        this.userDataDir = userDataDir;
+        const settingsPath = `${this.userDataDir}/settings.json`;
+        this.settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')); // Changed to instance variable
         this.history = new History(this);
         this.coder = new Coder(this);
         this.npc = new NPCContoller(this);
@@ -53,7 +57,7 @@ export class Agent {
                 "Set the weather to",
                 "Gamerule "
             ];
-            const eventname = settings.profiles.length > 1 ? 'whisper' : 'chat';
+            const eventname = this.settings.profiles.length > 1 ? 'whisper' : 'chat'; // Updated to use instance variable
             
             // Set up chat event listener
             this.bot.on(eventname, (username, message) => {

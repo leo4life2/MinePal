@@ -17,16 +17,19 @@ function Settings({ settings, handleSettingChange, settingNotes, showAdvanced, s
         />
       </div>
       <div className="setting-item">
-        <label htmlFor="host">
-          host:
-          {settingNotes.host && <span className="setting-note"> ({settingNotes.host})</span>}
+        <label htmlFor="load_memory">
+          load memory:
+          {settingNotes.load_memory && <span className="setting-note"> ({settingNotes.load_memory})</span>}
         </label>
-        <input
-          id="host"
-          type="text"
-          value={settings.host}
-          onChange={(e) => handleSettingChange('host', e.target.value)}
-        />
+        <label className="switch">
+          <input
+            type="checkbox"
+            id="load_memory"
+            checked={settings.load_memory}
+            onChange={(e) => handleSettingChange('load_memory', e.target.checked)}
+          />
+          <span className="slider"></span>
+        </label>
       </div>
       <div className="setting-item">
         <label htmlFor="port">
@@ -46,8 +49,20 @@ function Settings({ settings, handleSettingChange, settingNotes, showAdvanced, s
         </button>
         {showAdvanced && (
           <div className="advanced-settings-content">
+            <div className="setting-item">
+              <label htmlFor="host">
+                host:
+                {settingNotes.host && <span className="setting-note"> ({settingNotes.host})</span>}
+              </label>
+              <input
+                id="host"
+                type="text"
+                value={settings.host}
+                onChange={(e) => handleSettingChange('host', e.target.value)}
+              />
+            </div>
             {Object.entries(settings).map(([key, value]) => {
-              if (key !== 'player_username' && key !== 'host' && key !== 'port' && key !== 'profiles') {
+              if (key !== 'player_username' && key !== 'host' && key !== 'port' && key !== 'profiles' && key !== 'load_memory') {
                 return (
                   <div key={key} className="setting-item">
                     <label htmlFor={key}>

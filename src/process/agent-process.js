@@ -9,6 +9,8 @@ import path from 'path';
 export class AgentProcess {
     constructor() {
         this.agentProcess = null;
+        this.restartCount = 0; // Track restart count
+        this.lastRestartTime = Date.now(); // Track last restart time
         const now = new Date();
         this.logFileNamePrefix = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}`;
     }
@@ -16,20 +18,21 @@ export class AgentProcess {
     /**
      * Starts the agent process with the given profile and options.
      * @param {string} profile - The profile to use for the agent.
+     * @param {string} userDataDir - The directory to store log files.
      * @param {boolean} [load_memory=false] - Whether to load memory from a previous session.
      * @param {string|null} [init_message=null] - An initial message to send to the agent.
      */
-    start(profile, load_memory=false, init_message=null) {
+    start(profile, userDataDir, load_memory=false, init_message=null) {
         // Prepare arguments for the agent process
         let args = ['src/process/init-agent.js', this.name];
-        args.push('-p', profile);
+        args.push('-p', profile, '-u', userDataDir);
         if (load_memory)
             args.push('-l', load_memory);
         if (init_message)
             args.push('-m', init_message);
 
+        const logDir = path.join(userDataDir, 'runlogs');
         // Create log directory if it doesn't exist
-        const logDir = 'agent-runlogs';
         if (!fs.existsSync(logDir)) {
             fs.mkdirSync(logDir);
         }
@@ -38,6 +41,7 @@ export class AgentProcess {
         const sanitizedProfile = profile.replace(/[^a-zA-Z0-9-_]/g, '_');
         const logFileName = `${this.logFileNamePrefix}_${sanitizedProfile}.log`;
         const logFilePath = path.join(logDir, logFileName);
+        console.log(`Log file path: ${logFilePath}`);
 
         // Log all arguments at the top of the log file
         if (!fs.existsSync(logFilePath)) {
@@ -56,12 +60,28 @@ export class AgentProcess {
         this.agentProcess.stdout.pipe(logStream);
         this.agentProcess.stderr.pipe(logStream);
 
-        let last_restart = Date.now();
         this.agentProcess.on('exit', (code, signal) => {
             console.log(`Agent process exited with code ${code} and signal ${signal}`);
             if (!logStream.destroyed) {
                 logStream.write(`Agent process exited with code ${code} and signal ${signal}\n`);
                 logStream.end();
+            }
+
+            const now = Date.now();
+            if (now - this.lastRestartTime < 2000) {
+                this.restartCount++;
+            } else {
+                this.restartCount = 1; // Reset counter if more than 2 seconds have passed
+            }
+            this.lastRestartTime = now;
+
+            if (this.restartCount > 3) {
+                console.log('Restart limit reached. Not restarting.');
+                if (!logStream.destroyed) {
+                    logStream.write('Restart limit reached. Not restarting.\n');
+                    logStream.end();
+                }
+                return;
             }
 
             if (code !== 0 && signal !== 'SIGTERM') {
@@ -70,8 +90,7 @@ export class AgentProcess {
                     logStream.write('Restarting agent...\n');
                     logStream.end();
                 }
-                this.start(profile, true, 'Agent process restarted.');
-                last_restart = Date.now();
+                this.start(profile, userDataDir, true, 'Agent process restarted.');
             } else if (signal === 'SIGTERM') {
                 console.log('Agent process terminated by SIGTERM. Not restarting.');
                 if (!logStream.destroyed) {

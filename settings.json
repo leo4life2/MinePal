@@ -7,7 +7,7 @@
     "profiles": [
         "./ethan.json"
     ],
-    "load_memory": false,
+    "load_memory": true,
     "init_message": "Say hello world and your name",
     "allow_insecure_coding": false,
     "code_timeout_mins": 10

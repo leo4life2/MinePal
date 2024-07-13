@@ -1,11 +1,10 @@
 import { writeFile, readFile, mkdirSync } from 'fs';
-import settings from '../../settings.json' assert { type: 'json' };
 
 export class Coder {
     constructor(agent) {
         this.agent = agent;
         this.file_counter = 0;
-        this.fp = '/bots/'+agent.name+'/action-code/';
+        this.fp = `${this.agent.userDataDir}/bots/${agent.name}/action-code/`;
         this.executing = false;
         this.generating = false;
         this.code_template = '';
@@ -16,7 +15,7 @@ export class Coder {
             this.code_template = data;
         });
 
-        mkdirSync('.' + this.fp, { recursive: true });
+        mkdirSync(this.fp, { recursive: true });
     }
 
     // write custom code to file and import it
@@ -139,7 +138,7 @@ export class Coder {
             }
             code_return = await this.execute(async ()=>{
                 return await execution_file.main(this.agent.bot);
-            }, settings.code_timeout_mins);
+            }, this.agent.settings.code_timeout_mins);
 
             if (code_return.interrupted && !code_return.timedout)
                 return {success: false, message: null, interrupted: true, timedout: false};

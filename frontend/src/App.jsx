@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
-import Login from './components/Login';
 import Settings from './components/Settings';
-import Profiles from './components/Profiles';
 import Actions from './components/Actions';
 import Transcription from './components/Transcription';
 
@@ -32,9 +30,6 @@ function App() {
   const [microphone, setMicrophone] = useState(null);
   const [transcription, setTranscription] = useState("");
   const [agentStarted, setAgentStarted] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [newProfile, setNewProfile] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -57,27 +52,14 @@ function App() {
   };
 
   useEffect(() => {
-    const checkCredentials = () => {
-      const storedUsername = localStorage.getItem('username');
-      const storedPassword = localStorage.getItem('password');
-      if (storedUsername && storedPassword) {
-        setUsername(storedUsername);
-        setPassword(storedPassword);
-        setIsLoggedIn(true);
-        fetchDataWithRetry(storedUsername, storedPassword);
-      } else {
-        setLoading(false);
-      }
-    };
-
-    const fetchDataWithRetry = async (user, pass) => {
+    const fetchDataWithRetry = async () => {
       const startTime = Date.now();
       const timeoutDuration = 5000;
 
       while (Date.now() - startTime < timeoutDuration) {
         try {
-          await fetchSettings(user, pass);
-          await fetchAgentStatus(user, pass);
+          await fetchSettings();
+          await fetchAgentStatus();
           setError(null);
           break; // Exit loop if both fetches succeed
         } catch (err) {
@@ -89,7 +71,7 @@ function App() {
       setLoading(false);
     };
 
-    checkCredentials();
+    fetchDataWithRetry();
   }, []);
 
   const settingNotes = {
@@ -105,14 +87,9 @@ function App() {
     code_timeout_mins: "-1 for no timeout",
   }
 
-  const fetchSettings = async (user, pass) => {
+  const fetchSettings = async () => {
     try {
-      const response = await api.get('/settings', {
-        auth: {
-          username: user,
-          password: pass
-        }
-      });
+      const response = await api.get('/settings');
       const expectedFields = Object.keys(settings);
       const filteredSettings = Object.fromEntries(
         Object.entries(response.data).filter(([key]) => expectedFields.includes(key))
@@ -125,31 +102,15 @@ function App() {
     }
   };
 
-  const fetchAgentStatus = async (user, pass) => {
+  const fetchAgentStatus = async () => {
     try {
-      const response = await api.get('/agent-status', {
-        auth: {
-          username: user,
-          password: pass
-        }
-      });
+      const response = await api.get('/agent-status');
       setAgentStarted(response.data.agentStarted);
     } catch (err) {
       console.error("Failed to fetch agent status:", err);
       setError("Failed to load agent status.");
       throw err;
     }
-  };
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    localStorage.setItem('username', username);
-    localStorage.setItem('password', password);
-    // TODO: verify credentials
-    setIsLoggedIn(true);
-    setLoading(true);
-    fetchSettings(username, password);
-    fetchAgentStatus(username, password);
   };
 
   const handleSettingChange = (key, value) => {
@@ -159,14 +120,12 @@ function App() {
   const toggleAgent = async () => {
     if (agentStarted) {
       try {
-        const response = await api.post('/stop', {}, {
-          auth: {
-            username,
-            password
-          }
-        });
+        const response = await api.post('/stop', {});
         console.log("Agent stopped successfully:", response.data);
         setAgentStarted(false);
+        if (isRecording) {
+          await toggleMic(); // Ensure microphone and WebSocket are shut down
+        }
       } catch (error) {
         console.error("Failed to stop agent:", error);
         setError(error.response?.data || error.message || "An unknown error occurred while stopping the agent.");
@@ -187,12 +146,7 @@ function App() {
       }
 
       try {
-        const response = await api.post('/start', settings, {
-          auth: {
-            username,
-            password
-          }
-        });
+        const response = await api.post('/start', settings);
         console.log("Agent started successfully:", response.data);
         setAgentStarted(true);
       } catch (error) {
@@ -242,7 +196,7 @@ function App() {
   };
 
   const toggleMic = async () => {
-    if (!agentStarted) {
+    if (!agentStarted && !isRecording) {
       setError("Please start the agent first.");
       return;
     }
@@ -273,9 +227,9 @@ function App() {
       });
 
       newSocket.addEventListener("message", (event) => {
-        const data = JSON.parse(event.data);
-        if (data.channel.alternatives[0].transcript !== "") {
-          setTranscription(data.channel.alternatives[0].transcript);
+        const transcript = event.data.toString('utf8');
+        if (transcript !== "") {
+          setTranscription(transcript);
         }
       });
 
@@ -288,18 +242,6 @@ function App() {
 
   if (loading) {
     return <div className="spinner">Loading...</div>;
-  }
-
-  if (!isLoggedIn) {
-    return (
-      <Login
-        username={username}
-        password={password}
-        setUsername={setUsername}
-        setPassword={setPassword}
-        handleLogin={handleLogin}
-      />
-    );
   }
 
   return (
