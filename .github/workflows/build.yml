@@ -44,5 +44,5 @@ jobs:
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
           publish: always
         env:
-          CSC_LINK: file://~/private_keys/certs.p12
+          CSC_LINK: file:///Users/runner/private_keys/certs.p12
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
