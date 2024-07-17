@@ -26,6 +26,14 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build frontend with Vite
+        run: |
+          cd frontend
+          npm run build
+
       - name: Prepare for code signing
         if: matrix.os == 'macos-latest'
         run: |
