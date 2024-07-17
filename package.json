@@ -29,7 +29,9 @@
         "backend": "node server.js --mode server",
         "start": "electron .",
         "clean": "rm -rf dist",
-        "build": "npm run clean && electron-builder"
+        "build": "npm run clean && electron-builder",
+        "build:mac": "electron-builder --mac",
+        "build:win": "electron-builder --win"
     },
     "devDependencies": {
         "electron": "^31.2.0",
@@ -62,10 +64,11 @@
                 "NSMicrophoneUsageDescription": "We need access to your microphone for voice input.",
                 "com.apple.security.device.audio-input": true
             },
-            "hardenedRuntime": false
+            "hardenedRuntime": false,
+            "target": ["dmg"]
         },
         "win": {
-            "target": "nsis",
+            "target": ["nsis"],
             "icon": "build/icon.ico"
         },
         "linux": {
