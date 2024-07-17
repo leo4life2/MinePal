@@ -30,7 +30,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           mkdir -p ~/private_keys/
-          echo "${{ secrets.MAC_CERTS }}" > ~/private_keys/certs.p12
+          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
           security create-keychain -p "" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
