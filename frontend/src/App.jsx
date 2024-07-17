@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import mixpanel from 'mixpanel-browser';
 import './App.css';
 import Settings from './components/Settings';
 import Actions from './components/Actions';
 import Transcription from './components/Transcription';
+
+mixpanel.init('a9bdd5c85dab5761be032f1c1650defa');
 
 const api = axios.create({
   baseURL: LOCAL_BE_HOST
@@ -33,6 +36,8 @@ function App() {
   const [newProfile, setNewProfile] = useState("");
 
   const [loading, setLoading] = useState(true);
+
+  const [startTime, setStartTime] = useState(null);
 
   const addProfile = () => {
     if (newProfile.trim() !== "") {
@@ -117,14 +122,35 @@ function App() {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const checkServerAlive = async (host, port) => {
+    try {
+        const response = await api.get('/check-server', { params: { host, port } });
+        return response.data.alive;
+    } catch (error) {
+        console.error("Server ping failed:", error);
+        return false;
+    }
+  };
+
   const toggleAgent = async () => {
     if (agentStarted) {
       try {
         const response = await api.post('/stop', {});
         console.log("Agent stopped successfully:", response.data);
         setAgentStarted(false);
+        setError(null); // Clear errors on success
         if (isRecording) {
           await toggleMic(); // Ensure microphone and WebSocket are shut down
+        }
+
+        // Track the "Bot play time" event
+        if (startTime) {
+          const playTime = (Date.now() - startTime) / 1000; // in seconds
+          mixpanel.track('Bot play time', {
+            distinct_id: settings.player_username,
+            play_time: playTime
+          });
+          setStartTime(null);
         }
       } catch (error) {
         console.error("Failed to stop agent:", error);
@@ -145,10 +171,23 @@ function App() {
         return;
       }
 
+      const serverAlive = await checkServerAlive(settings.host, settings.port);
+      if (!serverAlive) {
+        setError("The Minecraft server is not reachable. Please check the host and port.");
+        return;
+      }
+
       try {
         const response = await api.post('/start', settings);
         console.log("Agent started successfully:", response.data);
         setAgentStarted(true);
+        setError(null); // Clear errors on success
+
+        // Identify the user in Mixpanel
+        mixpanel.identify(settings.player_username);
+
+        // Set the start time for tracking
+        setStartTime(Date.now());
       } catch (error) {
         console.error("Failed to start agent:", error);
         setError(error.response?.data || error.message || "An unknown error occurred while starting the agent.");

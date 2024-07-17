@@ -6,6 +6,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'fs';
 import cors from 'cors';
 import path from 'path';
+import net from 'net';
 
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -118,6 +119,26 @@ function startServer() {
         res.json(settings);
     });
 
+    app.get('/check-server', (req, res) => {
+        const { host, port } = req.query;
+        const socket = new net.Socket();
+    
+        socket.setTimeout(2000); // Set a timeout for the connection attempt
+    
+        socket.on('connect', () => {
+            logToFile(`Server at ${host}:${port} is reachable.`);
+            res.json({ alive: true });
+            socket.destroy(); // Close the connection
+        }).on('error', (err) => {
+            logToFile(`Server at ${host}:${port} is not reachable. Error: ${err.message}`);
+            res.json({ alive: false, error: err.message });
+        }).on('timeout', () => {
+            logToFile(`Server at ${host}:${port} is not reachable. Error: Timeout`);
+            res.json({ alive: false, error: 'Timeout' });
+            socket.destroy();
+        }).connect(port, host);
+    });
+
     app.get('/agent-status', (req, res) => {
         res.json({ agentStarted: agentProcessStarted });
     });
@@ -162,7 +183,7 @@ function startServer() {
                 emptyFields: emptyFields
             });
         }
-        
+
         Object.assign(settings, newSettings);
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
         profiles = settings.profiles;

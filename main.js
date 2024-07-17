@@ -6,7 +6,7 @@ import fs from 'fs';
 let mainWindow;
 
 const DEV = false;
-const DEBUG = true;
+const DEBUG = false;
 
 const logFile = path.join(app.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -60,12 +60,9 @@ if (!gotTheLock) {
     logToFile(`Platform: ${process.platform}`);
     if (process.platform === 'darwin') { // Check if the platform is macOS
         try {
-            logToFile("Requesting microphone access...");
             const micAccess = await systemPreferences.askForMediaAccess('microphone');
             if (micAccess) {
                 logToFile("Microphone access granted");
-            } else {
-                logToFile("Microphone access denied");
             }
         } catch (error) {
             logToFile("Failed to request microphone access: " + error);
