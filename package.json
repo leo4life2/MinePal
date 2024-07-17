@@ -29,7 +29,7 @@
         "backend": "node server.js --mode server",
         "start": "electron .",
         "clean": "rm -rf dist",
-        "build": "npm run clean && electron-builder",
+        "buildLocal": "npm run clean && electron-builder",
         "build:mac": "electron-builder --mac",
         "build:win": "electron-builder --win"
     },
