@@ -4,8 +4,6 @@ import { ItemGoal } from './item_goal.js';
 import { BuildGoal } from './build_goal.js';
 import { itemSatisfied, rotateXZ } from './utils.js';
 import * as skills from '../library/skills.js';
-import * as world from '../library/world.js';
-import * as mc from '../../utils/mcdata.js';
 
 
 export class NPCContoller {
@@ -39,10 +37,11 @@ export class NPCContoller {
     }
 
     init() {
-        for (let file of readdirSync('src/agent/npc/construction')) {
+        for (let file of readdirSync(`${this.agent.appPath}/src/agent/npc/construction`)) {
             if (file.endsWith('.json')) {
                 try {
-                    this.constructions[file.slice(0, -5)] = JSON.parse(readFileSync('src/agent/npc/construction/' + file, 'utf8'));
+                    const filePath = `${this.agent.appPath}/src/agent/npc/construction/${file}`;
+                    this.constructions[file.slice(0, -5)] = JSON.parse(readFileSync(filePath, 'utf8'));
                 } catch (e) {
                     console.log('Error reading construction file: ', file);
                 }

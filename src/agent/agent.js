@@ -2,7 +2,7 @@ import { History } from './history.js';
 import { Coder } from './coder.js';
 import { Prompter } from './prompter.js';
 import { initModes } from './modes.js';
-import { initBot } from '../utils/mcdata.js';
+import MCData from '../utils/mcdata.js';
 import { containsCommand, commandExists, executeCommand, truncCommandMessage } from './commands/index.js';
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
@@ -16,14 +16,16 @@ export class Agent {
      * Initializes and starts the agent.
      * @param {string} profile_fp - File path to the agent's profile.
      * @param {string} userDataDir - Path to the user data directory.
+     * @param {string} appPath - Path to the application directory.
      * @param {boolean} load_mem - Whether to load memory from previous sessions.
      * @param {string|null} init_message - Initial message to send to the agent.
      */
-    async start(profile_fp, userDataDir, load_mem=false, init_message=null) {
+    async start(profile_fp, userDataDir, appPath, load_mem=false, init_message=null) {
         // Initialize agent components
+        this.userDataDir = userDataDir;
+        this.appPath = appPath
         this.prompter = new Prompter(this, profile_fp);
         this.name = this.prompter.getName();
-        this.userDataDir = userDataDir;
         const settingsPath = `${this.userDataDir}/settings.json`;
         this.settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')); // Changed to instance variable
         this.history = new History(this);
@@ -34,7 +36,8 @@ export class Agent {
         await this.prompter.initExamples();
 
         console.log('Logging in...');
-        this.bot = initBot(this.name);
+        this.mcdata = MCData.getInstance(this.settings); // Use singleton with settings
+        this.bot = this.mcdata.initBot(this.name); // Initialize bot with agent's name
 
         initModes(this);
 
@@ -62,11 +65,7 @@ export class Agent {
             // Set up chat event listener
             this.bot.on(eventname, (username, message) => {
                 if (username === this.name) return;
-                
                 if (ignore_messages.some((m) => message.startsWith(m))) return;
-
-                console.log('received message from', username, ':', message);
-    
                 this.handleMessage(username, message);
             });
 

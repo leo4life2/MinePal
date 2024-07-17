@@ -1,5 +1,4 @@
 import * as skills from '../library/skills.js';
-import settings from '../../../settings.json' assert { type: 'json' };
 
 function wrapExecution(func, timeout=-1, resume_name=null) {
     return async function (agent, ...args) {
@@ -24,7 +23,7 @@ export const actionsList = [
         name: '!newAction',
         description: 'Perform new and unknown custom behaviors that are not available as a command by writing code.', 
         perform: async function (agent) {
-            if (!settings.allow_insecure_coding)
+            if (!agent.settings.allow_insecure_coding)
                 return 'newAction Failed! Agent is not allowed to write code. Notify the user.';
             return await agent.coder.generateCode(agent.history);
         }

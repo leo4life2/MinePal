@@ -9,8 +9,7 @@ export class Coder {
         this.generating = false;
         this.code_template = '';
         this.timedout = false;
-
-        readFile('./bots/template.js', 'utf8', (err, data) => {
+        readFile(`${this.agent.appPath}/bots/template.js`, 'utf8', (err, data) => {
             if (err) throw err;
             this.code_template = data;
         });

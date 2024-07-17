@@ -1,6 +1,6 @@
 import * as skills from '../library/skills.js';
 import * as world from '../library/world.js';
-import * as mc from '../../utils/mcdata.js';
+import MCData from '../../utils/mcdata.js';
 import { itemSatisfied } from './utils.js';
 
 
@@ -204,7 +204,7 @@ class ItemWrapper {
     }
 
     createChildren() {
-        let recipes = mc.getItemCraftingRecipes(this.name);
+        let recipes = MCData.getInstance().getItemCraftingRecipes(this.name);
         if (recipes) {
             for (let recipe of recipes) {
                 let includes_blacklisted = false;
@@ -222,21 +222,21 @@ class ItemWrapper {
             }
         }
 
-        let block_sources = mc.getItemBlockSources(this.name);
+        let block_sources = MCData.getInstance().getItemBlockSources(this.name);
         if (block_sources.length > 0 && this.name !== 'torch' && !this.name.includes('bed')) {  // Do not collect placed torches or beds
             for (let block_source of block_sources) {
                 if (block_source === 'grass_block') continue;  // Dirt nodes will collect grass blocks
-                let tool = mc.getBlockTool(block_source);
+                let tool = MCData.getInstance().getBlockTool(block_source);
                 this.add_method(new ItemNode(this.manager, this, this.name).setCollectable(block_source, tool));
             }
         }
 
-        let smeltingIngredient = mc.getItemSmeltingIngredient(this.name);
+        let smeltingIngredient = MCData.getInstance().getItemSmeltingIngredient(this.name);
         if (smeltingIngredient) {
             this.add_method(new ItemNode(this.manager, this, this.name).setSmeltable(smeltingIngredient));
         }
 
-        let animal_source = mc.getItemAnimalSource(this.name);
+        let animal_source = MCData.getInstance().getItemAnimalSource(this.name);
         if (animal_source) {
             this.add_method(new ItemNode(this.manager, this, this.name).setHuntable(animal_source));
         }

@@ -1,10 +1,10 @@
 import * as world from '../library/world.js';
-import * as mc from '../../utils/mcdata.js';
+import { MATCHING_WOOD_BLOCKS, WOOD_TYPES, WOOL_COLORS } from '../../utils/mcdata.js';
 
 
 export function getTypeOfGeneric(bot, block_name) {
     // Get type of wooden block
-    if (mc.MATCHING_WOOD_BLOCKS.includes(block_name)) {
+    if (MATCHING_WOOD_BLOCKS.includes(block_name)) {
 
         // Return most common wood type in inventory
         let type_count = {};
@@ -12,7 +12,7 @@ export function getTypeOfGeneric(bot, block_name) {
         let max_type = null;
         let inventory = world.getInventoryCounts(bot);
         for (const item in inventory) {
-            for (const wood of mc.WOOD_TYPES) {
+            for (const wood of WOOD_TYPES) {
                 if (item.includes(wood)) {
                     if (type_count[wood] === undefined)
                         type_count[wood] = 0;
@@ -28,7 +28,7 @@ export function getTypeOfGeneric(bot, block_name) {
             return max_type + '_' + block_name;
 
         // Return nearest wood type
-        let log_types = mc.WOOD_TYPES.map((wood) => wood + '_log');
+        let log_types = WOOD_TYPES.map((wood) => wood + '_log');
         let blocks = world.getNearestBlocks(bot, log_types, 16, 1);
         if (blocks.length > 0) {
             let wood = blocks[0].name.split('_')[0];
@@ -48,7 +48,7 @@ export function getTypeOfGeneric(bot, block_name) {
         let max_type = null;
         let inventory = world.getInventoryCounts(bot);
         for (const item in inventory) {
-            for (const color of mc.WOOL_COLORS) {
+            for (const color of WOOL_COLORS) {
                 if (item === color + '_wool') {
                     if (type_count[color] === undefined)
                         type_count[color] = 0;
@@ -73,7 +73,7 @@ export function getTypeOfGeneric(bot, block_name) {
 export function blockSatisfied(target_name, block) {
     if (target_name == 'dirt') {
         return block.name == 'dirt' || block.name == 'grass_block';
-    } else if (mc.MATCHING_WOOD_BLOCKS.includes(target_name)) {
+    } else if (MATCHING_WOOD_BLOCKS.includes(target_name)) {
         return block.name.endsWith(target_name);
     } else if (target_name == 'bed') {
         return block.name.endsWith('bed');

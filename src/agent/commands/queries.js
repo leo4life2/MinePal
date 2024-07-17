@@ -1,6 +1,5 @@
 import * as world from '../library/world.js';
-import * as mc from '../../utils/mcdata.js';
-
+import MCData from '../../utils/mcdata.js';
 
 const pad = (str) => {
     return '\n' + str + '\n';
@@ -90,7 +89,7 @@ export const queryList = [
             const bot = agent.bot;
             const table = world.getNearestBlock(bot, 'crafting_table');
             let res = 'CRAFTABLE_ITEMS';
-            for (const item of mc.getAllItems()) {
+            for (const item of MCData.getInstance().getAllItems()) {
                 let recipes = bot.recipesFor(item.id, null, 1, table);
                 if (recipes.length > 0) {
                     res += `\n- ${item.name}`;

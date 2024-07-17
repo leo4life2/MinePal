@@ -1,7 +1,6 @@
 import * as skills from './library/skills.js';
 import * as world from './library/world.js';
-import * as mc from '../utils/mcdata.js';
-
+import MCData from '../utils/mcdata.js';
 
 // a mode is a function that is called every tick to respond immediately to the world
 // it has the following fields:
@@ -72,7 +71,7 @@ const modes = [
         on: true,
         active: false,
         update: async function (agent) {
-            const enemy = world.getNearestEntityWhere(agent.bot, entity => mc.isHostile(entity), 16);
+            const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 16);
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
                 agent.bot.chat(`Aaa! A ${enemy.name}!`);
                 execute(this, agent, async () => {
@@ -88,7 +87,7 @@ const modes = [
         on: true,
         active: false,
         update: async function (agent) {
-            const enemy = world.getNearestEntityWhere(agent.bot, entity => mc.isHostile(entity), 8);
+            const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 8);
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
                 agent.bot.chat(`Fighting ${enemy.name}!`);
                 execute(this, agent, async () => {
@@ -104,7 +103,7 @@ const modes = [
         on: true,
         active: false,
         update: async function (agent) {
-            const huntable = world.getNearestEntityWhere(agent.bot, entity => mc.isHuntable(entity), 8);
+            const huntable = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHuntable(entity), 8);
             if (huntable && await world.isClearPath(agent.bot, huntable)) {
                 execute(this, agent, async () => {
                     agent.bot.chat(`Hunting ${huntable.name}!`);

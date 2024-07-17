@@ -1,11 +1,9 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, systemPreferences } from 'electron';
 import path from 'path';
-import { spawn } from 'child_process';
-import { execPath } from 'process';
+import { startServer } from './server.js';
 import fs from 'fs';
 
 let mainWindow;
-let server;
 
 const DEV = false;
 const DEBUG = true;
@@ -30,9 +28,9 @@ function createWindow() {
     if (DEV) {
         mainWindow.loadURL('http://localhost:5173');
     } else {
-        const indexPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
+        const indexPath = path.join(app.getAppPath(), 'frontend', 'dist', 'index.html');
         mainWindow.loadFile(indexPath).catch(err => {
-            console.error('Failed to load index.html:', err);
+            logToFile('Failed to load index.html: ' + err);
         });
     }
 
@@ -57,26 +55,27 @@ if (!gotTheLock) {
     }
   });
 
-  app.on('ready', () => {
+  app.on('ready', async () => {
     createWindow(); // Create the window first
-
-    // Start your existing server
-    const logDir = app.getPath('userData');
-    logToFile(`Log directory: ${logDir}`);
-    const nodePath = execPath; // Use the path to the current Node.js executable
-    server = spawn(nodePath, ['server.js', `--userDataDir=${logDir}`]);
-
-    server.stdout.on('data', (data) => {
-        logToFile(`Server output: ${data}`);
-    });
-
-    server.stderr.on('data', (data) => {
-        logToFile(`Server error: ${data}`);
-    });
-
-    server.on('close', (code) => {
-        logToFile(`Server process exited with code ${code}`);
-    });
+    logToFile(`Platform: ${process.platform}`);
+    if (process.platform === 'darwin') { // Check if the platform is macOS
+        try {
+            logToFile("Requesting microphone access...");
+            const micAccess = await systemPreferences.askForMediaAccess('microphone');
+            if (micAccess) {
+                logToFile("Microphone access granted");
+            } else {
+                logToFile("Microphone access denied");
+            }
+        } catch (error) {
+            logToFile("Failed to request microphone access: " + error);
+        }
+    }
+    try {
+        startServer();
+    } catch (error) {
+        logToFile("Failed to start server: " + error);
+    }
   });
 }
 
@@ -91,13 +90,3 @@ app.on('activate', function () {
         createWindow();
     }
 });
-
-const terminateServer = () => {
-    if (server) {
-        server.kill();
-    }
-};
-
-process.on('SIGTERM', terminateServer);
-process.on('SIGINT', terminateServer);
-process.on('exit', terminateServer);

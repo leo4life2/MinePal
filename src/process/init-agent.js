@@ -5,7 +5,7 @@ import path from 'path';
 
 const args = process.argv.slice(2);
 if (args.length < 1) {
-    console.log('Usage: node init_agent.js <agent_name> [profile] [load_memory] [init_message] [userDataDir]');
+    console.log('Usage: node init_agent.js [profile] [load_memory] [init_message] [userDataDir]');
     process.exit(1);
 }
 
@@ -29,18 +29,24 @@ const argv = yargs(args)
         alias: 'u',
         type: 'string',
         description: 'directory to store user data'
+    })
+    .option('appPath', {
+        alias: 'e',
+        type: 'string',
+        description: 'application path'
     }).argv
 
 const settingsPath = path.join(argv.userDataDir, 'settings.json');
 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
 
 const agent = new Agent();
-agent.start(argv.profile, argv.userDataDir, argv.load_memory, argv.init_message);
-    
-process.on('message', (message) => {
-    if (message.type === 'transcription') {
+agent.start(argv.profile, argv.userDataDir, argv.appPath, argv.load_memory, argv.init_message);
+
+process.on('message', (e) => {
+    console.log("message", e);
+    if (e.type === 'transcription') {
         // Handle the transcription message
-        agent.handleMessage(settings.player_username, message.data);
+        agent.handleMessage(settings.player_username, e.data);
     }
 });
 

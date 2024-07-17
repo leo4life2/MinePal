@@ -28,7 +28,8 @@
         "postinstall": "patch-package",
         "backend": "node server.js --mode server",
         "start": "electron .",
-        "build": "electron-builder"
+        "clean": "rm -rf dist",
+        "build": "npm run clean && electron-builder"
     },
     "devDependencies": {
         "electron": "^31.2.0",
@@ -45,8 +46,10 @@
             "node_modules/**/*",
             "main.js",
             "server.js",
+            "ethan.json",
             "src/**/*",
             "frontend/dist/**/*",
+            "bots/**/*",
             "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
             "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
             "!**/node_modules/.bin",
@@ -54,7 +57,12 @@
         ],
         "mac": {
             "category": "public.app-category.games",
-            "icon": "build/icon.icns"
+            "icon": "build/icon.icns",
+            "extendInfo": {
+                "NSMicrophoneUsageDescription": "We need access to your microphone for voice input.",
+                "com.apple.security.device.audio-input": true
+            },
+            "hardenedRuntime": false
         },
         "win": {
             "target": "nsis",

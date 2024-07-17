@@ -1,5 +1,5 @@
 import pf from 'mineflayer-pathfinder';
-import * as mc from '../../utils/mcdata.js';
+import MCData from '../../utils/mcdata.js';
 
 
 export function getNearestFreeSpace(bot, size=1, distance=8) {
@@ -53,13 +53,13 @@ export function getNearestBlocks(bot, block_types=null, distance=16, count=10000
     // if blocktypes is not a list, make it a list
     let block_ids = [];
     if (block_types === null) {
-        block_ids = mc.getAllBlockIds(['air']);
+        block_ids = MCData.getInstance().getAllBlockIds(['air']);
     }
     else {
         if (!Array.isArray(block_types))
             block_types = [block_types];
         for(let block_type of block_types) {
-            block_ids.push(mc.getBlockId(block_type));
+            block_ids.push(MCData.getInstance().getBlockId(block_type));
         }
     }
 
@@ -280,5 +280,5 @@ export function getBiomeName(bot) {
      * let biome = world.getBiomeName(bot);
      **/
     const biomeId = bot.world.getBiome(bot.entity.position);
-    return mc.getAllBiomes()[biomeId].name;
+    return MCData.getInstance().getAllBiomes()[biomeId].name;
 }

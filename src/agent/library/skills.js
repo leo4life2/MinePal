@@ -1,4 +1,4 @@
-import * as mc from "../../utils/mcdata.js";
+import MCData from "../../utils/mcdata.js";
 import * as world from "./world.js";
 import pf from 'mineflayer-pathfinder';
 import Vec3 from 'vec3';
@@ -45,7 +45,7 @@ export async function craftRecipe(bot, itemName, num=1) {
     let placedTable = false;
 
     // get recipes that don't require a crafting table
-    let recipes = bot.recipesFor(mc.getItemId(itemName), null, 1, null); 
+    let recipes = bot.recipesFor(MCData.getInstance().getItemId(itemName), null, 1, null); 
     let craftingTable = null;
     if (!recipes || recipes.length === 0) {
 
@@ -60,7 +60,7 @@ export async function craftRecipe(bot, itemName, num=1) {
                 await placeBlock(bot, 'crafting_table', pos.x, pos.y, pos.z);
                 craftingTable = world.getNearestBlock(bot, 'crafting_table', 8);
                 if (craftingTable) {
-                    recipes = bot.recipesFor(mc.getItemId(itemName), null, 1, craftingTable);
+                    recipes = bot.recipesFor(MCData.getInstance().getItemId(itemName), null, 1, craftingTable);
                     placedTable = true;
                 }
             }
@@ -70,7 +70,7 @@ export async function craftRecipe(bot, itemName, num=1) {
             }
         }
         else {
-            recipes = bot.recipesFor(mc.getItemId(itemName), null, 1, craftingTable);
+            recipes = bot.recipesFor(MCData.getInstance().getItemId(itemName), null, 1, craftingTable);
         }
     }
     if (!recipes || recipes.length === 0) {
@@ -132,10 +132,10 @@ export async function smeltItem(bot, itemName, num=1) {
     const furnace = await bot.openFurnace(furnaceBlock);
     // check if the furnace is already smelting something
     let input_item = furnace.inputItem();
-    if (input_item && input_item.type !== mc.getItemId(itemName) && input_item.count > 0) {
+    if (input_item && input_item.type !== MCData.getInstance().getItemId(itemName) && input_item.count > 0) {
         // TODO: check if furnace is currently burning fuel. furnace.fuel is always null, I think there is a bug.
         // This only checks if the furnace has an input item, but it may not be smelting it and should be cleared.
-        log(bot, `The furnace is currently smelting ${mc.getItemName(input_item.type)}.`);
+        log(bot, `The furnace is currently smelting ${MCData.getInstance().getItemName(input_item.type)}.`);
         if (placedFurnace)
             await collectBlock(bot, 'furnace', 1);
         return false;
@@ -160,11 +160,11 @@ export async function smeltItem(bot, itemName, num=1) {
             return false;
         }
         await furnace.putFuel(fuel.type, null, put_fuel);
-        log(bot, `Added ${put_fuel} ${mc.getItemName(fuel.type)} to furnace fuel.`);
-        console.log(`Added ${put_fuel} ${mc.getItemName(fuel.type)} to furnace fuel.`)
+        log(bot, `Added ${put_fuel} ${MCData.getInstance().getItemName(fuel.type)} to furnace fuel.`);
+        console.log(`Added ${put_fuel} ${MCData.getInstance().getItemName(fuel.type)} to furnace fuel.`)
     }
     // put the items in the furnace
-    await furnace.putInput(mc.getItemId(itemName), null, num);
+    await furnace.putInput(MCData.getInstance().getItemId(itemName), null, num);
     // wait for the items to smelt
     let total = 0;
     let collected_last = true;
@@ -198,10 +198,10 @@ export async function smeltItem(bot, itemName, num=1) {
         return false;
     }
     if (total < num) {
-        log(bot, `Only smelted ${total} ${mc.getItemName(smelted_item.type)}.`);
+        log(bot, `Only smelted ${total} ${MCData.getInstance().getItemName(smelted_item.type)}.`);
         return false;
     }
-    log(bot, `Successfully smelted ${itemName}, got ${total} ${mc.getItemName(smelted_item.type)}.`);
+    log(bot, `Successfully smelted ${itemName}, got ${total} ${MCData.getInstance().getItemName(smelted_item.type)}.`);
     return true;
 }
 
@@ -309,7 +309,7 @@ export async function defendSelf(bot, range=9) {
     bot.modes.pause('self_defense');
     bot.modes.pause('cowardice');
     let attacked = false;
-    let enemy = world.getNearestEntityWhere(bot, entity => mc.isHostile(entity), range);
+    let enemy = world.getNearestEntityWhere(bot, entity => MCData.getInstance().isHostile(entity), range);
     while (enemy) {
         await equipHighestAttack(bot);
         if (bot.entity.position.distanceTo(enemy.position) > 4 && enemy.name !== 'creeper' && enemy.name !== 'phantom') {
@@ -321,7 +321,7 @@ export async function defendSelf(bot, range=9) {
         bot.pvp.attack(enemy);
         attacked = true;
         await new Promise(resolve => setTimeout(resolve, 500));
-        enemy = world.getNearestEntityWhere(bot, entity => mc.isHostile(entity), range);
+        enemy = world.getNearestEntityWhere(bot, entity => MCData.getInstance().isHostile(entity), range);
         if (bot.interrupt_code) {
             bot.pvp.stop();
             return false;
@@ -498,7 +498,7 @@ export async function placeBlock(bot, blockType, x, y, z, placeOn='bottom', dont
      * await skills.placeBlock(bot, "oak_log", p.x + 2, p.y, p.x);
      * await skills.placeBlock(bot, "torch", p.x + 1, p.y, p.x, 'side');
      **/
-    if (!mc.getBlockId(blockType)) {
+    if (!MCData.getInstance().getBlockId(blockType)) {
         log(bot, `Invalid block type: ${blockType}.`);
         return false;
     }
@@ -541,7 +541,7 @@ export async function placeBlock(bot, blockType, x, y, z, placeOn='bottom', dont
 
     let block = bot.inventory.items().find(item => item.name === blockType);
     if (!block && bot.game.gameMode === 'creative') {
-        await bot.creative.setInventorySlot(36, mc.makeItem(blockType, 1)); // 36 is first hotbar slot
+        await bot.creative.setInventorySlot(36, MCData.getInstance().makeItem(blockType, 1)); // 36 is first hotbar slot
         block = bot.inventory.items().find(item => item.name === blockType);
     }
     if (!block) {
@@ -867,14 +867,14 @@ export async function avoidEnemies(bot, distance=16) {
      * await skills.avoidEnemies(bot, 8);
      **/
     bot.modes.pause('self_preservation'); // prevents damage-on-low-health from interrupting the bot
-    let enemy = world.getNearestEntityWhere(bot, entity => mc.isHostile(entity), distance);
+    let enemy = world.getNearestEntityWhere(bot, entity => MCData.getInstance().isHostile(entity), distance);
     while (enemy) {
         const follow = new pf.goals.GoalFollow(enemy, distance+1); // move a little further away
         const inverted_goal = new pf.goals.GoalInvert(follow);
         bot.pathfinder.setMovements(new pf.Movements(bot));
         bot.pathfinder.setGoal(inverted_goal, true);
         await new Promise(resolve => setTimeout(resolve, 500));
-        enemy = world.getNearestEntityWhere(bot, entity => mc.isHostile(entity), distance);
+        enemy = world.getNearestEntityWhere(bot, entity => MCData.getInstance().isHostile(entity), distance);
         if (bot.interrupt_code) {
             break;
         }

@@ -1,6 +1,14 @@
-import { spawn } from 'child_process';
+import { fork } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { app } from 'electron';
+
+const logFile = path.join(app.getPath('userData'), 'app.log');
+const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
+function logToFile(message) {
+    logStream.write(`${new Date().toISOString()} - ${message}\n`);
+}
 
 /**
  * Represents a process for managing and running an agent.
@@ -24,10 +32,11 @@ export class AgentProcess {
      */
     start(profile, userDataDir, load_memory=false, init_message=null) {
         // Prepare arguments for the agent process
-        let args = ['src/process/init-agent.js', this.name];
-        args.push('-p', profile, '-u', userDataDir);
+        let args = [path.join(app.getAppPath(), 'src/process/init-agent.js')]; // Adjust path
+        const profilePath = path.join(app.getAppPath(), profile);
+        args.push('-p', profilePath, '-u', userDataDir, '-e', app.getAppPath());
         if (load_memory)
-            args.push('-l', load_memory);
+            args.push('-l', load_memory.toString()); // Ensure it's a string
         if (init_message)
             args.push('-m', init_message);
 
@@ -41,7 +50,7 @@ export class AgentProcess {
         const sanitizedProfile = profile.replace(/[^a-zA-Z0-9-_]/g, '_');
         const logFileName = `${this.logFileNamePrefix}_${sanitizedProfile}.log`;
         const logFilePath = path.join(logDir, logFileName);
-        console.log(`Log file path: ${logFilePath}`);
+        logToFile(`Log file path: ${logFilePath}`);
 
         // Log all arguments at the top of the log file
         if (!fs.existsSync(logFilePath)) {
@@ -50,21 +59,21 @@ export class AgentProcess {
             fs.appendFileSync(logFilePath, `\n\nArguments: ${args.join(' ')}\n\n`);
         }
 
-        // Spawn the agent process with IPC enabled and redirect output to log file
-        const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-        this.agentProcess = spawn('node', args, {
-            stdio: ['inherit', 'pipe', 'pipe', 'ipc'], // Enable IPC and pipe stdout/stderr
+        // Spawn the agent process using Node.js's child_process.fork
+        const agentLogStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+        this.agentProcess = fork(path.join(app.getAppPath(), 'src/process/init-agent.js'), args, {
+            stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
         });
-        
+
         // Pipe process output to log file
-        this.agentProcess.stdout.pipe(logStream);
-        this.agentProcess.stderr.pipe(logStream);
+        this.agentProcess.stdout.pipe(agentLogStream);
+        this.agentProcess.stderr.pipe(agentLogStream);
 
         this.agentProcess.on('exit', (code, signal) => {
-            console.log(`Agent process exited with code ${code} and signal ${signal}`);
-            if (!logStream.destroyed) {
-                logStream.write(`Agent process exited with code ${code} and signal ${signal}\n`);
-                logStream.end();
+            logToFile(`Agent process exited with code ${code} and signal ${signal}`);
+            if (!agentLogStream.destroyed) {
+                agentLogStream.write(`Agent process exited with code ${code} and signal ${signal}\n`);
+                agentLogStream.end();
             }
 
             const now = Date.now();
@@ -76,35 +85,35 @@ export class AgentProcess {
             this.lastRestartTime = now;
 
             if (this.restartCount > 3) {
-                console.log('Restart limit reached. Not restarting.');
-                if (!logStream.destroyed) {
-                    logStream.write('Restart limit reached. Not restarting.\n');
-                    logStream.end();
+                logToFile('Restart limit reached. Not restarting.');
+                if (!agentLogStream.destroyed) {
+                    agentLogStream.write('Restart limit reached. Not restarting.\n');
+                    agentLogStream.end();
                 }
                 return;
             }
 
-            if (code !== 0 && signal !== 'SIGTERM') {
-                console.log('Restarting agent...');
-                if (!logStream.destroyed) {
-                    logStream.write('Restarting agent...\n');
-                    logStream.end();
+            if (code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGINT') {
+                logToFile('Restarting agent...');
+                if (!agentLogStream.destroyed) {
+                    agentLogStream.write('Restarting agent...\n');
+                    agentLogStream.end();
                 }
                 this.start(profile, userDataDir, true, 'Agent process restarted.');
-            } else if (signal === 'SIGTERM') {
-                console.log('Agent process terminated by SIGTERM. Not restarting.');
-                if (!logStream.destroyed) {
-                    logStream.write('Agent process terminated by SIGTERM. Not restarting.\n');
-                    logStream.end();
+            } else if (signal === 'SIGTERM' || signal === 'SIGINT') {
+                logToFile('Agent process terminated by SIGTERM. Not restarting.');
+                if (!agentLogStream.destroyed) {
+                    agentLogStream.write('Agent process terminated by SIGTERM. Not restarting.\n');
+                    agentLogStream.end();
                 }
             }
         });
     
         this.agentProcess.on('error', (err) => {
-            console.error('Failed to start agent process:', err);
-            if (!logStream.destroyed) {
-                logStream.write(`Failed to start agent process: ${err}\n`);
-                logStream.end();
+            logToFile(`Failed to start agent process: ${err}`);
+            if (!agentLogStream.destroyed) {
+                agentLogStream.write(`Failed to start agent process: ${err}\n`);
+                agentLogStream.end();
             }
         });
     }
@@ -114,17 +123,17 @@ export class AgentProcess {
      * @param {string} transcription - The transcription to send.
      */
     sendTranscription(transcription) {
-        if (this.agentProcess && this.agentProcess.connected && transcription.trim() !== '') {
-            this.agentProcess.send({
-                type: 'transcription',
-                data: transcription
-            });
-        } else {
-            if (!this.agentProcess) {
-                console.error('Cannot send transcription: Agent process is not running.');
-            } else if (!this.agentProcess.connected) {
-                console.error('Cannot send transcription: Agent process is not connected.');
+        if (this.agentProcess && transcription.trim() !== '') {
+            try {
+                this.agentProcess.send({
+                    type: 'transcription',
+                    data: transcription
+                });
+            } catch (error) {
+                logToFile(`Failed to send message: ${error}`);
             }
+        } else if (!this.agentProcess) {
+            logToFile('Agent process is not initialized.');
         }
     }
 }
