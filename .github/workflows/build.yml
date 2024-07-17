@@ -26,9 +26,23 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Prepare for code signing
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p ~/private_keys/
+          echo "${{ secrets.MAC_CERTS }}" > ~/private_keys/certs.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
       - name: Build/release Electron app
         uses: samuelmeuli/action-electron-builder@v1.6.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
           publish: always
+        env:
+          CSC_LINK: file://~/private_keys/certs.p12
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
