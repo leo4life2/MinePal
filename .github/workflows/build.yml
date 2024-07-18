@@ -39,6 +39,7 @@ jobs:
         run: |
           mkdir -p ~/private_keys/
           echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
+          echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
           security create-keychain -p "" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain

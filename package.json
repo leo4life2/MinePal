@@ -34,12 +34,14 @@
         "build:win": "electron-builder --win"
     },
     "devDependencies": {
+        "@electron/notarize": "^2.3.2",
         "electron": "^31.2.0",
         "electron-builder": "^24.13.3"
     },
     "build": {
         "appId": "com.nemosai.minepal",
         "productName": "Minepal",
+        "afterSign": "notarize.js",
         "directories": {
             "buildResources": "build"
         },
@@ -62,13 +64,20 @@
             "icon": "build/icon.icns",
             "extendInfo": {
                 "NSMicrophoneUsageDescription": "We need access to your microphone for voice input.",
-                "com.apple.security.device.audio-input": true
+                "com.apple.security.device.audio-input": true,
+                "com.apple.security.cs.allow-jit": true,
+                "com.apple.security.cs.allow-unsigned-executable-memory": true,
+                "com.apple.security.cs.allow-dyld-environment-variables": true
             },
-            "hardenedRuntime": false,
-            "target": ["dmg"]
+            "hardenedRuntime": true,
+            "target": [
+                "dmg"
+            ]
         },
         "win": {
-            "target": ["nsis"],
+            "target": [
+                "nsis"
+            ],
             "icon": "build/icon.ico"
         },
         "linux": {
