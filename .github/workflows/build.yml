@@ -59,6 +59,8 @@ jobs:
         env:
           CSC_LINK: file:///Users/runner/private_keys/certs.p12
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          API_KEY_ID: ${{ vars.API_KEY_ID }}
+          API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
 
       - name: Build/release Electron app (non-macOS)
         if: matrix.os != 'macos-latest'
