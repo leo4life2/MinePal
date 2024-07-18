@@ -27,7 +27,10 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: npm install --include=dev
+        run: |
+          npm install --include=dev
+          cd frontend
+          npm install --include=dev
 
       - name: Build frontend with Vite
         run: |
