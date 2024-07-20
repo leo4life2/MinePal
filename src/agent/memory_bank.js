@@ -22,4 +22,11 @@ export class MemoryBank {
 	getKeys() {
 		return Object.keys(this.memory).join(', ')
 	}
+
+	renamePlace(oldName, newName) {
+		if (this.memory[oldName]) {
+			this.memory[newName] = this.memory[oldName];
+			delete this.memory[oldName];
+		}
+	}
 }

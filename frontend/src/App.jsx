@@ -56,29 +56,6 @@ function App() {
     }));
   };
 
-  useEffect(() => {
-    const fetchDataWithRetry = async () => {
-      const startTime = Date.now();
-      const timeoutDuration = 5000;
-
-      while (Date.now() - startTime < timeoutDuration) {
-        try {
-          await fetchSettings();
-          await fetchAgentStatus();
-          setError(null);
-          break; // Exit loop if both fetches succeed
-        } catch (err) {
-          console.error("Fetch failed, retrying...", err);
-          await new Promise(resolve => setTimeout(resolve, 500)); // Wait before retrying
-        }
-      }
-
-      setLoading(false);
-    };
-
-    fetchDataWithRetry();
-  }, []);
-
   const settingNotes = {
     minecraft_version: "supports up to 1.20.4",
     host: "or \"localhost\", \"your.ip.address.here\"",
@@ -114,6 +91,19 @@ function App() {
     } catch (err) {
       console.error("Failed to fetch agent status:", err);
       setError("Failed to load agent status.");
+      throw err;
+    }
+  };
+
+  const fetchBackendAlive = async () => {
+    try {
+      const response = await api.get('/backend-alive');
+      if (!response.data.backend_alive) {
+        throw new Error("Backend is down.");
+      }
+    } catch (err) {
+      console.error("Failed to check backend status:", err);
+      setError(`Failed to check backend status: ${err.message}`);
       throw err;
     }
   };
@@ -278,6 +268,30 @@ function App() {
       });
     }
   };
+
+  useEffect(() => {
+    const fetchDataWithRetry = async () => {
+      const startTime = Date.now();
+      const timeoutDuration = 5000;
+
+      while (Date.now() - startTime < timeoutDuration) {
+        try {
+          await fetchSettings();
+          await fetchAgentStatus();
+          await fetchBackendAlive();
+          setError(null);
+          break; // Exit loop if all fetches succeed
+        } catch (err) {
+          console.error("Fetch failed, retrying...", err);
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait before retrying
+        }
+      }
+
+      setLoading(false);
+    };
+
+    fetchDataWithRetry();
+  }, []);
 
   if (loading) {
     return <div className="spinner">Loading...</div>;

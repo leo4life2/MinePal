@@ -3,7 +3,7 @@ import { app as electronApp } from 'electron';
 import express from 'express';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { WSS_BACKEND_URL } from './src/constants.js';
+import { HTTPS_BACKEND_URL, WSS_BACKEND_URL } from './src/constants.js';
 import fs from 'fs';
 import cors from 'cors';
 import path from 'path';
@@ -120,6 +120,20 @@ function startServer() {
             logToFile("socket: client disconnected");
             proxyWs.close();
         });
+    });
+
+    app.get('/backend-alive', async (req, res) => {
+        try {
+            const response = await fetch(`${HTTPS_BACKEND_URL}/ping`);
+            if (response.ok && await response.text() === 'pong') {
+                res.json({ backend_alive: true });
+            } else {
+                res.json({ backend_alive: false });
+            }
+        } catch (error) {
+            logToFile(`Heartbeat error: ${error.message}`);
+            res.json({ backend_alive: false });
+        }
     });
 
     app.get('/settings', (req, res) => {

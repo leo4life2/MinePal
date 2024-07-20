@@ -798,7 +798,6 @@ export async function goToPlayer(bot, username, distance=3) {
     log(bot, `You have reached ${username}.`);
 }
 
-
 export async function followPlayer(bot, username, distance=4) {
     /**
      * Follow the given player endlessly. Will not return until the code is manually stopped.
@@ -822,7 +821,6 @@ export async function followPlayer(bot, username, distance=4) {
     }
     return true;
 }
-
 
 export async function moveAway(bot, distance) {
     /**
@@ -1062,4 +1060,158 @@ export async function activateNearestBlock(bot, type) {
     await bot.activateBlock(block);
     log(bot, `Activated ${type} at x:${block.position.x.toFixed(1)}, y:${block.position.y.toFixed(1)}, z:${block.position.z.toFixed(1)}.`);
     return true;
+}
+
+export async function useOn(bot, targetEntity) {
+    /**
+     * Uses the currently held item on the specified entity.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {Entity} targetEntity, the entity to use the item on.
+     * @returns {Promise<boolean>} true if the item was used on the entity, false otherwise.
+     * @example
+     * await skills.useOn(bot, targetEntity);
+     **/
+    if (!targetEntity) {
+        log(bot, `No target entity specified.`);
+        return false;
+    }
+
+    // Ensure the bot is close enough to the target entity
+    const distance = bot.entity.position.distanceTo(targetEntity.position);
+    if (distance > 4.5) {
+        log(bot, `Target entity is too far away, moving closer...`);
+        const move = new pf.Movements(bot);
+        bot.pathfinder.setMovements(move);
+        await bot.pathfinder.goto(new pf.goals.GoalFollow(targetEntity, 2));
+    }
+
+    // Ensure the bot is looking at the target entity
+    await bot.lookAt(targetEntity.position);
+
+    try {
+        await bot.useOn(targetEntity);
+        log(bot, `Successfully used item on ${targetEntity.name}.`);
+        return true;
+    } catch (err) {
+        log(bot, `Failed to use item on ${targetEntity.name}: ${err.message}`);
+        return false;
+    }
+}
+
+export async function lookInChest(bot) {
+    /**
+     * Look in the nearest chest and log its contents.
+     * @param {MinecraftBot} bot - Reference to the minecraft bot.
+     * @returns {Promise<boolean>} true if the chest contents were logged, false if no chest was found.
+     * @example
+     * await skills.lookInChest(bot);
+     */
+    const chestToOpen = bot.findBlock({
+        matching: bot.registry.blocksByName.chest.id,
+        maxDistance: 6
+    });
+
+    if (!chestToOpen) {
+        log(bot, 'No chest found nearby.');
+        return false;
+    }
+
+    const chest = await bot.openContainer(chestToOpen);
+    const itemsInChest = chest.containerItems().map(item => `${item.name} x${item.count}`);
+    
+    if (itemsInChest.length === 0) {
+        log(bot, 'The chest is empty.');
+    } else {
+        log(bot, 'Chest contents:');
+        itemsInChest.forEach(item => log(bot, `- ${item}`));
+    }
+
+    chest.close();
+    return true;
+}
+
+export async function depositToChest(bot, itemName, amount) {
+    /**
+     * Deposit the specified amount of items into the nearest chest.
+     * @param {MinecraftBot} bot - Reference to the minecraft bot.
+     * @param {string} itemName - The name of the item to deposit.
+     * @param {number} amount - The amount of items to deposit.
+     * @returns {Promise<boolean>} true if the items were deposited, false otherwise.
+     * @example
+     * await skills.depositToChest(bot, "oak_log", 10);
+     */
+    const chestToOpen = bot.findBlock({
+        matching: bot.registry.blocksByName.chest.id,
+        maxDistance: 6
+    });
+
+    if (!chestToOpen) {
+        log(bot, 'No chest found');
+        return false;
+    }
+
+    const chest = await bot.openContainer(chestToOpen);
+    const itemsInChest = chest.containerItems().map(item => `${item.name} x${item.count}`).join(', ');
+    log(bot, `Opened chest containing: ${itemsInChest}`);
+
+    const item = bot.inventory.items().find(item => item.name === itemName);
+    if (!item) {
+        log(bot, `You do not have any ${itemName} to deposit.`);
+        chest.close();
+        return false;
+    }
+
+    try {
+        await chest.deposit(item.type, null, amount);
+        log(bot, `Deposited ${amount} ${itemName}`);
+        chest.close();
+        return true;
+    } catch (err) {
+        log(bot, `Unable to deposit ${amount} ${itemName}`);
+        chest.close();
+        return false;
+    }
+}
+
+export async function withdrawFromChest(bot, itemName, amount) {
+    /**
+     * Withdraw the specified amount of items from the nearest chest.
+     * @param {MinecraftBot} bot - Reference to the minecraft bot.
+     * @param {string} itemName - The name of the item to withdraw.
+     * @param {number} amount - The amount of items to withdraw.
+     * @returns {Promise<boolean>} true if the items were withdrawn, false otherwise.
+     * @example
+     * await skills.withdrawFromChest(bot, "oak_log", 10);
+     */
+    const chestToOpen = bot.findBlock({
+        matching: bot.registry.blocksByName.chest.id,
+        maxDistance: 6
+    });
+
+    if (!chestToOpen) {
+        log(bot, 'No chest found');
+        return false;
+    }
+
+    const chest = await bot.openContainer(chestToOpen);
+    const itemsInChest = chest.containerItems().map(item => `${item.name} x${item.count}`).join(', ');
+    log(bot, `Opened chest containing: ${itemsInChest}`);
+
+    const item = chest.containerItems().find(item => item.name === itemName);
+    if (!item) {
+        log(bot, `No ${itemName} found in the chest.`);
+        chest.close();
+        return false;
+    }
+
+    try {
+        await chest.withdraw(item.type, null, amount);
+        log(bot, `Withdrew ${amount} ${itemName}`);
+        chest.close();
+        return true;
+    } catch (err) {
+        log(bot, `Unable to withdraw ${amount} ${itemName}`);
+        chest.close();
+        return false;
+    }
 }
