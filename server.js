@@ -3,6 +3,7 @@ import { app as electronApp } from 'electron';
 import express from 'express';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import { WSS_BACKEND_URL } from './src/constants.js';
 import fs from 'fs';
 import cors from 'cors';
 import path from 'path';
@@ -14,8 +15,6 @@ const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
 }
-
-const BACKEND_HOST = 'wss://backend.minepal.net:11111';
 
 function startServer() {
     logToFile("Starting server...");
@@ -72,27 +71,35 @@ function startServer() {
         next();
     });
 
+    let transcriptBuffer = "";
+
     wss.on("connection", (ws) => {
         logToFile("socket: client connected");
-        const proxyWs = new WebSocket(BACKEND_HOST);
+        const proxyWs = new WebSocket(WSS_BACKEND_URL);
 
         proxyWs.on('open', () => {
-            logToFile(`proxy: connected to ${BACKEND_HOST}`);
+            logToFile(`proxy: connected to ${WSS_BACKEND_URL}`);
         });
 
         proxyWs.on('message', (message) => {
-            // Forward message from backend host to frontend
-            const parsedMessage = message.toString('utf8');
-            ws.send(parsedMessage);
+            const parsedMessage = JSON.parse(message.toString('utf8'));
+            const { is_final, speech_final, transcript } = parsedMessage;
 
-            // Call sendTranscription for all agents
-            agentProcesses.forEach(agentProcess => {
-                agentProcess.sendTranscription(parsedMessage);
-            });
+            if (is_final) {
+                transcriptBuffer += transcript;
+            }
+
+            if (speech_final) {
+                ws.send(transcriptBuffer); // to frontend
+                agentProcesses.forEach(agentProcess => {
+                    agentProcess.sendTranscription(transcriptBuffer);
+                });
+                transcriptBuffer = "";
+            }
         });
 
         proxyWs.on('close', () => {
-            logToFile(`proxy: connection to ${BACKEND_HOST} closed`);
+            logToFile(`proxy: connection to ${WSS_BACKEND_URL} closed`);
             ws.close();
         });
 

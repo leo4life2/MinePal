@@ -1,9 +1,9 @@
 import axios from 'axios';
-
-const BACKEND_HOST = 'https://backend.minepal.net:11111';
+import { HTTPS_BACKEND_URL } from '../constants.js';
 export class GPT {
     constructor(model_name) {
         this.model_name = model_name;
+        console.log(`Using model: ${model_name}`);
     }
 
     async sendRequest(turns, systemMessage, stop_seq='***') {
@@ -12,7 +12,7 @@ export class GPT {
         let res = null;
         try {
             console.log('Awaiting backend API response...');
-            const response = await axios.post(`${BACKEND_HOST}/openai/chat`, {
+            const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, {
                 model_name: this.model_name,
                 messages: messages,
                 stop_seq: stop_seq,
@@ -32,7 +32,7 @@ export class GPT {
 
     async embed(text) {
         try {
-            const response = await axios.post(`${BACKEND_HOST}/openai/embed`, {
+            const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/embed`, {
                 model_name: this.model_name,
                 text: text,
             });

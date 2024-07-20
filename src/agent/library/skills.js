@@ -785,7 +785,7 @@ export async function goToPlayer(bot, username, distance=3) {
 
     bot.modes.pause('self_defense');
     bot.modes.pause('cowardice');
-    let player = bot.players[username].entity
+    let player = bot.players[username]?.entity;
     if (!player) {
         log(bot, `Could not find ${username}.`);
         return false;

@@ -21,6 +21,12 @@ const modes = [
         on: true,
         active: false,
         fall_blocks: ['sand', 'gravel', 'concrete_powder'], // includes matching substrings like 'sandstone' and 'red_sand'
+        /**
+         * Update function for self-preservation mode.
+         * Checks the agent's environment for dangerous conditions like water, lava, fire, or falling blocks.
+         * Responds by jumping, moving away, or seeking water if on fire.
+         * @param {Object} agent - The agent object containing the bot.
+         */
         update: async function (agent) {
             const bot = agent.bot;
             let block = bot.blockAt(bot.entity.position);
@@ -68,8 +74,13 @@ const modes = [
         name: 'cowardice',
         description: 'Run away from enemies. Interrupts other actions.',
         interrupts: ['all'],
-        on: true,
+        on: false,
         active: false,
+        /**
+         * Update function for cowardice mode.
+         * Detects nearby hostile entities and makes the agent run away from them.
+         * @param {Object} agent - The agent object containing the bot.
+         */
         update: async function (agent) {
             const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 16);
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
@@ -86,6 +97,11 @@ const modes = [
         interrupts: ['all'],
         on: true,
         active: false,
+        /**
+         * Update function for self-defense mode.
+         * Detects nearby hostile entities and makes the agent attack them.
+         * @param {Object} agent - The agent object containing the bot.
+         */
         update: async function (agent) {
             const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 8);
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
@@ -102,6 +118,11 @@ const modes = [
         interrupts: ['defaults'],
         on: true,
         active: false,
+        /**
+         * Update function for hunting mode.
+         * Detects nearby huntable entities and makes the agent attack them.
+         * @param {Object} agent - The agent object containing the bot.
+         */
         update: async function (agent) {
             const huntable = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHuntable(entity), 8);
             if (huntable && await world.isClearPath(agent.bot, huntable)) {
@@ -122,6 +143,11 @@ const modes = [
         wait: 2, // number of seconds to wait after noticing an item to pick it up
         prev_item: null,
         noticed_at: -1,
+        /**
+         * Update function for item collecting mode.
+         * Detects nearby items and makes the agent pick them up after a short delay.
+         * @param {Object} agent - The agent object containing the bot.
+         */
         update: async function (agent) {
             let item = world.getNearestEntityWhere(agent.bot, entity => entity.name === 'item', 8);
             if (item && item !== this.prev_item && await world.isClearPath(agent.bot, item)) {
@@ -150,6 +176,11 @@ const modes = [
         active: false,
         cooldown: 5,
         last_place: Date.now(),
+        /**
+         * Update function for torch placing mode.
+         * Places torches in dark areas when the agent is idle and there are no torches nearby.
+         * @param {Object} agent - The agent object containing the bot.
+         */
         update: function (agent) {
             if (world.shouldPlaceTorch(agent.bot)) {
                 if (Date.now() - this.last_place < this.cooldown * 1000) return;
@@ -171,6 +202,11 @@ const modes = [
         staring: false,
         last_entity: null,
         next_change: 0,
+        /**
+         * Update function for idle staring mode.
+         * Makes the agent look around at nearby entities when idle.
+         * @param {Object} agent - The agent object containing the bot.
+         */
         update: function (agent) {
             const entity = agent.bot.nearestEntity();
             let entity_in_view = entity && entity.position.distanceTo(agent.bot.entity.position) < 10 && entity.name !== 'enderman';
@@ -204,10 +240,23 @@ const modes = [
         interrupts: [],
         on: false,
         active: false,
+        /**
+         * Update function for cheat mode.
+         * Currently does nothing.
+         * @param {Object} agent - The agent object containing the bot.
+         */
         update: function (agent) { /* do nothing */ }
     }
 ];
 
+/**
+ * Executes a given function within the context of a mode.
+ * Sets the mode to active, runs the function, and then sets the mode to inactive.
+ * @param {Object} mode - The mode object.
+ * @param {Object} agent - The agent object containing the bot.
+ * @param {Function} func - The function to execute.
+ * @param {number} [timeout=-1] - Optional timeout for the function execution.
+ */
 async function execute(mode, agent, func, timeout=-1) {
     mode.active = true;
     let code_return = await agent.coder.execute(async () => {
@@ -217,7 +266,14 @@ async function execute(mode, agent, func, timeout=-1) {
     console.log(`Mode ${mode.name} finished executing, code_return: ${code_return.message}`);
 }
 
+/**
+ * Class representing a controller for managing modes.
+ */
 class ModeController {
+    /**
+     * Creates an instance of ModeController.
+     * @param {Object} agent - The agent object containing the bot.
+     */
     constructor(agent) {
         this.agent = agent;
         this.modes_list = modes;
@@ -227,22 +283,45 @@ class ModeController {
         }
     }
 
+    /**
+     * Checks if a mode exists.
+     * @param {string} mode_name - The name of the mode.
+     * @returns {boolean} True if the mode exists, false otherwise.
+     */
     exists(mode_name) {
         return this.modes_map[mode_name] != null;
     }
 
+    /**
+     * Sets the on state of a mode.
+     * @param {string} mode_name - The name of the mode.
+     * @param {boolean} on - The on state to set.
+     */
     setOn(mode_name, on) {
         this.modes_map[mode_name].on = on;
     }
 
+    /**
+     * Checks if a mode is on.
+     * @param {string} mode_name - The name of the mode.
+     * @returns {boolean} True if the mode is on, false otherwise.
+     */
     isOn(mode_name) {
         return this.modes_map[mode_name].on;
     }
 
+    /**
+     * Pauses a mode.
+     * @param {string} mode_name - The name of the mode.
+     */
     pause(mode_name) {
         this.modes_map[mode_name].paused = true;
     }
 
+    /**
+     * Gets a string representation of available modes.
+     * @returns {string} A string listing all available modes and their states.
+     */
     getStr() {
         let res = 'Available Modes:';
         for (let mode of this.modes_list) {
@@ -252,6 +331,9 @@ class ModeController {
         return res;
     }
 
+    /**
+     * Unpauses all paused modes.
+     */
     unPauseAll() {
         for (let mode of this.modes_list) {
             if (mode.paused) console.log(`Unpausing mode ${mode.name}`);
@@ -259,6 +341,11 @@ class ModeController {
         }
     }
 
+    /**
+     * Updates the modes based on the agent's state.
+     * Calls the update function of each mode if it is on, not paused, and not active.
+     * @returns {Promise<void>}
+     */
     async update() {
         if (this.agent.isIdle()) {
             this.unPauseAll();
@@ -273,6 +360,10 @@ class ModeController {
         }
     }
 
+    /**
+     * Gets a JSON representation of the modes and their states.
+     * @returns {Object} A JSON object representing the modes and their states.
+     */
     getJson() {
         let res = {};
         for (let mode of this.modes_list) {
@@ -281,6 +372,10 @@ class ModeController {
         return res;
     }
 
+    /**
+     * Loads modes from a JSON object.
+     * @param {Object} json - A JSON object representing the modes and their states.
+     */
     loadJson(json) {
         for (let mode of this.modes_list) {
             if (json[mode.name] != undefined) {
@@ -290,6 +385,11 @@ class ModeController {
     }
 }
 
+/**
+ * Initializes the modes for the agent.
+ * Adds the mode controller to the bot object and loads initial modes from the prompter.
+ * @param {Object} agent - The agent object containing the bot.
+ */
 export function initModes(agent) {
     // the mode controller is added to the bot object so it is accessible from anywhere the bot is used
     agent.bot.modes = new ModeController(agent);
