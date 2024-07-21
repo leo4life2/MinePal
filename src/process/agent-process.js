@@ -2,9 +2,12 @@ import { fork } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
+import { createStream } from 'rotating-file-stream';
 
-const logFile = path.join(app.getPath('userData'), 'app.log');
-const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+const logStream = createStream('app.log', {
+    size: '500K', // Rotate every 500KB
+    path: app.getPath('userData')
+});
 
 function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
@@ -19,8 +22,6 @@ export class AgentProcess {
         this.agentProcess = null;
         this.restartCount = 0; // Track restart count
         this.lastRestartTime = Date.now(); // Track last restart time
-        const now = new Date();
-        this.logFileNamePrefix = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}`;
     }
 
     /**
@@ -46,10 +47,12 @@ export class AgentProcess {
             fs.mkdirSync(logDir);
         }
 
-        // Create log file name with datetime and sanitized profile
-        const sanitizedProfile = profile.replace(/[^a-zA-Z0-9-_]/g, '_');
-        const logFileName = `${this.logFileNamePrefix}_${sanitizedProfile}.log`;
-        const logFilePath = path.join(logDir, logFileName);
+        const logFilePath = path.join(logDir, 'agent.log');
+        const agentLogStream = createStream('agent.log', {
+            size: '5M', // Rotate every 5MB
+            path: logDir
+        });
+
         logToFile(`Log file path: ${logFilePath}`);
 
         // Log all arguments at the top of the log file
@@ -60,7 +63,6 @@ export class AgentProcess {
         }
 
         // Spawn the agent process using Node.js's child_process.fork
-        const agentLogStream = fs.createWriteStream(logFilePath, { flags: 'a' });
         this.agentProcess = fork(path.join(app.getAppPath(), 'src/process/init-agent.js'), args, {
             stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
         });
@@ -71,7 +73,7 @@ export class AgentProcess {
 
         this.agentProcess.on('exit', (code, signal) => {
             logToFile(`Agent process exited with code ${code} and signal ${signal}`);
-            if (!agentLogStream.destroyed) {
+            if (agentLogStream.writable) {
                 agentLogStream.write(`Agent process exited with code ${code} and signal ${signal}\n`);
                 agentLogStream.end();
             }
@@ -86,7 +88,7 @@ export class AgentProcess {
 
             if (this.restartCount > 3) {
                 logToFile('Restart limit reached. Not restarting.');
-                if (!agentLogStream.destroyed) {
+                if (agentLogStream.writable) {
                     agentLogStream.write('Restart limit reached. Not restarting.\n');
                     agentLogStream.end();
                 }
@@ -95,14 +97,14 @@ export class AgentProcess {
 
             if (code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGINT') {
                 logToFile('Restarting agent...');
-                if (!agentLogStream.destroyed) {
+                if (agentLogStream.writable) {
                     agentLogStream.write('Restarting agent...\n');
                     agentLogStream.end();
                 }
                 this.start(profile, userDataDir, true, 'Agent process restarted.');
             } else if (signal === 'SIGTERM' || signal === 'SIGINT') {
                 logToFile('Agent process terminated by SIGTERM. Not restarting.');
-                if (!agentLogStream.destroyed) {
+                if (agentLogStream.writable) {
                     agentLogStream.write('Agent process terminated by SIGTERM. Not restarting.\n');
                     agentLogStream.end();
                 }

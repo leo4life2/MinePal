@@ -766,7 +766,7 @@ export async function goToPosition(bot, x, y, z, min_distance=2) {
 }
 
 
-export async function goToPlayer(bot, username, distance=3) {
+export async function goToPlayer(bot, username, distance=1) {
     /**
      * Navigate to the given player.
      * @param {MinecraftBot} bot, reference to the minecraft bot.
@@ -1214,4 +1214,26 @@ export async function withdrawFromChest(bot, itemName, amount) {
         chest.close();
         return false;
     }
+}
+
+export function startCrouching(bot) {
+    /**
+     * Start crouching.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @example
+     * skills.startCrouching(bot);
+     **/
+    bot.setControlState('sneak', true);
+    log(bot, 'Started crouching.');
+}
+
+export function stopCrouching(bot) {
+    /**
+     * Stop crouching.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @example
+     * skills.stopCrouching(bot);
+     **/
+    bot.setControlState('sneak', false);
+    log(bot, 'Stopped crouching.');
 }

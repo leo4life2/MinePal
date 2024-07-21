@@ -1,15 +1,18 @@
 import { app, BrowserWindow, systemPreferences } from 'electron';
 import path from 'path';
 import { startServer } from './server.js';
-import fs from 'fs';
+import { createStream } from 'rotating-file-stream';
 
 let mainWindow;
 
 const DEV = false;
 const DEBUG = false;
 
-const logFile = path.join(app.getPath('userData'), 'app.log');
-const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+const logDirectory = app.getPath('userData');
+const logStream = createStream('app.log', {
+    size: '500K', // Rotate every 500KB
+    path: logDirectory
+});
 
 function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
@@ -17,8 +20,8 @@ function logToFile(message) {
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 650,
+        height: 700,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,

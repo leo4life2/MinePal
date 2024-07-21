@@ -165,6 +165,7 @@ export class Coder {
             this.interruptible = true;
             let res = await this.execute(this.resume_func, timeout);
             this.interruptible = false;
+            this.resume_func = null; // Clear the resume function after execution
             return res;
         } else {
             return {success: false, message: null, interrupted: false, timedout: false};

@@ -67,8 +67,10 @@ export function getNearestBlocks(bot, block_types=null, distance=16, count=10000
     let blocks = [];
     for (let i = 0; i < positions.length; i++) {
         let block = bot.blockAt(positions[i]);
-        let distance = positions[i].distanceTo(bot.entity.position);
-        blocks.push({ block: block, distance: distance });
+        if (bot.canSeeBlock(block)) { // Check if the bot can see the block
+            let distance = positions[i].distanceTo(bot.entity.position);
+            blocks.push({ block: block, distance: distance });
+        }
     }
     blocks.sort((a, b) => a.distance - b.distance);
 

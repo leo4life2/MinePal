@@ -16,11 +16,11 @@
         "mineflayer-armor-manager": "^2.0.1",
         "mineflayer-auto-eat": "^3.3.6",
         "mineflayer-collectblock": "^1.4.1",
-        "mineflayer-pathfinder": "^2.4.4",
+        "mineflayer-pathfinder": "file:../mineflayer-pathfinder",
         "mineflayer-pvp": "^1.3.2",
         "patch-package": "^8.0.0",
         "prismarine-item": "^1.14.0",
-        "vec3": "^0.1.10",
+        "rotating-file-stream": "^3.2.3",
         "ws": "^8.18.0",
         "yargs": "^17.7.2"
     },

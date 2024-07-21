@@ -22,16 +22,16 @@ function wrapExecution(func, timeout = -1, resume_name = null) {
 }
 
 export const actionsList = [
-  {
-    name: "!newAction",
-    description:
-      "Perform new and unknown custom behaviors that are not available as a command by writing code.",
-    perform: async function (agent) {
-      if (!agent.settings.allow_insecure_coding)
-        return "newAction Failed! Agent is not allowed to write code. Notify the user.";
-      return await agent.coder.generateCode(agent.history);
-    },
-  },
+  // {
+  //   name: "!newAction",
+  //   description:
+  //     "Perform new and unknown custom behaviors that are not available as a command by writing code.",
+  //   perform: async function (agent) {
+  //     if (!agent.settings.allow_insecure_coding)
+  //       return "newAction Failed! Agent is not allowed to write code. Notify the user.";
+  //     return await agent.coder.generateCode(agent.history);
+  //   },
+  // },
   {
     name: "!stop",
     description:
@@ -87,11 +87,10 @@ export const actionsList = [
     name: "!goToPlayer",
     description: "Go to the given player.",
     params: {
-      player_name: "(string) The name of the player to go to.",
-      closeness: "(number) How close to get to the player.",
+      player_name: "(string) The name of the player to go to."
     },
-    perform: wrapExecution(async (agent, player_name, closeness) => {
-      return await skills.goToPlayer(agent.bot, player_name, closeness);
+    perform: wrapExecution(async (agent, player_name) => {
+      return await skills.goToPlayer(agent.bot, player_name);
     }),
   },
   {
@@ -257,19 +256,19 @@ export const actionsList = [
       await skills.stay(agent.bot);
     }),
   },
-  {
-    name: "!goal",
-    description: "Set a goal to automatically work towards.",
-    params: {
-      name: "(string) The name of the goal to set. Can be item or building name. If empty will automatically choose a goal.",
-      quantity: "(number) The quantity of the goal to set. Default is 1.",
-    },
-    perform: async function (agent, name = null, quantity = 1) {
-      await agent.npc.setGoal(name, quantity);
-      agent.bot.emit("idle"); // to trigger the goal
-      return "Set goal: " + agent.npc.data.curr_goal.name;
-    },
-  },
+  // {
+  //   name: "!goal",
+  //   description: "Set a goal to automatically work towards.",
+  //   params: {
+  //     name: "(string) The name of the goal to set. Can be item or building name. If empty will automatically choose a goal.",
+  //     quantity: "(number) The quantity of the goal to set. Default is 1.",
+  //   },
+  //   perform: async function (agent, name = null, quantity = 1) {
+  //     await agent.npc.setGoal(name, quantity);
+  //     agent.bot.emit("idle"); // to trigger the goal
+  //     return "Set goal: " + agent.npc.data.curr_goal.name;
+  //   },
+  // },
   {
     name: "!equip",
     description: "Equip an item to a specific body part.",
@@ -328,4 +327,34 @@ export const actionsList = [
       return success ? "Chest contents seen." : "No chest found nearby.";
     }),
   },
+  // {
+  //   name: "!startCrouching",
+  //   description: "Make the agent start crouching.",
+  //   perform: wrapExecution(async (agent) => {
+  //     await skills.startCrouching(agent.bot);
+  //   }),
+  // },
+  // {
+  //   name: "!stopCrouching",
+  //   description: "Make the agent stop crouching.",
+  //   perform: wrapExecution(async (agent) => {
+  //     await skills.stopCrouching(agent.bot);
+  //   }),
+  // },
+  // {
+  //   name: "!getControlState",
+  //   description: "Get the current control state of the agent.",
+  //   perform: wrapExecution(async (agent) => {
+  //     try {
+  //       const states = ['forward', 'back', 'left', 'right', 'jump', 'sprint', 'sneak'];
+  //       const controlStates = states.map(state => `${state}: ${agent.bot.getControlState(state)}`);
+  //       console.log(controlStates.join(', '));
+  //       return controlStates.join(', ');
+  //     } catch (error) {
+  //       console.error('Error in getControlState:', error);
+  //       console.error(error.stack);
+  //       return 'Error occurred while getting control state';
+  //     }
+  //   }),
+  // },
 ];
