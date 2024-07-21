@@ -1237,3 +1237,32 @@ export function stopCrouching(bot) {
     bot.setControlState('sneak', false);
     log(bot, 'Stopped crouching.');
 }
+
+export async function consume(bot, itemName) {
+    /**
+     * Consume an item in the bot's inventory.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {string} itemName, the name of the item to consume.
+     * @returns {Promise<boolean>} true if the item was consumed, false otherwise.
+     * @example
+     * await skills.consume(bot, 'apple');
+     **/
+    const item = bot.inventory.items().find(item => item.name === itemName);
+    if (!item) {
+        log(bot, `No ${itemName} found in inventory.`);
+        return false;
+    }
+
+    try {
+        await bot.equip(item, 'hand');
+        await bot.consume();
+        log(bot, `Consumed ${itemName}`);
+        return true;
+    } catch (err) {
+        log(bot, `Unable to consume ${itemName}: ${err.message}`);
+        return false;
+    }
+}
+
+
+

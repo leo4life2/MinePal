@@ -327,6 +327,16 @@ export const actionsList = [
       return success ? "Chest contents seen." : "No chest found nearby.";
     }),
   },
+  {
+    name: "!consume",
+    description: "Eating or drinking, consume an item in the bot's inventory.",
+    params: {
+      itemName: "(string) The name of the item to consume.",
+    },
+    perform: wrapExecution(async (agent, itemName) => {
+      return await skills.consume(agent.bot, itemName);
+    }),
+  },
   // {
   //   name: "!startCrouching",
   //   description: "Make the agent start crouching.",
