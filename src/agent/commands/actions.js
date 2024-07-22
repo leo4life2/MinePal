@@ -22,16 +22,6 @@ function wrapExecution(func, timeout = -1, resume_name = null) {
 }
 
 export const actionsList = [
-  // {
-  //   name: "!newAction",
-  //   description:
-  //     "Perform new and unknown custom behaviors that are not available as a command by writing code.",
-  //   perform: async function (agent) {
-  //     if (!agent.settings.allow_insecure_coding)
-  //       return "newAction Failed! Agent is not allowed to write code. Notify the user.";
-  //     return await agent.coder.generateCode(agent.history);
-  //   },
-  // },
   {
     name: "!stop",
     description:
@@ -43,26 +33,6 @@ export const actionsList = [
       agent.coder.cancelResume();
       agent.bot.emit("idle");
       return "Agent stopped.";
-    },
-  },
-  {
-    name: "!restart",
-    description: "Restart the agent process.",
-    perform: async function (agent) {
-      await agent.history.save();
-      console.log("[CLEANKILL] Restart command called.");
-      agent.cleanKill();
-    },
-  },
-  {
-    name: "!clearChat",
-    description: "Clear the chat history.",
-    perform: async function (agent) {
-      agent.history.clear();
-      return (
-        agent.name +
-        "'s chat history was cleared, starting new conversation from scratch."
-      );
     },
   },
   {
@@ -256,19 +226,6 @@ export const actionsList = [
       await skills.stay(agent.bot);
     }),
   },
-  // {
-  //   name: "!goal",
-  //   description: "Set a goal to automatically work towards.",
-  //   params: {
-  //     name: "(string) The name of the goal to set. Can be item or building name. If empty will automatically choose a goal.",
-  //     quantity: "(number) The quantity of the goal to set. Default is 1.",
-  //   },
-  //   perform: async function (agent, name = null, quantity = 1) {
-  //     await agent.npc.setGoal(name, quantity);
-  //     agent.bot.emit("idle"); // to trigger the goal
-  //     return "Set goal: " + agent.npc.data.curr_goal.name;
-  //   },
-  // },
   {
     name: "!equip",
     description: "Equip an item to a specific body part.",
@@ -366,5 +323,28 @@ export const actionsList = [
   //       return 'Error occurred while getting control state';
   //     }
   //   }),
+  // },
+    // {
+  //   name: "!goal",
+  //   description: "Set a goal to automatically work towards.",
+  //   params: {
+  //     name: "(string) The name of the goal to set. Can be item or building name. If empty will automatically choose a goal.",
+  //     quantity: "(number) The quantity of the goal to set. Default is 1.",
+  //   },
+  //   perform: async function (agent, name = null, quantity = 1) {
+  //     await agent.npc.setGoal(name, quantity);
+  //     agent.bot.emit("idle"); // to trigger the goal
+  //     return "Set goal: " + agent.npc.data.curr_goal.name;
+  //   },
+  // },
+    // {
+  //   name: "!newAction",
+  //   description:
+  //     "Perform new and unknown custom behaviors that are not available as a command by writing code.",
+  //   perform: async function (agent) {
+  //     if (!agent.settings.allow_insecure_coding)
+  //       return "newAction Failed! Agent is not allowed to write code. Notify the user.";
+  //     return await agent.coder.generateCode(agent.history);
+  //   },
   // },
 ];
