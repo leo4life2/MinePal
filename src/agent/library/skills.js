@@ -251,7 +251,8 @@ export async function attackNearest(bot, mobType, kill=true) {
      * await skills.attackNearest(bot, "zombie", true);
      **/
     bot.modes.pause('cowardice');
-    const mob = world.getNearbyEntities(bot, 24).find(entity => entity.name === mobType);
+    const nearbyEntities = world.getNearbyEntities(bot, 24);
+    const mob = nearbyEntities.find(entity => entity !== bot.entity && entity.name === mobType);
     if (mob) {
         return await attackEntity(bot, mob, kill);
     }
@@ -1121,6 +1122,28 @@ export async function activateNearestBlock(bot, type) {
     await bot.activateBlock(block);
     log(bot, `Activated ${type} at x:${block.position.x.toFixed(1)}, y:${block.position.y.toFixed(1)}, z:${block.position.z.toFixed(1)}.`);
     return true;
+}
+
+export async function activateItem(bot, offHand = false) {
+    /**
+     * Activates the currently held item.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {boolean} offHand, whether to activate the item in the off hand. Defaults to false (main hand).
+     * @returns {Promise<boolean>} true if the item was activated, false if there was an error.
+     * @example
+     * await skills.activateItem(bot);
+     * await skills.activateItem(bot, true); // activate off-hand item
+     **/
+    try {
+        // TODO: not working for spawn eggs
+        await bot.activateItem(offHand);
+        const handName = offHand ? "off hand" : "main hand";
+        log(bot, `Activated item in ${handName}.`);
+        return true;
+    } catch (error) {
+        log(bot, `Failed to activate item: ${error.message}`);
+        return false;
+    }
 }
 
 export async function activateNearestEntity(bot, entityType) {

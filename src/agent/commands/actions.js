@@ -231,12 +231,15 @@ export const actionsList = [
     }),
   },
   {
-    name: "!activateEntity",
-    description: "Activate the nearest entity of a given type. E.g. boat, horse.",
-    params: { type: "(string) The type of entity to activate." },
-    perform: wrapExecution(async (agent, type) => {
-      const success = await skills.activateNearestEntity(agent.bot, type);
-      return success ? `Activated nearest ${type}.` : `No ${type} found nearby.`;
+    name: "!activateItem",
+    description: "Use item, activate the currently held item in main or off hand.",
+    params: {
+      offHand: "(boolean, optional) Whether to activate the item in the off hand. Defaults to false (main hand).",
+    },
+    perform: wrapExecution(async (agent, offHand = false) => {
+      const success = await skills.activateItem(agent.bot, offHand);
+      const handName = offHand ? "off hand" : "main hand";
+      return success ? `Activated item in ${handName}.` : `Failed to activate item in ${handName}.`;
     }),
   },
   {
@@ -338,19 +341,12 @@ export const actionsList = [
     }),
   },
   // {
-  //   name: "!getControlState",
-  //   description: "Get the current control state of the agent.",
-  //   perform: wrapExecution(async (agent) => {
-  //     try {
-  //       const states = ['forward', 'back', 'left', 'right', 'jump', 'sprint', 'sneak'];
-  //       const controlStates = states.map(state => `${state}: ${agent.bot.getControlState(state)}`);
-  //       console.log(controlStates.join(', '));
-  //       return controlStates.join(', ');
-  //     } catch (error) {
-  //       console.error('Error in getControlState:', error);
-  //       console.error(error.stack);
-  //       return 'Error occurred while getting control state';
-  //     }
+  //   name: "!activateEntity",
+  //   description: "Activate the nearest entity of a given type. E.g. boat, horse.",
+  //   params: { type: "(string) The type of entity to activate." },
+  //   perform: wrapExecution(async (agent, type) => {
+  //     const success = await skills.activateNearestEntity(agent.bot, type);
+  //     return success ? `Activated nearest ${type}.` : `No ${type} found nearby.`;
   //   }),
   // },
     // {

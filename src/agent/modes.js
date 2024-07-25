@@ -28,6 +28,7 @@ const modes = [
          * @param {Object} agent - The agent object containing the bot.
          */
         update: async function (agent) {
+            const dangerousBlocks = ['lava', 'flowing_lava', 'fire', 'magma_block', 'cactus', 'campfire', 'soul_fire', 'sweet_berry_bush', 'wither_rose'];
             const bot = agent.bot;
             let block = bot.blockAt(bot.entity.position);
             let blockAbove = bot.blockAt(bot.entity.position.offset(0, 1, 0));
@@ -44,8 +45,7 @@ const modes = [
                     await skills.moveAway(bot, 2);
                 });
             }
-            else if (block.name === 'lava' || block.name === 'flowing_lava' || block.name === 'fire' ||
-                blockAbove.name === 'lava' || blockAbove.name === 'flowing_lava' || blockAbove.name === 'fire') {
+            else if (dangerousBlocks.includes(block.name) || dangerousBlocks.includes(blockAbove.name)) {
                 bot.chat('I\'m on fire!'); // TODO: gets stuck in lava
                 execute(this, agent, async () => {
                     let nearestWater = world.getNearestBlock(bot, 'water', 20);
@@ -258,11 +258,9 @@ const modes = [
  * @param {number} [timeout=-1] - Optional timeout for the function execution.
  */
 async function execute(mode, agent, func, timeout=-1) {
-    mode.active = true;
     let code_return = await agent.coder.execute(async () => {
         await func();
     }, timeout);
-    mode.active = false;
     console.log(`Mode ${mode.name} finished executing, code_return: ${code_return.message}`);
 }
 
@@ -354,7 +352,9 @@ class ModeController {
             let available = mode.interrupts.includes('all') || this.agent.isIdle();
             let interruptible = this.agent.coder.interruptible && (mode.interrupts.includes('defaults') || mode.interrupts.includes(this.agent.coder.resume_name));
             if (mode.on && !mode.paused && !mode.active && (available || interruptible)) {
+                mode.active = true;
                 await mode.update(this.agent);
+                mode.active = false;
             }
             if (mode.active) break;
         }

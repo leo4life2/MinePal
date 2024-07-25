@@ -18,10 +18,11 @@ function logToFile(message) {
  * This class handles the spawning, monitoring, and restarting of agent processes.
  */
 export class AgentProcess {
-    constructor() {
+    constructor(notifyBotKicked) {
         this.agentProcess = null;
         this.restartCount = 0; // Track restart count
         this.lastRestartTime = Date.now(); // Track last restart time
+        this.notifyBotKicked = notifyBotKicked
     }
 
     /**
@@ -95,19 +96,21 @@ export class AgentProcess {
                 return;
             }
 
-            if (code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGINT') {
+            if (code === 128 || signal === 'SIGTERM' || signal === 'SIGINT') {
+                const reason = code === 128 ? 'bot being kicked' : 'SIGTERM';
+                logToFile(`Agent process terminated due to ${reason}. Not restarting.`);
+                if (agentLogStream.writable) {
+                    agentLogStream.write(`Agent process terminated due to ${reason}. Not restarting.\n`);
+                    agentLogStream.end();
+                }
+                this.notifyBotKicked();
+            } else if (code !== 0) {
                 logToFile('Restarting agent...');
                 if (agentLogStream.writable) {
                     agentLogStream.write('Restarting agent...\n');
                     agentLogStream.end();
                 }
                 this.start(profile, userDataDir, true, 'Agent process restarted.');
-            } else if (signal === 'SIGTERM' || signal === 'SIGINT') {
-                logToFile('Agent process terminated by SIGTERM. Not restarting.');
-                if (agentLogStream.writable) {
-                    agentLogStream.write('Agent process terminated by SIGTERM. Not restarting.\n');
-                    agentLogStream.end();
-                }
             }
         });
     

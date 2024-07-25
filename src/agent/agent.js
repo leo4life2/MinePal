@@ -28,6 +28,7 @@ export class Agent {
         this.name = this.prompter.getName();
         const settingsPath = `${this.userDataDir}/settings.json`;
         this.settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')); // Changed to instance variable
+        this.owner = this.settings.player_username
         this.history = new History(this);
         this.coder = new Coder(this);
         this.npc = new NPCContoller(this);
@@ -208,7 +209,7 @@ export class Agent {
         this.bot.on('kicked', (reason) => {
             console.warn('Bot kicked!', reason);
             console.log('[CLEANKILL] Bot kicked.');
-            this.cleanKill('Bot kicked! Killing agent process.');
+            this.cleanKill('Bot kicked! Killing agent process.', reason="KICK");
         });
         this.bot.on('messagestr', async (message, _, jsonMsg) => {
             if (jsonMsg.translate && jsonMsg.translate.startsWith('death') && message.startsWith(this.name)) {
@@ -227,7 +228,7 @@ export class Agent {
         this.npc.init();
 
         // Set up update loop for modes
-        const INTERVAL = 300;
+        const INTERVAL = 1000;
         setTimeout(async () => {
             while (true) {
                 let start = Date.now();
@@ -254,10 +255,15 @@ export class Agent {
      * Performs a clean shutdown of the agent.
      * @param {string} msg - Message to log before shutting down.
      */
-    cleanKill(msg='Killing agent process...') {
+    cleanKill(msg='Killing agent process...', reason = null) {
         this.history.add('system', msg);
         this.bot.chat('Goodbye world.')
         this.history.save();
-        process.exit(1);
+
+        if (reason === 'KICK') {
+            process.exit(128);
+        } else {
+            process.exit(1);
+        }
     }
 }

@@ -12,8 +12,23 @@ import net from 'net';
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
+let wss; // Declare wss in the outer scope
+
 function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
+}
+
+function broadcastMessage(message) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
+}
+
+function notifyBotKicked() {
+    logToFile("Bot was kicked");
+    broadcastMessage("Error: Bot kicked.");
 }
 
 function startServer() {
@@ -57,7 +72,7 @@ function startServer() {
     const app = express();
     const port = 10101;
     const server = http.createServer(app);
-    const wss = new WebSocketServer({ server });
+    wss = new WebSocketServer({ server }); // Initialize wss within startServer
 
     // Configure CORS to allow credentials
     app.use(cors({
@@ -72,6 +87,14 @@ function startServer() {
     });
 
     let transcriptBuffer = "";
+
+    function broadcastMessage(message) {
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        });
+    }
 
     wss.on("connection", (ws) => {
         logToFile("socket: client connected");
@@ -144,7 +167,7 @@ function startServer() {
         const { host, port } = req.query;
         const socket = new net.Socket();
     
-        socket.setTimeout(2000); // Set a timeout for the connection attempt
+        socket.setTimeout(2000); // Set a timeout for the connection
     
         socket.on('connect', () => {
             logToFile(`Server at ${host}:${port} is reachable.`);
@@ -212,7 +235,7 @@ function startServer() {
         init_message = settings.init_message;
 
         for (let profile of profiles) {
-            const agentProcess = new AgentProcess();
+            const agentProcess = new AgentProcess(notifyBotKicked);
             agentProcess.start(profile, userDataDir, load_memory, init_message);
             agentProcesses.push(agentProcess);
         }

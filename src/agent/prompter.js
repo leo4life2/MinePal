@@ -75,6 +75,7 @@ export class Prompter {
 
     async replaceStrings(prompt, messages, examples=null, prev_memory=null, to_summarize=[], last_goals=null) {
         prompt = prompt.replaceAll('$NAME', this.agent.name);
+        prompt = prompt.replaceAll('$OWNER', this.agent.owner);
 
         if (prompt.includes('$STATS')) {
             let stats = await getCommand('!stats').perform(this.agent);
@@ -121,6 +122,7 @@ export class Prompter {
         if (remaining !== null) {
             console.warn('Unknown prompt placeholders:', remaining.join(', '));
         }
+
         return prompt;
     }
 
