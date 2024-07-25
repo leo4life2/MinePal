@@ -10,7 +10,6 @@ interface Options {
     eatingTimeout: number
     ignoreInventoryCheck: boolean
     checkOnItemPickup: boolean
-    offhand: boolean
     equipOldItem: boolean
 }
 
@@ -19,8 +18,9 @@ declare module 'mineflayer' {
         autoEat: {
             disabled: boolean
             isEating: boolean
+            hasFood: boolean
             options: Options
-            eat: (offhand?: boolean) => Promise<boolean>
+            eat: () => Promise<boolean>
             disable: () => void
             enable: () => void
         }
@@ -33,165 +33,72 @@ declare module 'mineflayer' {
     }
 }
 
+const DEFAULT_OPTIONS: Options = {
+    priority: 'auto',
+    startAt: 19,
+    healthThreshold: 14,
+    eatingTimeout: 3000,
+    bannedFood: [],
+    ignoreInventoryCheck: false,
+    checkOnItemPickup: true,
+    equipOldItem: true
+}
+
 export function plugin(bot: Bot) {
-    // @ts-ignore - Initializations
-    bot.autoEat = {}
-    bot.autoEat.disabled = false
-    bot.autoEat.isEating = false
-    bot.autoEat.options = {
-        priority: 'auto',
-        startAt: 16,
-        healthThreshold: 14,
-        eatingTimeout: 3000,
-        bannedFood: [
-            // puffer fish - only gives negative effects
-            bot.registry.foodsByName['pufferfish'].id,
-            // spider eye - gives poison effect
-            bot.registry.foodsByName['spider_eye'].id,
-            // poisonous potato - gives poison effect
-            bot.registry.foodsByName['poisonous_potato'].id,
-            // rotten flesh - gives hunger effect (and is disgusting)
-            bot.registry.foodsByName['rotten_flesh'].id,
-            // chorus fruit - randomly teleports you
-            bot.registry.foodsByName['chorus_fruit'].id,
-            // raw chicken - 30% chance of getting hunger effect
-            bot.registry.foodsByName['chicken'].id,
-            // suspicious stew - gives random effects (including hunger)
-            bot.registry.foodsByName['suspicious_stew'].id,
-            // golden apple - shouldn't be eaten unless the user wants to
-            bot.registry.foodsByName['golden_apple'].id
-        ],
-        ignoreInventoryCheck: false,
-        checkOnItemPickup: true,
-        offhand: true,
-        equipOldItem: true
-    }
-
-    bot.autoEat.disable = () => {
-        bot.autoEat.disabled = true
-    }
-
-    bot.autoEat.enable = () => {
-        bot.autoEat.disabled = false
-    }
-
-    bot.autoEat.eat = async (useOffhand = bot.autoEat.options.offhand) => {
-        if (bot.autoEat.disabled || bot.autoEat.isEating || bot.food > 19) return false
-
-        let startAt = bot.autoEat.options.startAt
-
-        if (
-            bot.autoEat.options.priority === 'auto' &&
-            bot.health <= bot.autoEat.options.healthThreshold
-        ) {
-            startAt = 19
-        }
-
-        if (bot.food > startAt) return false
-
-        bot.autoEat.isEating = true
-
-        const canOffhand = !bot.supportFeature('doesntHaveOffHandSlot')
-        const priority = bot.autoEat.options.priority
-        const banned = bot.autoEat.options.bannedFood
-        const food = bot.registry.foodsByName
-        const items = bot.inventory.items()
-        const offhandItem = bot.inventory.slots[45]
-        const offhand = useOffhand && canOffhand
-
-        if (offhandItem && canOffhand) items.push(offhandItem)
-
-        const bestChoices = items
-            .filter((item) => item.name in bot.registry.foodsByName)
-            .filter((item) => !banned.includes(item.type))
-            .sort((a, b) => {
-                if (priority !== 'auto') return food[b.name][priority] - food[a.name][priority]
-
-                if (bot.health <= bot.autoEat.options.healthThreshold) {
-                    return food[b.name].saturation - food[a.name].saturation
-                } else {
-                    return food[b.name].foodPoints - food[a.name].foodPoints
-                }
-            })
-
-        if (bestChoices.length === 0) {
-            bot.autoEat.isEating = false
-            bot.emit('autoeat_error', new Error('No food found'))
-            return false
-        }
-
-        let bestFood = bestChoices[0]
-        const usedHand: EquipmentDestination = offhand ? 'off-hand' : 'hand'
-
-        // Find the food that has the closest amount of points needed to be full
-        // This is to prevent wasting food
-        if (
-            priority === 'foodPoints' ||
-            (priority === 'auto' && bot.health > bot.autoEat.options.healthThreshold)
-        ) {
-            const neededPoints = 20 - bot.food
-            const bestFoodPoints = food[bestFood.name].foodPoints
-
-            for (const item of bestChoices) {
-                const points = food[item.name].foodPoints
-
-                if (Math.abs(points - neededPoints) < Math.abs(bestFoodPoints - neededPoints)) {
-                    bestFood = item
-                }
+    bot.autoEat = {
+        disabled: false,
+        isEating: false,
+        hasFood: true, // Initialize hasFood to true
+        options: { ...DEFAULT_OPTIONS, bannedFood: getBannedFood(bot) },
+        disable: () => { bot.autoEat.disabled = true },
+        enable: () => { bot.autoEat.disabled = false },
+        eat: async () => {
+            if (bot.autoEat.disabled || bot.food > 19 || bot.food > bot.autoEat.options.startAt) {
+                bot.autoEat.isEating = false
+                console.log(`[autoeat] Skipping: ${bot.autoEat.disabled ? 'disabled' : bot.food > 19 ? 'food > 19' : 'food > startAt'} (food: ${bot.food}, startAt: ${bot.autoEat.options.startAt})`);
+                return false
             }
+
+            const bestFood = getBestFood(bot)
+            if (!bestFood) {
+                bot.emit('autoeat_error', new Error('No food found'))
+                bot.autoEat.isEating = false
+                bot.autoEat.hasFood = false // Set hasFood to false if no food found
+                bot.chat("I'm out of food!");
+                return false
+            }
+
+            await eatFood(bot, bestFood)
+            bot.autoEat.isEating = false
+            return true
         }
+    }
 
-        bot.emit('autoeat_started', bestFood, offhand)
-
-        const requiresConfirmation = bot.inventory.requiresConfirmation
-
-        if (bot.autoEat.options.ignoreInventoryCheck) bot.inventory.requiresConfirmation = false
-
-        const oldItem = bot.inventory.slots[bot.getEquipmentDestSlot(usedHand)]
-
-        await bot.equip(bestFood, usedHand)
-
-        bot.inventory.requiresConfirmation = requiresConfirmation
-
-        bot.deactivateItem()
-        bot.activateItem(offhand)
-
-        const time = performance.now()
-
-        while (
-            bot.autoEat.isEating &&
-            performance.now() - time < bot.autoEat.options.eatingTimeout &&
-            bot.inventory.slots[bot.getEquipmentDestSlot(usedHand)]?.name === bestFood.name
-        ) {
-            await sleep()
-        }
-
-        if (bot.autoEat.options.equipOldItem && oldItem && oldItem.name !== bestFood.name) {
-            await bot.equip(oldItem, usedHand)
-        }
-
-        bot.autoEat.isEating = false
-        bot.emit('autoeat_finished', bestFood, offhand)
-
-        return true
+    // Set startAt based on health threshold
+    if (bot.autoEat.options.priority === 'auto' && bot.health <= bot.autoEat.options.healthThreshold) {
+        bot.autoEat.options.startAt = 19
+    } else {
+        bot.autoEat.options.startAt = DEFAULT_OPTIONS.startAt
     }
 
     bot.on('playerCollect', async (who) => {
         if (!bot.autoEat.options.checkOnItemPickup || who.username !== bot.username) return
-
-        try {
-            await bot.waitForTicks(1)
-            await bot.autoEat.eat()
-        } catch (error) {
-            bot.emit('autoeat_error', error as Error)
-        }
+        // console.log("[autoeat] collect try eat");
+        bot.autoEat.hasFood = true // Set hasFood to true on playerCollect event
+        await tryEat(bot)
     })
 
     bot.on('health', async () => {
-        try {
-            await bot.autoEat.eat()
-        } catch (error) {
-            bot.emit('autoeat_error', error as Error)
+        if (bot.food < bot.autoEat.options.startAt && !bot.autoEat.isEating && bot.autoEat.hasFood) {
+            // console.log("[autoeat] health eating");
+            await tryEat(bot);
+        }
+    })
+
+    bot.on('physicsTick', async () => {
+        if (bot.food < bot.autoEat.options.startAt && !bot.autoEat.isEating && bot.autoEat.hasFood) {
+            // console.log("[autoeat] physics tick eating!");
+            await tryEat(bot);
         }
     })
 
@@ -204,12 +111,101 @@ export function plugin(bot: Bot) {
     })
 
     bot._client.on('entity_status', (packet: any) => {
-        if (
-            packet.entityId === bot.entity.id &&
-            packet.entityStatus === 9 &&
-            bot.autoEat.isEating
-        ) {
+        if (packet.entityId === bot.entity.id && packet.entityStatus === 9 && bot.autoEat.isEating) {
             bot.autoEat.isEating = false
         }
     })
+
+    bot.on('autoeat_error', (error: Error) => {
+        console.log(`[AutoEat] error: ${error.message}`)
+    })
+}
+
+function getBannedFood(bot: Bot): number[] {
+    return [
+        bot.registry.foodsByName['pufferfish'].id,
+        bot.registry.foodsByName['spider_eye'].id,
+        bot.registry.foodsByName['poisonous_potato'].id,
+        bot.registry.foodsByName['rotten_flesh'].id,
+        bot.registry.foodsByName['chorus_fruit'].id,
+        bot.registry.foodsByName['chicken'].id,
+        bot.registry.foodsByName['suspicious_stew'].id,
+        bot.registry.foodsByName['golden_apple'].id
+    ]
+}
+
+function getBestFood(bot: Bot): Item | null {
+    const priority = bot.autoEat.options.priority
+    const banned = bot.autoEat.options.bannedFood
+    const food = bot.registry.foodsByName
+    const items = bot.inventory.items()
+
+    const bestChoices = items
+        .filter((item) => item.name in bot.registry.foodsByName)
+        .filter((item) => !banned.includes(item.type))
+        .sort((a, b) => {
+            if (priority !== 'auto') return food[b.name][priority] - food[a.name][priority]
+            if (bot.health <= bot.autoEat.options.healthThreshold) {
+                return food[b.name].saturation - food[a.name].saturation
+            } else {
+                return food[b.name].foodPoints - food[a.name].foodPoints
+            }
+        })
+
+    if (bestChoices.length === 0) return null
+
+    let bestFood = bestChoices[0]
+    if (priority === 'foodPoints' || (priority === 'auto' && bot.health > bot.autoEat.options.healthThreshold)) {
+        const neededPoints = 20 - bot.food
+        const bestFoodPoints = food[bestFood.name].foodPoints
+
+        for (const item of bestChoices) {
+            const points = food[item.name].foodPoints
+            if (Math.abs(points - neededPoints) < Math.abs(bestFoodPoints - neededPoints)) {
+                bestFood = item
+            }
+        }
+    }
+
+    return bestFood
+}
+
+async function eatFood(bot: Bot, bestFood: Item) {
+    const usedHand: EquipmentDestination = 'hand'
+    bot.emit('autoeat_started', bestFood, false)
+
+    const requiresConfirmation = bot.inventory.requiresConfirmation
+    if (bot.autoEat.options.ignoreInventoryCheck) bot.inventory.requiresConfirmation = false
+
+    const oldItem = bot.inventory.slots[bot.getEquipmentDestSlot(usedHand)]
+    await bot.equip(bestFood, usedHand)
+    bot.inventory.requiresConfirmation = requiresConfirmation
+
+    bot.deactivateItem();
+    await bot.consume();
+
+    const time = performance.now()
+    while (bot.autoEat.isEating && performance.now() - time < bot.autoEat.options.eatingTimeout &&
+        bot.inventory.slots[bot.getEquipmentDestSlot(usedHand)]?.name === bestFood.name) {
+        await sleep()
+    }
+
+    if (bot.autoEat.options.equipOldItem && oldItem && oldItem.name !== bestFood.name) {
+        await bot.equip(oldItem, usedHand)
+    }
+
+    bot.autoEat.isEating = false
+    bot.emit('autoeat_finished', bestFood, false)
+}
+
+async function tryEat(bot: Bot) {
+    if (bot.autoEat.isEating) return;
+
+    bot.autoEat.isEating = true
+    try {
+        await bot.waitForTicks(1)
+        await bot.autoEat.eat()
+    } catch (error) {
+        bot.emit('autoeat_error', error as Error)
+    }
 }

@@ -803,6 +803,7 @@ function inject (bot) {
         forward: 0.0,
         jump: 0x02
       })
+      bot.vehicle = null;
     } else {
       bot.emit('error', new Error('dismount: not mounted'))
     }

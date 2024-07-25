@@ -69,13 +69,6 @@ export class Agent {
                 this.handleMessage(username, message);
             });
 
-            // Configure auto-eat settings
-            this.bot.autoEat.options = {
-                priority: 'foodPoints',
-                startAt: 14,
-                bannedFood: ["rotten_flesh", "spider_eye", "poisonous_potato", "pufferfish", "chicken"]
-            };
-
             // Handle initial message or send a greeting
             if (init_message) {
                 this.handleMessage('system', init_message);

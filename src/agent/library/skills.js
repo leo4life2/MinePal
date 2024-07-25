@@ -351,16 +351,79 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
         log(bot, `Invalid number of blocks to collect: ${num}.`);
         return false;
     }
+    // Define common block types where the block and drop are different
+    const blockDropMap = {
+        'stone': ['cobblestone'],
+        'coal_ore': ['coal', 'deepslate_coal_ore'],
+        'iron_ore': ['raw_iron', 'deepslate_iron_ore'],
+        'gold_ore': ['raw_gold', 'deepslate_gold_ore'],
+        'diamond_ore': ['diamond', 'deepslate_diamond_ore'],
+        'redstone_ore': ['redstone', 'deepslate_redstone_ore'],
+        'lapis_ore': ['lapis_lazuli', 'deepslate_lapis_ore'],
+        'emerald_ore': ['emerald', 'deepslate_emerald_ore'],
+        'nether_quartz_ore': ['quartz'],
+        'grass_block': ['dirt'],
+        'gravel': ['flint'],
+        'snow': ['snowball'],
+        'clay': ['clay_ball'],
+        'glowstone': ['glowstone_dust'],
+        'nether_gold_ore': ['gold_nugget'],
+        'ancient_debris': ['netherite_scrap']
+    };
+
     let blocktypes = [blockType];
-    if (blockType.endsWith('ore'))
-        blocktypes.push('deepslate_'+blockType);
-    if (blockType === 'dirt')
-        blocktypes.push('grass_block');
+
+    // Check if the requested block type has a different drop or deepslate variant
+    if (blockDropMap[blockType]) {
+        blocktypes = [...blocktypes, ...blockDropMap[blockType]];
+    }
+
+    // Check if we're looking for a drop instead of a block
+    for (const [block, drops] of Object.entries(blockDropMap)) {
+        if (drops.includes(blockType)) {
+            blocktypes.push(block);
+        }
+    }
+
+    // Remove duplicates
+    blocktypes = [...new Set(blocktypes)];
+
+    // Special case for cobblestone when none is visible
+    if (blocktypes.includes('cobblestone')) {
+        const safeBlocks = ['grass_block', 'dirt', 'sand', 'gravel', 'stone', 'andesite', 'diorite', 'granite'];
+        const currentBlock = bot.blockAt(bot.entity.position.offset(0, -1, 0));
+        
+        // Check if no cobblestone is visible nearby
+        let nearbyBlocks = world.getNearestBlocks(bot, ['cobblestone'], 16);
+        if (nearbyBlocks.length === 0 && safeBlocks.includes(currentBlock.name)) {
+            let depth = 0;
+            while (depth < 64) {  // Limit to avoid digging too deep
+                const blockBelow = bot.blockAt(bot.entity.position.offset(0, -1 - depth, 0));
+                if (blockBelow.name === 'cobblestone') {
+                    break;
+                }
+                if (!safeBlocks.includes(blockBelow.name)) {
+                    break;
+                }
+                await breakBlockAt(bot, blockBelow.position.x, blockBelow.position.y, blockBelow.position.z);
+                // await bot.pathfinder.goto(new pf.goals.GoalBlock(blockBelow.position.x, blockBelow.position.y, blockBelow.position.z));
+                depth++;
+                
+                nearbyBlocks = world.getNearestBlocks(bot, ['cobblestone'], 16);
+                if (nearbyBlocks.length > 0) {
+                    break;
+                }
+            }
+        }
+    }
 
     let collected = 0;
+    let retries = 0;
 
-    for (let i=0; i<num; i++) {
-        let blocks = world.getNearestBlocks(bot, blocktypes, 64);
+    console.log("starting collect loop");
+
+    while (collected < num && retries < 10) {
+        let blocks = world.getNearestBlocks(bot, blocktypes, 128);
         if (exclude) {
             for (let position of exclude) {
                 blocks = blocks.filter(
@@ -369,15 +432,17 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
             }
         }
         if (blocks.length === 0) {
-            if (collected === 0)
-                log(bot, `No ${blockType} nearby to collect.`);
-            else
-                log(bot, `No more ${blockType} nearby to collect.`);
-            break;
+            retries++;
+            // Move around a tiny bit
+            const pos = bot.entity.position;
+            const randomOffset = () => (Math.random() - 0.5) * 2; // Random offset between -1 and 1
+            await goToPosition(bot, pos.x + randomOffset(), pos.y, pos.z + randomOffset(), 1);
+            console.log("no blocks, moving and retrying");
+            continue;
         }
         const block = blocks[0];
         await bot.tool.equipForBlock(block);
-        const itemId = bot.heldItem ? bot.heldItem.type : null
+        const itemId = bot.heldItem ? bot.heldItem.type : null;
         if (!block.canHarvest(itemId)) {
             log(bot, `Don't have right tools to harvest ${blockType}.`);
             return false;
@@ -386,20 +451,16 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
             await bot.collectBlock.collect(block);
             collected++;
             await autoLight(bot);
-        }
-        catch (err) {
+        } catch (err) {
             if (err.name === 'NoChests') {
                 log(bot, `Failed to collect ${blockType}: Inventory full, no place to deposit.`);
                 break;
-            }
-            else {
-                log(bot, `Failed to collect ${blockType}: ${err}.`);
+            } else {
+                retries++;
                 continue;
             }
         }
-        
-        if (bot.interrupt_code)
-            break;  
+        if (bot.interrupt_code) break;
     }
     log(bot, `Collected ${collected} ${blockType}.`);
     return collected > 0;
@@ -1062,6 +1123,34 @@ export async function activateNearestBlock(bot, type) {
     return true;
 }
 
+export async function activateNearestEntity(bot, entityType) {
+    /**
+     * Activate the nearest entity of the given type.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {string} entityType, the type of entity to activate.
+     * @returns {Promise<boolean>} true if the entity was activated, false otherwise.
+     * @example
+     * await skills.activateNearestEntity(bot, "villager");
+     **/
+    let entity = world.getNearestEntityWhere(bot, entity => entity.name === entityType, 16);
+    if (!entity) {
+        log(bot, `Could not find any ${entityType} to activate.`);
+        return false;
+    }
+    if (entity === bot.vehicle) {
+        log(bot, `Already riding the nearest ${entityType}.`);
+        return false;
+    }
+    if (bot.entity.position.distanceTo(entity.position) > 4.5) {
+        let pos = entity.position;
+        bot.pathfinder.setMovements(new pf.Movements(bot));
+        await bot.pathfinder.goto(new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+    }
+    await bot.activateEntity(entity);
+    log(bot, `Activated ${entityType} at x:${entity.position.x.toFixed(1)}, y:${entity.position.y.toFixed(1)}, z:${entity.position.z.toFixed(1)}.`);
+    return true;
+}
+
 export async function useOn(bot, targetEntity) {
     /**
      * Uses the currently held item on the specified entity.
@@ -1223,7 +1312,7 @@ export function startCrouching(bot) {
      * @example
      * skills.startCrouching(bot);
      **/
-    bot.setControlState('sneak', true);
+    bot.pathfinder.sneak = true;
     log(bot, 'Started crouching.');
 }
 
@@ -1234,7 +1323,7 @@ export function stopCrouching(bot) {
      * @example
      * skills.stopCrouching(bot);
      **/
-    bot.setControlState('sneak', false);
+    bot.pathfinder.sneak = false;
     log(bot, 'Stopped crouching.');
 }
 
@@ -1264,5 +1353,26 @@ export async function consume(bot, itemName) {
     }
 }
 
+export async function dismount(bot) {
+    /**
+     * Dismount the bot from any entity it is currently riding.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @returns {Promise<boolean>} true if the bot dismounted, false otherwise.
+     * @example
+     * await skills.dismount(bot);
+     **/
+    if (!bot.vehicle) {
+        log(bot, 'The bot is not riding any entity.');
+        return false;
+    }
 
+    try {
+        await bot.dismount();
+        log(bot, 'Successfully dismounted.');
+        return true;
+    } catch (err) {
+        log(bot, `Failed to dismount: ${err.message}`);
+        return false;
+    }
+}
 

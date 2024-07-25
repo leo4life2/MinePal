@@ -204,7 +204,8 @@ export class Coder {
             this.executing = false;
             clearTimeout(TIMEOUT);
             this.cancelResume();
-            console.error(`Process ${process.pid}: Code execution triggered catch: ${err}`);
+            console.error(`Process ${process.pid}: Code execution triggered catch:`);
+            console.error(err.stack);
             console.log("[CODERSTOP] Execute catch.");
             await this.stop();
 

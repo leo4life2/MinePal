@@ -124,6 +124,18 @@ export const actionsList = [
     }),
   },
   {
+    name: "!goToCoordinates",
+    description: "Navigate to the specified coordinates.",
+    params: {
+      x: "(number) The x coordinate to navigate to.",
+      y: "(number) The y coordinate to navigate to.",
+      z: "(number) The z coordinate to navigate to.",
+    },
+    perform: wrapExecution(async (agent, x, y, z) => {
+      await skills.goToPosition(agent.bot, x, y, z);
+    }),
+  },
+  {
     name: "!givePlayer",
     description: "Give the specified item to the given player.",
     params: {
@@ -155,7 +167,7 @@ export const actionsList = [
     },
     perform: wrapExecution(
       async (agent, type) => {
-        let success = await skills.collectBlock(agent.bot, type, 1);
+        let success = await skills.collectBlock(agent.bot, type, 2368); // 2368 = total slots * 1 stack
         if (!success) agent.coder.cancelResume();
       },
       10,
@@ -216,6 +228,15 @@ export const actionsList = [
     params: { type: "(string) The type of object to activate." },
     perform: wrapExecution(async (agent, type) => {
       await skills.activateNearestBlock(agent.bot, type);
+    }),
+  },
+  {
+    name: "!activateEntity",
+    description: "Activate the nearest entity of a given type. E.g. boat, horse.",
+    params: { type: "(string) The type of entity to activate." },
+    perform: wrapExecution(async (agent, type) => {
+      const success = await skills.activateNearestEntity(agent.bot, type);
+      return success ? `Activated nearest ${type}.` : `No ${type} found nearby.`;
     }),
   },
   {
@@ -294,20 +315,28 @@ export const actionsList = [
       return await skills.consume(agent.bot, itemName);
     }),
   },
-  // {
-  //   name: "!startCrouching",
-  //   description: "Make the agent start crouching.",
-  //   perform: wrapExecution(async (agent) => {
-  //     await skills.startCrouching(agent.bot);
-  //   }),
-  // },
-  // {
-  //   name: "!stopCrouching",
-  //   description: "Make the agent stop crouching.",
-  //   perform: wrapExecution(async (agent) => {
-  //     await skills.stopCrouching(agent.bot);
-  //   }),
-  // },
+  {
+    name: "!dismount",
+    description: "Dismount the bot from any entity it is currently riding.",
+    perform: wrapExecution(async (agent) => {
+      const success = await skills.dismount(agent.bot);
+      return success ? "Successfully dismounted." : "Failed to dismount or not riding any entity.";
+    }),
+  },
+  {
+    name: "!startCrouching",
+    description: "AKA sneak. Make the agent start crouching.",
+    perform: wrapExecution(async (agent) => {
+      await skills.startCrouching(agent.bot);
+    }),
+  },
+  {
+    name: "!stopCrouching",
+    description: "AKA sneak. Make the agent stop crouching.",
+    perform: wrapExecution(async (agent) => {
+      await skills.stopCrouching(agent.bot);
+    }),
+  },
   // {
   //   name: "!getControlState",
   //   description: "Get the current control state of the agent.",

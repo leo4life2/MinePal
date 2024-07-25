@@ -60,6 +60,7 @@ function goto (bot, goal) {
     bot.on('goal_reached', goalReached)
     bot.on('path_update', noPathListener)
     bot.on('goal_updated', goalChangedListener)
+    
     bot.pathfinder.setGoal(goal)
   })
 }

@@ -41,6 +41,7 @@ function inject(bot) {
   bot.pathfinder.searchRadius = -1; // in blocks, limits of the search area, -1: don't limit the search
   bot.pathfinder.enablePathShortcut = false; // disabled by default as it can cause bugs in specific configurations
   bot.pathfinder.LOSWhenPlacingBlocks = true;
+  bot.pathfinder.sneak = false;
 
   bot.pathfinder.bestHarvestTool = (block) => {
     const availableTools = bot.inventory.items();
@@ -511,9 +512,21 @@ function inject(bot) {
           target.position.distanceSquared(bot.entity.position) >
           stateGoal.rangeSq
         ) {
-          bot.setControlState("forward", true);
+          if (bot.vehicle) {
+            console.log("vehicle move forward");
+            bot.moveVehicle(0, 1); // Move forward
+          } else {
+            console.log("foot move forward");
+            bot.setControlState("forward", true);
+          }
         } else {
-          bot.clearControlStates();
+          if (bot.vehicle) {
+            console.log("vehicle stop");
+            bot.moveVehicle(0, 0); // Stop
+          } else {
+            bot.clearControlStates();
+            console.log("foot stop");
+          }
         }
         return;
       }
@@ -673,27 +686,34 @@ function inject(bot) {
               if (interactableBlocks.includes(refBlock.name)) {
                 bot.setControlState("sneak", true);
               }
-              bot
-                .placeBlock(
-                  refBlock,
-                  new Vec3(placingBlock.dx, placingBlock.dy, placingBlock.dz)
-                )
-                .then(function () {
-                  // Dont release Sneak if the block placement was not successful
-                  bot.setControlState("sneak", false);
-                  if (
-                    bot.pathfinder.LOSWhenPlacingBlocks &&
-                    placingBlock.returnPos
+
+              // Spam placeBlock while jumping
+              const placeBlockInterval = setInterval(() => {
+                bot
+                  .placeBlock(
+                    refBlock,
+                    new Vec3(placingBlock.dx, placingBlock.dy, placingBlock.dz)
                   )
-                    returningPos = placingBlock.returnPos.clone();
-                })
-                .catch((_ignoreError) => {
-                  resetPath("place_error");
-                })
-                .then(() => {
-                  placing = false;
-                  lastNodeTime = performance.now();
-                });
+                  .then(function () {
+                    clearInterval(placeBlockInterval); // Stop spamming once successful
+                    bot.setControlState("sneak", false);
+                    if (
+                      bot.pathfinder.LOSWhenPlacingBlocks &&
+                      placingBlock.returnPos
+                    )
+                      returningPos = placingBlock.returnPos.clone();
+                    
+                    // Emit blockPlaced event
+                    const newBlock = bot.blockAt(
+                      new Vec3(placingBlock.x, placingBlock.y, placingBlock.z)
+                    );
+                    bot.emit('blockPlaced', refBlock, newBlock);
+                  })
+                  .catch((_ignoreError) => {
+                    // Keep trying until successful
+                  });
+              }, 50); // Adjust the interval as needed
+
             })
             .catch((_ignoreError) => {});
         }
@@ -738,31 +758,37 @@ function inject(bot) {
       dz = nextPoint.z - p.z;
     }
 
-    bot.look(Math.atan2(-dx, -dz), 0);
-    bot.setControlState("forward", true);
-    bot.setControlState("jump", false);
-
-    if (bot.entity.isInWater) {
-      bot.setControlState("jump", true);
-      bot.setControlState("sprint", false);
-    } else if (
-      stateMovements.allowSprinting &&
-      physics.canStraightLine(path, true)
-    ) {
-      bot.setControlState("jump", false);
-      bot.setControlState("sprint", true);
-    } else if (stateMovements.allowSprinting && physics.canSprintJump(path)) {
-      bot.setControlState("jump", true);
-      bot.setControlState("sprint", true);
-    } else if (physics.canStraightLine(path)) {
-      bot.setControlState("jump", false);
-      bot.setControlState("sprint", false);
-    } else if (physics.canWalkJump(path)) {
-      bot.setControlState("jump", true);
-      bot.setControlState("sprint", false);
+    if (bot.vehicle) {
+      console.log("Vehicle movement");
+      bot.moveVehicle(dx > 0 ? 1 : -1, dz > 0 ? 1 : -1);
     } else {
-      bot.setControlState("forward", false);
-      bot.setControlState("sprint", false);
+      bot.look(Math.atan2(-dx, -dz), 0);
+      bot.setControlState("forward", true);
+      bot.setControlState("jump", false);
+      bot.setControlState('sneak', bot.pathfinder.sneak);
+
+      if (bot.entity.isInWater) {
+        bot.setControlState("jump", true);
+        bot.setControlState("sprint", false);
+      } else if (
+        stateMovements.allowSprinting &&
+        physics.canStraightLine(path, true)
+      ) {
+        bot.setControlState("jump", false);
+        bot.setControlState("sprint", true);
+      } else if (stateMovements.allowSprinting && physics.canSprintJump(path)) {
+        bot.setControlState("jump", true);
+        bot.setControlState("sprint", true);
+      } else if (physics.canStraightLine(path)) {
+        bot.setControlState("jump", false);
+        bot.setControlState("sprint", false);
+      } else if (physics.canWalkJump(path)) {
+        bot.setControlState("jump", true);
+        bot.setControlState("sprint", false);
+      } else {
+        bot.setControlState("forward", false);
+        bot.setControlState("sprint", false);
+      }
     }
 
     // check for futility

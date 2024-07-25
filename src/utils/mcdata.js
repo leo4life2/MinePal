@@ -53,7 +53,19 @@ class MCData {
 
     isHostile(mob) {
         if (!mob || !mob.name) return false;
-        return (mob.type === 'mob' || mob.type === 'hostile') && mob.name !== 'iron_golem' && mob.name !== 'snow_golem';
+        
+        const conditionallyHostile = [
+            'wolf', 'bee', 'polar_bear', 'llama', 'trader_llama', 
+            'panda', 'iron_golem', 'enderman', 'zombified_piglin'
+        ];
+        
+        if (conditionallyHostile.includes(mob.name.toLowerCase())) {
+            // These mobs are only hostile under certain conditions
+            // For simplicity, we're considering them non-hostile by default
+            return false;
+        }
+        
+        return (mob.type === 'mob' || mob.type === 'hostile');
     }
 
     getItemId(itemName) {

@@ -11,7 +11,6 @@ export class GPT {
 
         let res = null;
         try {
-            console.log('Awaiting backend API response...');
             const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, {
                 model_name: this.model_name,
                 messages: messages,
