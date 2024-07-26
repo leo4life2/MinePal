@@ -8,6 +8,7 @@ import fs from 'fs';
 import cors from 'cors';
 import path from 'path';
 import net from 'net';
+import pidusage from 'pidusage';
 
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -267,6 +268,31 @@ function startServer() {
     });
 
     logToFile("Server started successfully.");
+
+    // CPU and Memory Usage Tracking
+    let maxCpu = 0;
+    let maxMemory = 0;
+
+    setInterval(async () => {
+        try {
+            const pids = [process.pid, ...agentProcesses.map(ap => ap.agentProcess.pid)];
+            const stats = await Promise.all(pids.map(pid => pidusage(pid)));
+
+            const totalCpu = stats.reduce((acc, stat) => acc + stat.cpu, 0);
+            const totalMemory = stats.reduce((acc, stat) => acc + stat.memory, 0);
+
+            if (totalCpu > maxCpu) maxCpu = totalCpu;
+            if (totalMemory > maxMemory) maxMemory = totalMemory;
+        } catch (err) {
+            logToFile(`Error fetching usage stats: ${err.message}`);
+        }
+    }, 300);
+
+    setInterval(() => {
+        logToFile(`Max CPU: ${maxCpu.toFixed(2)}%, Max Memory: ${(maxMemory / 1024 / 1024).toFixed(2)} MB`);
+        maxCpu = 0;
+        maxMemory = 0;
+    }, 5000);
 }
 
 export { startServer };

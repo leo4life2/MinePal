@@ -35,7 +35,8 @@
     "devDependencies": {
         "@electron/notarize": "^2.3.2",
         "electron": "^31.2.0",
-        "electron-builder": "^24.13.3"
+        "electron-builder": "^24.13.3",
+        "pidusage": "^3.0.2"
     },
     "build": {
         "appId": "com.nemosai.minepal",
