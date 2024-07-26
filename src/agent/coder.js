@@ -1,14 +1,16 @@
 import { writeFile, readFile, mkdirSync } from 'fs';
+import { EventEmitter } from 'events';
 
-export class Coder {
+export class Coder extends EventEmitter {
     constructor(agent) {
+        super();
         this.agent = agent;
         this.file_counter = 0;
         this.fp = `${this.agent.userDataDir}/bots/${agent.name}/action-code/`;
-        this.executing = false;
         this.generating = false;
         this.code_template = '';
         this.timedout = false;
+        this.stopLock = false; // Add a lock flag
         readFile(`${this.agent.appPath}/bots/template.js`, 'utf8', (err, data) => {
             if (err) throw err;
             this.code_template = data;
@@ -81,6 +83,7 @@ export class Coder {
         // wrapper to prevent overlapping code generation loops
         console.log("[CODERSTOP] Generate code.");
         await this.stop();
+        console.log("[CODERSTOP] Generate code stop success.");
         this.generating = true;
         let res = await this.generateCodeLoop(agent_history);
         this.generating = false;
@@ -183,15 +186,14 @@ export class Coder {
 
         let TIMEOUT;
         try {
-            console.log('[CODERSTOP] executing code...\n');
+            console.log('[CODERSTOP] executing code stop\n');
             await this.stop();
+            console.log('[CODERSTOP] executing code stop success\n');
             this.clear();
 
-            this.executing = true;
             if (timeout > 0)
                 TIMEOUT = this._startTimeout(timeout);
             await func(); // open fire
-            this.executing = false;
             clearTimeout(TIMEOUT);
 
             let output = this.formatOutput(this.agent.bot);
@@ -201,13 +203,13 @@ export class Coder {
             if (!interrupted && !this.generating) this.agent.bot.emit('idle');
             return {success:true, message: output, interrupted, timedout};
         } catch (err) {
-            this.executing = false;
             clearTimeout(TIMEOUT);
             this.cancelResume();
             console.error(`Process ${process.pid}: Code execution triggered catch:`);
             console.error(err.stack);
             console.log("[CODERSTOP] Execute catch.");
             await this.stop();
+            console.log("[CODERSTOP] Execute catch stop success.");
 
             let message = this.formatOutput(this.agent.bot) + '!!Code threw exception!!  Error: ' + err;
             let interrupted = this.agent.bot.interrupt_code;
@@ -232,22 +234,35 @@ export class Coder {
     }
 
     async stop() {
-        if (!this.executing) return;
-        const start = Date.now();
+        if (this.stopLock) return; // Check if stop is already executing
+        this.stopLock = true; // Set the lock
+
         this.agent.bot.interrupt_code = true;
-        this.agent.bot.collectBlock.cancelTask();
-        this.agent.bot.pathfinder.stop();
-        this.agent.bot.pvp.stop();
+        this.agent.bot.collectBlock.cancelTask(() => {
+            this.emit('executionStopped');
+        });
+        this.agent.bot.pathfinder.stop(); // sync, oneline
+        this.agent.bot.pvp.stop(); // async
+        this.agent.bot.once('stoppedAttacking', () => {
+            this.emit('executionStopped');
+        });
+
         console.log('waiting for code to finish executing...');
 
-        while (this.executing) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            if (Date.now() - start > 20 * 1000) { // Increased timeout to 20 seconds
-                console.log('[CLEANKILL] Code execution refused to stop after 20 seconds.');
-                this.agent.cleanKill('Code execution refused to stop after 20 seconds. Killing process.');
-                break;
-            }
-        }
+        const timeout = setTimeout(() => {
+            console.log('[CLEANKILL] Code execution refused to stop after 50 seconds.');
+            console.trace('Trace for cleanKill call:');
+            this.agent.cleanKill('Code execution refused to stop after 50 seconds. Killing process.');
+        }, 50 * 1000); // Increased timeout to 50 seconds
+
+        await new Promise(resolve => {
+            this.once('executionStopped', () => {
+                clearTimeout(timeout);
+                resolve();
+            });
+        });
+
+        this.stopLock = false; // Release the lock after execution
     }
 
     clear() {
@@ -263,6 +278,7 @@ export class Coder {
             this.agent.history.add('system', `Code execution timed out after ${TIMEOUT_MINS} minutes. Attempting force stop.`);
             console.log("[CODERSTOP] Timeout.");
             await this.stop(); // last attempt to stop
+            console.log("[CODERSTOP] Timeout stop success.");
         }, TIMEOUT_MINS*60*1000);
     }
 }

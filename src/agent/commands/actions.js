@@ -209,9 +209,12 @@ export const actionsList = [
   {
     name: "!attack",
     description: "Attack and kill the nearest entity of a given type.",
-    params: { type: "(string) The type of entity to attack." },
-    perform: wrapExecution(async (agent, type) => {
-      await skills.attackNearest(agent.bot, type, true);
+    params: { 
+      type: "(string) The type of entity to attack. If it's a player, give the player's name.",
+      isPlayer: "(boolean) Whether the target is a player or not. If type is not a Minecraft mob type, this is true."
+    },
+    perform: wrapExecution(async (agent, type, isPlayer) => {
+      await skills.attackNearest(agent.bot, type, true, isPlayer);
     }),
   },
   {

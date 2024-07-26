@@ -240,7 +240,7 @@ export async function clearNearestFurnace(bot) {
 }
 
 
-export async function attackNearest(bot, mobType, kill=true) {
+export async function attackNearest(bot, mobType, kill=true, isPlayer=false) {
     /**
      * Attack mob of the given type.
      * @param {MinecraftBot} bot, reference to the minecraft bot.
@@ -252,11 +252,16 @@ export async function attackNearest(bot, mobType, kill=true) {
      **/
     bot.modes.pause('cowardice');
     const nearbyEntities = world.getNearbyEntities(bot, 24);
-    const mob = nearbyEntities.find(entity => entity !== bot.entity && entity.name === mobType);
+    let mob;
+    if (isPlayer) {
+        mob = nearbyEntities.find(entity => entity !== bot.entity && entity.type === 'player' && entity.username === mobType);
+    } else {
+        mob = nearbyEntities.find(entity => entity !== bot.entity && entity.name === mobType);
+    }
     if (mob) {
         return await attackEntity(bot, mob, kill);
     }
-    log(bot, 'Could not find any '+mobType+' to attack.');
+    log(bot, `Could not find any ${isPlayer ? 'player' : 'mob'} named ${mobType} to attack.`);
     return false;
 }
 
@@ -276,7 +281,7 @@ export async function attackEntity(bot, entity, kill=true) {
     await equipHighestAttack(bot)
 
     if (!kill) {
-        if (bot.entity.position.distanceTo(pos) > 5) {
+        if (bot.entity.position.distanceTo(pos) > 4) {
             console.log('moving to mob...')
             await goToPosition(bot, pos.x, pos.y, pos.z);
         }
