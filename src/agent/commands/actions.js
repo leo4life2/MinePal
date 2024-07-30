@@ -343,15 +343,15 @@ export const actionsList = [
       await skills.stopCrouching(agent.bot);
     }),
   },
-  // {
-  //   name: "!activateEntity",
-  //   description: "Activate the nearest entity of a given type. E.g. boat, horse.",
-  //   params: { type: "(string) The type of entity to activate." },
-  //   perform: wrapExecution(async (agent, type) => {
-  //     const success = await skills.activateNearestEntity(agent.bot, type);
-  //     return success ? `Activated nearest ${type}.` : `No ${type} found nearby.`;
-  //   }),
-  // },
+  {
+    name: "!activateEntity",
+    description: "Activate the nearest entity of a given type. E.g. boat, horse.",
+    params: { type: "(string) The type of entity to activate." },
+    perform: wrapExecution(async (agent, type) => {
+      const success = await skills.activateNearestEntity(agent.bot, type);
+      return success ? `Activated nearest ${type}.` : `No ${type} found nearby.`;
+    }),
+  },
     // {
   //   name: "!goal",
   //   description: "Set a goal to automatically work towards.",

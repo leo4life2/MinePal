@@ -249,18 +249,19 @@ export class Coder extends EventEmitter {
 
         console.log('waiting for code to finish executing...');
 
-        const timeout = setTimeout(() => {
-            console.log('[CLEANKILL] Code execution refused to stop after 50 seconds.');
-            console.trace('Trace for cleanKill call:');
-            this.agent.cleanKill('Code execution refused to stop after 50 seconds. Killing process.');
-        }, 50 * 1000); // Increased timeout to 50 seconds
+        // const timeout = setTimeout(() => {
+        //     console.log('[CLEANKILL] Code execution refused to stop after 50 seconds.');
+        //     console.trace('Trace for cleanKill call:');
+        //     this.agent.cleanKill('Code execution refused to stop after 50 seconds. Killing process.');
+        // }, 50 * 1000); // Increased timeout to 50 seconds
 
-        await new Promise(resolve => {
-            this.once('executionStopped', () => {
-                clearTimeout(timeout);
-                resolve();
-            });
-        });
+        // await new Promise(resolve => {
+        //     this.once('executionStopped', () => {
+        //         clearTimeout(timeout);
+        //         console.log("Clearing timeout.");
+        //         resolve();
+        //     });
+        // });
 
         this.stopLock = false; // Release the lock after execution
     }

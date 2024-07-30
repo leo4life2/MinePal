@@ -8,9 +8,6 @@ import MCData from '../utils/mcdata.js';
 // active: whether an action has been triggered by the mode and hasn't yet finished
 // paused: whether the mode is paused by another action that overrides the behavior (eg followplayer implements its own self defense)
 // update: the function that is called every tick (if on is true)
-// when a mode is active, it will trigger an action to be performed but won't wait for it to return output
-
-// the order of this list matters! first modes will be prioritized
 // while update functions are async, they should *not* be awaited longer than ~100ms as it will block the update loop
 // to perform longer actions, use the execute function which won't block the update loop
 const modes = [
@@ -97,6 +94,9 @@ const modes = [
         interrupts: ['all'],
         on: true,
         active: false,
+        lastMessageTime: 0, // Track the last message time
+        messageCooldown: 5000, // 5 seconds cooldown between messages
+        currentEnemyName: null, // Track the name of the current enemy being fought
         /**
          * Update function for self-defense mode.
          * Detects nearby hostile entities and makes the agent attack them.
@@ -105,10 +105,17 @@ const modes = [
         update: async function (agent) {
             const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 8);
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
-                agent.bot.chat(`Fighting ${enemy.name}!`);
+                const now = Date.now();
+                if (enemy.name !== this.currentEnemyName || now - this.lastMessageTime > this.messageCooldown) {
+                    agent.bot.chat(`Fighting ${enemy.name}!`);
+                    this.lastMessageTime = now;
+                    this.currentEnemyName = enemy.name;
+                }
                 execute(this, agent, async () => {
                     await skills.defendSelf(agent.bot, 8);
                 });
+            } else {
+                this.currentEnemyName = null; // Reset if no enemy is found
             }
         }
     },
