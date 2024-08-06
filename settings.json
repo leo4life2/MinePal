@@ -4,11 +4,7 @@
     "port": "5555",
     "auth": "offline",
     "player_username": "WhosMaCreeper",
-    "profiles": [
-        "./ethan.json"
-    ],
     "load_memory": true,
-    "init_message": "Say hello world and your name",
     "allow_insecure_coding": false,
     "code_timeout_mins": 10
 }

@@ -26,7 +26,6 @@
     },
     "scripts": {
         "postinstall": "patch-package",
-        "backend": "node server.js --mode server",
         "start": "electron .",
         "clean": "rm -rf dist",
         "buildLocal": "npm run clean && electron-builder",

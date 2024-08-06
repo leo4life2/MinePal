@@ -160,7 +160,27 @@ function startServer() {
     });
 
     app.get('/settings', (req, res) => {
-        res.json(settings);
+        const profilesDir = path.join(userDataDir, 'profiles');
+        const updatedProfiles = [];
+    
+        fs.readdirSync(profilesDir).forEach(file => {
+            if (file.endsWith('.json')) {
+                const profilePath = path.join(profilesDir, file);
+                const profileData = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+                updatedProfiles.push({
+                    name: profileData.name,
+                    personality: profileData.personality
+                });
+            }
+        });
+    
+        const updatedSettings = {
+            ...settings,
+            profiles: updatedProfiles
+        };
+    
+        fs.writeFileSync(settingsPath, JSON.stringify(updatedSettings, null, 4));
+        res.json(updatedSettings);
     });
 
     app.get('/check-server', (req, res) => {
@@ -206,7 +226,7 @@ function startServer() {
     });
 
     app.post('/start', express.json(), (req, res) => {
-        logToFile('API: POST /start called');
+        logToFile('API: POST /start called')
         if (agentProcessStarted) {
             logToFile('API: Agent process already started');
             return res.status(409).send('Agent process already started. Restart not allowed.');
@@ -228,6 +248,12 @@ function startServer() {
             });
         }
 
+        // removed from UI, hardcoding these settings
+        newSettings.allow_insecure_coding = false;
+        newSettings.code_timeout_mins = 10;
+        newSettings.auth = "offline";
+        newSettings.load_memory = true;
+
         Object.assign(settings, newSettings);
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
         profiles = settings.profiles;
@@ -235,13 +261,43 @@ function startServer() {
         init_message = settings.init_message;
 
         for (let profile of profiles) {
+            const profileBotName = profile.name;
             const agentProcess = new AgentProcess(notifyBotKicked);
-            agentProcess.start(profile, userDataDir, load_memory, init_message);
+            agentProcess.start(profileBotName, userDataDir, load_memory, init_message);
             agentProcesses.push(agentProcess);
         }
         agentProcessStarted = true;
         logToFile('API: Settings updated and AgentProcess started for all profiles');
         res.send('Settings updated and AgentProcess started for all profiles');
+    });
+
+    app.post('/save-profiles', express.json(), (req, res) => {
+        const profilesDir = path.join(userDataDir, 'profiles');
+        const ethanTemplatePath = path.join(electronApp.getAppPath(), 'ethan.json');
+        const newProfiles = req.body.profiles;
+
+        // Validate input
+        if (!Array.isArray(newProfiles) || newProfiles.some(profile => !profile.name || !profile.personality)) {
+            return res.status(400).json({ error: "Invalid input. Each profile must have 'name' and 'personality' fields." });
+        }
+
+        // Delete all existing profiles
+        fs.readdirSync(profilesDir).forEach(file => {
+            if (file.endsWith('.json')) {
+                fs.unlinkSync(path.join(profilesDir, file));
+            }
+        });
+
+        // Create new profiles
+        newProfiles.forEach(profile => {
+            const newProfilePath = path.join(profilesDir, `${profile.name}.json`);
+            const profileData = JSON.parse(fs.readFileSync(ethanTemplatePath, 'utf8'));
+            profileData.name = profile.name;
+            profileData.personality = profile.personality;
+            fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
+        });
+
+        res.json({ message: "Profiles saved successfully." });
     });
 
     const shutdown = () => {

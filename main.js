@@ -1,7 +1,13 @@
+import fs from 'fs';
+import { promisify } from 'util';
 import { app, BrowserWindow, systemPreferences } from 'electron';
 import path from 'path';
 import { startServer } from './server.js';
 import { createStream } from 'rotating-file-stream';
+
+const copyFile = promisify(fs.copyFile);
+const mkdir = promisify(fs.mkdir);
+const access = promisify(fs.access);
 
 let mainWindow;
 
@@ -18,10 +24,30 @@ function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
 }
 
+async function checkAndCopyProfile() {
+    const profilesDir = path.join(logDirectory, 'profiles');
+    const ethanJsonPath = path.join(app.getAppPath(), 'ethan.json');
+    const targetPath = path.join(profilesDir, 'ethan.json');
+
+    try {
+        await access(profilesDir);
+    } catch (err) {
+        await mkdir(profilesDir);
+        logToFile('Created profiles directory');
+        // Only add ethan if there's no profile dir.
+        try {
+            await copyFile(ethanJsonPath, targetPath);
+            logToFile('Copied ethan.json to profiles directory');
+        } catch (err) {
+            logToFile('Failed to copy ethan.json: ' + err);
+        }
+    }
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 650,
-        height: 700,
+        height: 800,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -76,6 +102,7 @@ if (!gotTheLock) {
     } catch (error) {
         logToFile("Failed to start server: " + error);
     }
+    await checkAndCopyProfile(); // Check and copy profile
   });
 }
 

@@ -18,42 +18,24 @@ function App() {
     host: "",
     port: "",
     player_username: "",
-    auth: "",
     profiles: [],
-    load_memory: false,
-    init_message: "",
-    allow_insecure_coding: false,
-    code_timeout_mins: "",
   });
 
   const [error, setError] = useState(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [socket, setSocket] = useState(null);
   const [microphone, setMicrophone] = useState(null);
   const [transcription, setTranscription] = useState("");
   const [agentStarted, setAgentStarted] = useState(false);
-  const [newProfile, setNewProfile] = useState("");
-
+  const [selectedProfiles, setSelectedProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [startTime, setStartTime] = useState(null);
 
-  const addProfile = () => {
-    if (newProfile.trim() !== "") {
-      setSettings(prev => ({
-        ...prev,
-        profiles: [...prev.profiles, newProfile.trim()]
-      }));
-      setNewProfile("");
-    }
-  };
-
-  const removeProfile = (index) => {
-    setSettings(prev => ({
-      ...prev,
-      profiles: prev.profiles.filter((_, i) => i !== index)
-    }));
+  const handleProfileSelect = (profile) => {
+    setSelectedProfiles(prev => 
+      prev.includes(profile) ? prev.filter(p => p !== profile) : [...prev, profile]
+    );
+    console.log("selected", selectedProfiles);
   };
 
   const settingNotes = {
@@ -61,12 +43,6 @@ function App() {
     host: "or \"localhost\", \"your.ip.address.here\"",
     port: "default is 25565",
     player_username: "your Minecraft username",
-    auth: "or \"microsoft\"",
-    profiles: "add more profiles here, check ./profiles/ for more. More than 1 profile will require you to /msg each bot individually",
-    load_memory: "load memory from previous session",
-    init_message: "sends to all on spawn",
-    allow_insecure_coding: "disable at own risk",
-    code_timeout_mins: "-1 for no timeout",
   }
 
   const fetchSettings = async () => {
@@ -106,10 +82,6 @@ function App() {
       setError(`Failed to check backend status: ${err.message}`);
       throw err;
     }
-  };
-
-  const handleSettingChange = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
   };
 
   const checkServerAlive = async (host, port) => {
@@ -161,14 +133,22 @@ function App() {
         return;
       }
 
+      if (selectedProfiles.length === 0) {
+        setError("Please select at least one pal to play with.");
+        return;
+      }
+
       const serverAlive = await checkServerAlive(settings.host, settings.port);
       if (!serverAlive) {
         setError("The Minecraft server is not reachable. Please check the host and port.");
         return;
       }
-
       try {
-        const response = await api.post('/start', settings);
+        const filteredSettings = {
+          ...settings,
+          profiles: selectedProfiles // Only send selected profiles
+        };
+        const response = await api.post('/start', filteredSettings);
         console.log("Agent started successfully:", response.data);
         setAgentStarted(true);
         setError(null); // Clear errors on success
@@ -299,19 +279,14 @@ function App() {
 
   return (
     <div className="container">
-      <h1>Minepal Control Panel</h1>
+      <h1>MinePal Control Panel</h1>
       <Settings
-        {...{
-          settings,
-          handleSettingChange,
-          settingNotes,
-          showAdvanced,
-          setShowAdvanced,
-          newProfile,
-          setNewProfile,
-          addProfile,
-          removeProfile
-        }}
+        settings={settings}
+        setSettings={setSettings}
+        settingNotes={settingNotes}
+        selectedProfiles={selectedProfiles}
+        handleProfileSelect={handleProfileSelect}
+        api={api}
       />
       <Actions
         agentStarted={agentStarted}

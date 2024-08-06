@@ -35,7 +35,9 @@ export class AgentProcess {
     start(profile, userDataDir, load_memory=false, init_message=null) {
         // Prepare arguments for the agent process
         let args = [path.join(app.getAppPath(), 'src/process/init-agent.js')]; // Adjust path
-        const profilePath = path.join(app.getAppPath(), profile);
+        const logDirectory = app.getPath('userData');
+        const profilesDir = path.join(logDirectory, 'profiles');
+        const profilePath = path.join(profilesDir, `${profile}.json`);
         args.push('-p', profilePath, '-u', userDataDir, '-e', app.getAppPath());
         if (load_memory)
             args.push('-l', load_memory.toString()); // Ensure it's a string
@@ -115,9 +117,9 @@ export class AgentProcess {
         });
     
         this.agentProcess.on('error', (err) => {
-            logToFile(`Failed to start agent process: ${err}`);
+            logToFile(`Failed to start agent process: ${err}\n${err.stack}`);
             if (!agentLogStream.destroyed) {
-                agentLogStream.write(`Failed to start agent process: ${err}\n`);
+                agentLogStream.write(`Failed to start agent process: ${err}\n${err.stack}\n`);
                 agentLogStream.end();
             }
         });

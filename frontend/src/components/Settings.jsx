@@ -1,7 +1,6 @@
-import React from 'react';
-import Profiles from './Profiles'; // Import the Profiles component
+import Profiles from './Profiles';
 
-function Settings({ settings, handleSettingChange, settingNotes, showAdvanced, setShowAdvanced, newProfile, setNewProfile, addProfile, removeProfile }) {
+function Settings({ settings, setSettings, handleSettingChange, settingNotes, selectedProfiles, handleProfileSelect, api }) {
   return (
     <div className="settings">
       <div className="setting-item">
@@ -17,94 +16,49 @@ function Settings({ settings, handleSettingChange, settingNotes, showAdvanced, s
         />
       </div>
       <div className="setting-item">
-        <label htmlFor="load_memory">
-          load memory:
-          {settingNotes.load_memory && <span className="setting-note"> ({settingNotes.load_memory})</span>}
+        <label htmlFor="host">
+          host : port:
+          {settingNotes.host && <span className="setting-note"> ({settingNotes.host})</span>}
         </label>
-        <label className="switch">
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <input
-            type="checkbox"
-            id="load_memory"
-            checked={settings.load_memory}
-            onChange={(e) => handleSettingChange('load_memory', e.target.checked)}
+            id="host"
+            type="text"
+            value={settings.host}
+            onChange={(e) => handleSettingChange('host', e.target.value)}
+            style={{ flex: '0 0 80%' }}
           />
-          <span className="slider"></span>
-        </label>
+          <span style={{ margin: '0 8px' }}>:</span>
+          <input
+            id="port"
+            type="number"
+            value={settings.port}
+            onChange={(e) => handleSettingChange('port', e.target.value)}
+          />
+        </div>
       </div>
       <div className="setting-item">
-        <label htmlFor="port">
-          port:
-          {settingNotes.port && <span className="setting-note"> ({settingNotes.port})</span>}
+        <label htmlFor="minecraft_version">
+          minecraft version:
+          {settingNotes.minecraft_version && <span className="setting-note"> ({settingNotes.minecraft_version})</span>}
         </label>
         <input
-          id="port"
-          type="number"
-          value={settings.port}
-          onChange={(e) => handleSettingChange('port', e.target.value)}
+          id="minecraft_version"
+          type="text"
+          value={settings.minecraft_version}
+          onChange={(e) => handleSettingChange('minecraft_version', e.target.value)}
         />
       </div>
-      <div className="advanced-settings">
-        <button onClick={() => setShowAdvanced(!showAdvanced)}>
-          {showAdvanced ? 'Hide Advanced Settings' : 'Show Advanced Settings'}
-        </button>
-        {showAdvanced && (
-          <div className="advanced-settings-content">
-            <div className="setting-item">
-              <label htmlFor="host">
-                host:
-                {settingNotes.host && <span className="setting-note"> ({settingNotes.host})</span>}
-              </label>
-              <input
-                id="host"
-                type="text"
-                value={settings.host}
-                onChange={(e) => handleSettingChange('host', e.target.value)}
-              />
-            </div>
-            {Object.entries(settings).map(([key, value]) => {
-              if (key !== 'player_username' && key !== 'host' && key !== 'port' && key !== 'profiles' && key !== 'load_memory') {
-                return (
-                  <div key={key} className="setting-item">
-                    <label htmlFor={key}>
-                      {key.replace(/_/g, ' ')}:
-                      {settingNotes[key] && <span className="setting-note"> ({settingNotes[key]})</span>}
-                    </label>
-                    {typeof value === 'boolean' ? (
-                      <label className="switch">
-                        <input
-                          type="checkbox"
-                          id={key}
-                          checked={value}
-                          onChange={(e) => handleSettingChange(key, e.target.checked)}
-                        />
-                        <span className="slider"></span>
-                      </label>
-                    ) : (
-                      <input
-                        id={key}
-                        type={key === 'code_timeout_mins' ? 'number' : 'text'}
-                        value={value}
-                        onChange={(e) => handleSettingChange(key, e.target.value)}
-                      />
-                    )}
-                  </div>
-                );
-              }
-              return null;
-            })}
-            <div className="setting-item">
-              <Profiles
-                settings={settings}
-                newProfile={newProfile}
-                setNewProfile={setNewProfile}
-                addProfile={addProfile}
-                removeProfile={removeProfile}
-                settingNotes={settingNotes}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      <label htmlFor="profiles">
+          your pals:
+      </label>
+      <Profiles
+        profiles={settings.profiles}
+        setSettings={setSettings}
+        handleProfileSelect={handleProfileSelect}
+        selectedProfiles={selectedProfiles}
+        api={api}
+      />
     </div>
   );
 }
