@@ -156,6 +156,12 @@ function App() {
         // Identify the user in Mixpanel
         mixpanel.identify(settings.player_username);
 
+        // Track the number of bots spawned
+        mixpanel.track('Bots spawned', {
+          distinct_id: settings.player_username,
+          bot_count: selectedProfiles.length
+        });
+
         // Set the start time for tracking
         setStartTime(Date.now());
       } catch (error) {
@@ -248,6 +254,25 @@ function App() {
       });
     }
   };
+
+  const handleBeforeUnload = (event) => {
+    // This might not work lol, because we're an Electron app, but just gonna have this here first.
+    
+    if (agentStarted) {
+      const playTime = (Date.now() - startTime) / 1000; // in seconds
+      mixpanel.track('Bot play time', {
+        distinct_id: settings.player_username,
+        play_time: playTime
+      });
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [agentStarted, startTime]);
 
   useEffect(() => {
     const fetchDataWithRetry = async () => {
