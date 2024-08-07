@@ -6,12 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-
+  build-macos-intel:
+    runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -33,7 +29,6 @@ jobs:
           npx vite build
 
       - name: Prepare for code signing
-        if: matrix.os == 'macos-latest'
         run: |
           mkdir -p ~/private_keys/
           echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
@@ -45,7 +40,6 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
 
       - name: Build/release Electron app (macOS - x64)
-        if: matrix.os == 'macos-latest'
         uses: samuelmeuli/action-electron-builder@v1.6.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -58,8 +52,40 @@ jobs:
           API_KEY_ID: ${{ vars.API_KEY_ID }}
           API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
 
+  build-macos-arm:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm install --include=dev
+          cd frontend
+          npm install --include=dev
+
+      - name: Build frontend with Vite
+        run: |
+          cd frontend
+          npx vite build
+
+      - name: Prepare for code signing
+        run: |
+          mkdir -p ~/private_keys/
+          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
+          echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
       - name: Build/release Electron app (macOS - arm64)
-        if: matrix.os == 'macos-latest'
         uses: samuelmeuli/action-electron-builder@v1.6.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -72,8 +98,33 @@ jobs:
           API_KEY_ID: ${{ vars.API_KEY_ID }}
           API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
 
+  build-non-macos:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm install --include=dev
+          cd frontend
+          npm install --include=dev
+
+      - name: Build frontend with Vite
+        run: |
+          cd frontend
+          npx vite build
+
       - name: Build/release Electron app (non-macOS)
-        if: matrix.os != 'macos-latest'
         uses: samuelmeuli/action-electron-builder@v1.6.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
