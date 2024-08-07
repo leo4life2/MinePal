@@ -38,6 +38,11 @@ function App() {
     console.log("selected", selectedProfiles);
   };
 
+  const handleSettingChange = (key, value) => {
+    console.log(`Changing ${key} to ${value}`);
+    setSettings(prevSettings => ({ ...prevSettings, [key]: value }));
+  };
+
   const settingNotes = {
     minecraft_version: "supports up to 1.20.4",
     host: "or \"localhost\", \"your.ip.address.here\"",
@@ -311,6 +316,7 @@ function App() {
         settingNotes={settingNotes}
         selectedProfiles={selectedProfiles}
         handleProfileSelect={handleProfileSelect}
+        handleSettingChange={handleSettingChange}
         api={api}
       />
       <Actions
