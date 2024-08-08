@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import { History } from './history.js';
 import { Coder } from './coder.js';
 import { Prompter } from './prompter.js';
@@ -18,13 +19,13 @@ export class Agent {
      * @param {string} userDataDir - Path to the user data directory.
      * @param {string} appPath - Path to the application directory.
      * @param {boolean} load_mem - Whether to load memory from previous sessions.
-     * @param {string|null} init_message - Initial message to send to the agent.
      */
-    async start(profile_fp, userDataDir, appPath, load_mem=false, init_message=null) {
+    async start(profile_fp, userDataDir, appPath, load_mem=false) {
         // Initialize agent components
         this.userDataDir = userDataDir;
         this.appPath = appPath
-        this.prompter = new Prompter(this, profile_fp);
+        this.profile = JSON.parse(readFileSync(profile_fp, 'utf8'));
+        this.prompter = new Prompter(this);
         this.name = this.prompter.getName();
         const settingsPath = `${this.userDataDir}/settings.json`;
         this.settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')); // Changed to instance variable
@@ -70,9 +71,12 @@ export class Agent {
                 this.handleMessage(username, message);
             });
 
+            const init_message = this.profile.init_message
             // Handle initial message or send a greeting
             if (init_message) {
-                this.handleMessage('system', init_message);
+                // this.handleMessage('system', init_message);
+                this.bot.chat(init_message);
+                this.bot.emit('finished_executing');
             } else {
                 this.bot.chat('Hello world! I am ' + this.name);
                 this.bot.emit('finished_executing');

@@ -81,7 +81,8 @@ const modes = [
         update: async function (agent) {
             const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 16);
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
-                agent.bot.chat(`Aaa! A ${enemy.name}!`);
+                agent.bot.chat(`Aaa! A ${enemy.name.replace(/_/g, ' ').toLowerCase()}!`);
+
                 execute(this, agent, async () => {
                     await skills.avoidEnemies(agent.bot, 24);
                 });
@@ -107,7 +108,7 @@ const modes = [
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
                 const now = Date.now();
                 if (enemy.name !== this.currentEnemyName || now - this.lastMessageTime > this.messageCooldown) {
-                    agent.bot.chat(`Fighting ${enemy.name}!`);
+                    agent.bot.chat(`Fighting ${enemy.name.replace(/_/g, ' ').toLowerCase()}!`);
                     this.lastMessageTime = now;
                     this.currentEnemyName = enemy.name;
                 }

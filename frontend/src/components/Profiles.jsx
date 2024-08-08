@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles, api }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [currentProfileIndex, setCurrentProfileIndex] = useState(null);
   const [editableName, setEditableName] = useState('');
   const [editablePersonality, setEditablePersonality] = useState('');
+  const [editableInitMessage, setEditableInitMessage] = useState('');
 
-  const openModal = (profile = { name: '', personality: '' }, index = null) => {
+  const openModal = (profile = { name: '', personality: '', init_message: '' }, index = null) => {
     setCurrentProfileIndex(index);
     setEditableName(profile.name);
     setEditablePersonality(profile.personality);
+    setEditableInitMessage(profile.init_message);
     setModalOpen(true);
   };
 
@@ -31,10 +33,12 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
 
     const updatedProfiles = [...profiles];
     if (currentProfileIndex !== null) {
-      updatedProfiles[currentProfileIndex] = { name: editableName, personality: editablePersonality };
+      updatedProfiles[currentProfileIndex] = { name: editableName, personality: editablePersonality, init_message: editableInitMessage };
     } else {
-      updatedProfiles.push({ name: editableName, personality: editablePersonality });
+      updatedProfiles.push({ name: editableName, personality: editablePersonality, init_message: editableInitMessage });
     }
+
+    console.log(updatedProfiles);
 
     try {
       await api.post('/save-profiles', { profiles: updatedProfiles });
@@ -71,7 +75,7 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
   return (
     <div className="profiles">
       {profiles.map((profile, index) => renderProfileBox(profile, index))}
-      {profiles.length < 2 && renderEmptyBox(profiles.length)}
+      {renderEmptyBox(profiles.length)}
 
       {modalOpen && (
         <div className="modal">
@@ -87,8 +91,16 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
               onChange={(e) => setEditablePersonality(e.target.value)}
               placeholder="Personality"
             />
-            <button onClick={saveChanges}>Save</button>
-            <button onClick={closeModal}>Cancel</button>
+            <input
+              type="text"
+              value={editableInitMessage}
+              onChange={(e) => setEditableInitMessage(e.target.value)}
+              placeholder="Bot's first message (e.g., registration or login command)"
+            />
+            <div className="button-group">
+              <button className="save-button" onClick={saveChanges}>Save</button>
+              <button className="cancel-button" onClick={closeModal}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

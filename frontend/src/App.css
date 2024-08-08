@@ -45,7 +45,6 @@ label {
 }
 
 input:not([type="checkbox"]) {
-  width: 100%;
   padding: 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -322,6 +321,7 @@ input:checked + .slider:before {
 
 .profile-box input {
   margin-right: 10px;
+  width: auto; /* Ensure the checkbox does not take full width */
 }
 
 .profile-box.empty {
@@ -363,4 +363,48 @@ input:checked + .slider:before {
   border: 1px solid var(--primary-color);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-color);
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  box-sizing: border-box;
+  font-family: 'Poppins', sans-serif;
+}
+
+textarea {
+  resize: vertical; /* Only allow vertical resizing */
+  min-height: 100px; /* Minimum height for the textarea */
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'Poppins', sans-serif;
+}
+
+.modal-content input,
+.modal-content textarea {
+  margin-bottom: 15px; /* Add space between textboxes and buttons */
+}
+
+.modal-content .button-group {
+  display: flex;
+  justify-content: space-between;
+}
+
+.modal-content .save-button {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+}
+
+.modal-content .cancel-button {
+  background-color: var(--secondary-color);
+  color: var(--bg-color);
+  margin-left: auto; /* Align the cancel button to the right */
 }

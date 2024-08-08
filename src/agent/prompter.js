@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { Examples } from '../utils/examples.js';
 import { getCommandDocs } from './commands/index.js';
 import { getSkillDocs } from './library/index.js';
@@ -8,9 +8,9 @@ import { getCommand } from './commands/index.js';
 import { GPT } from '../models/gpt.js';
 
 export class Prompter {
-    constructor(agent, fp) {
+    constructor(agent) {
         this.agent = agent;
-        this.profile = JSON.parse(readFileSync(fp, 'utf8'));
+        this.profile = agent.profile
         this.convo_examples = null;
         this.coding_examples = null;
 

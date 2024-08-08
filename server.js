@@ -54,7 +54,6 @@ function startServer() {
                 "./ethan.json"
             ],
             "load_memory": true,
-            "init_message": "Say hello world and your name",
             "allow_insecure_coding": false,
             "code_timeout_mins": 10
         };
@@ -65,7 +64,6 @@ function startServer() {
 
     let profiles = settings.profiles;
     let load_memory = settings.load_memory;
-    let init_message = settings.init_message;
     let agentProcessStarted = false;
     let agentProcesses = [];
 
@@ -169,7 +167,8 @@ function startServer() {
                 const profileData = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
                 updatedProfiles.push({
                     name: profileData.name,
-                    personality: profileData.personality
+                    personality: profileData.personality,
+                    init_message: profileData.init_message
                 });
             }
         });
@@ -258,12 +257,11 @@ function startServer() {
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
         profiles = settings.profiles;
         load_memory = settings.load_memory;
-        init_message = settings.init_message;
 
         for (let profile of profiles) {
             const profileBotName = profile.name;
             const agentProcess = new AgentProcess(notifyBotKicked);
-            agentProcess.start(profileBotName, userDataDir, load_memory, init_message);
+            agentProcess.start(profileBotName, userDataDir, load_memory);
             agentProcesses.push(agentProcess);
         }
         agentProcessStarted = true;
@@ -275,7 +273,6 @@ function startServer() {
         const profilesDir = path.join(userDataDir, 'profiles');
         const ethanTemplatePath = path.join(electronApp.getAppPath(), 'ethan.json');
         const newProfiles = req.body.profiles;
-
         // Validate input
         if (!Array.isArray(newProfiles) || newProfiles.some(profile => !profile.name || !profile.personality)) {
             return res.status(400).json({ error: "Invalid input. Each profile must have 'name' and 'personality' fields." });
@@ -294,6 +291,7 @@ function startServer() {
             const profileData = JSON.parse(fs.readFileSync(ethanTemplatePath, 'utf8'));
             profileData.name = profile.name;
             profileData.personality = profile.personality;
+            profileData.init_message = profile.init_message || ""; // Set init_message to empty string if not provided
             fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
         });
 

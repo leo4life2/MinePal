@@ -30,9 +30,8 @@ export class AgentProcess {
      * @param {string} profile - The profile to use for the agent.
      * @param {string} userDataDir - The directory to store log files.
      * @param {boolean} [load_memory=false] - Whether to load memory from a previous session.
-     * @param {string|null} [init_message=null] - An initial message to send to the agent.
      */
-    start(profile, userDataDir, load_memory=false, init_message=null) {
+    start(profile, userDataDir, load_memory=false) {
         // Prepare arguments for the agent process
         let args = [path.join(app.getAppPath(), 'src/process/init-agent.js')]; // Adjust path
         const logDirectory = app.getPath('userData');
@@ -41,8 +40,6 @@ export class AgentProcess {
         args.push('-p', profilePath, '-u', userDataDir, '-e', app.getAppPath());
         if (load_memory)
             args.push('-l', load_memory.toString()); // Ensure it's a string
-        if (init_message)
-            args.push('-m', init_message);
 
         const logDir = path.join(userDataDir, 'runlogs');
         // Create log directory if it doesn't exist

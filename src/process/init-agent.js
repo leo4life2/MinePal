@@ -5,7 +5,7 @@ import path from 'path';
 
 const args = process.argv.slice(2);
 if (args.length < 1) {
-    console.log('Usage: node init_agent.js [profile] [load_memory] [init_message] [userDataDir]');
+    console.log('Usage: node init_agent.js [profile] [load_memory] [userDataDir]');
     process.exit(1);
 }
 
@@ -19,11 +19,6 @@ const argv = yargs(args)
         alias: 'l',
         type: 'boolean',
         description: 'load agent memory from file on startup'
-    })
-    .option('init_message', {
-        alias: 'm',
-        type: 'string',
-        description: 'automatically prompt the agent on startup'
     })
     .option('userDataDir', {
         alias: 'u',
@@ -40,7 +35,7 @@ const settingsPath = path.join(argv.userDataDir, 'settings.json');
 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
 
 const agent = new Agent();
-agent.start(argv.profile, argv.userDataDir, argv.appPath, argv.load_memory, argv.init_message);
+agent.start(argv.profile, argv.userDataDir, argv.appPath, argv.load_memory);
 
 process.on('message', (e) => {
     console.log("message", e);
