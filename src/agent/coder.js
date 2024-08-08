@@ -263,12 +263,12 @@ export class Coder extends EventEmitter {
         //     });
         // });
 
+        this.agent.bot.interrupt_code = false; // Clear interrupt_code after execution has stopped
         this.stopLock = false; // Release the lock after execution
     }
 
     clear() {
         this.agent.bot.output = '';
-        this.agent.bot.interrupt_code = false;
         this.timedout = false;
     }
 

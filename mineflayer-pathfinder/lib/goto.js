@@ -31,7 +31,8 @@ function goto (bot, goal) {
 
     function goalChangedListener (newGoal) {
       if (newGoal !== goal) {
-        cleanup(error('GoalChanged', 'The goal was changed before it could be completed!'))
+        console.log('GoalChanged: The goal was changed before it could be completed!')
+        cleanup()
       }
     }
 
