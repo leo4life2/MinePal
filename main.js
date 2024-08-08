@@ -11,7 +11,7 @@ const access = promisify(fs.access);
 
 let mainWindow;
 
-const DEV = false;
+const DEV = true;
 const DEBUG = false;
 
 const logDirectory = app.getPath('userData');

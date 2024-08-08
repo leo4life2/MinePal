@@ -41,6 +41,9 @@ export class Agent {
         this.mcdata = MCData.getInstance(this.settings); // Use singleton with settings
         this.bot = this.mcdata.initBot(this.name); // Initialize bot with agent's name
 
+        this.bot.whisper = this.settings.whisper_to_player;
+        this.bot.owner = this.owner;
+
         initModes(this);
 
         if (load_mem)

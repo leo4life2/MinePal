@@ -50,6 +50,22 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
     }
   };
 
+  const deleteProfile = async () => {
+    if (currentProfileIndex === null) return;
+
+    const updatedProfiles = profiles.filter((_, idx) => idx !== currentProfileIndex);
+    console.log(updatedProfiles);
+
+    try {
+      await api.post('/save-profiles', { profiles: updatedProfiles });
+      setSettings(prev => ({ ...prev, profiles: updatedProfiles }));
+      closeModal();
+    } catch (error) {
+      console.error("Failed to delete profile:", error);
+      alert("Failed to delete profile. Please try again.");
+    }
+  };
+
   const handleCheckboxClick = (e, profile) => {
     e.stopPropagation();
     handleProfileSelect(profile);
@@ -100,6 +116,9 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
             <div className="button-group">
               <button className="save-button" onClick={saveChanges}>Save</button>
               <button className="cancel-button" onClick={closeModal}>Cancel</button>
+              {currentProfileIndex !== null && (
+                <button className="delete-button" onClick={deleteProfile}>Delete Pal</button>
+              )}
             </div>
           </div>
         </div>

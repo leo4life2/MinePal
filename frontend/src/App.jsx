@@ -19,6 +19,7 @@ function App() {
     port: "",
     player_username: "",
     profiles: [],
+    whisper_to_player: false, // Added this line
   });
 
   const [error, setError] = useState(null);

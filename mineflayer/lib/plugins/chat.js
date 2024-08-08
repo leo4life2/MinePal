@@ -190,7 +190,11 @@ function inject (bot, options) {
     chatWithHeader(`/tell ${username} `, message)
   }
   bot.chat = (message) => {
-    chatWithHeader('', message)
+    if (bot.whisper && bot.owner && !message.startsWith('/')) {
+      chatWithHeader(`/tell ${bot.owner} `, message)
+    } else {
+      chatWithHeader('', message)
+    }
   }
 
   bot.tabComplete = tabComplete

@@ -49,6 +49,20 @@ function Settings({ settings, setSettings, handleSettingChange, settingNotes, se
           onChange={(e) => handleSettingChange('minecraft_version', e.target.value)}
         />
       </div>
+      <div className="setting-item">
+        <label htmlFor="whisper_to_player">
+          Whisper to Player:
+        </label>
+        <label className="switch">
+          <input
+            id="whisper_to_player"
+            type="checkbox"
+            checked={settings.whisper_to_player}
+            onChange={(e) => handleSettingChange('whisper_to_player', e.target.checked)}
+          />
+          <span className="slider"></span>
+        </label>
+      </div>
       <label htmlFor="profiles">
           your pals:
       </label>

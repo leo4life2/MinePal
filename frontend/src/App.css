@@ -403,7 +403,7 @@ textarea::placeholder {
   color: var(--bg-color);
 }
 
-.modal-content .cancel-button {
+.modal-content .delete-button {
   background-color: var(--secondary-color);
   color: var(--bg-color);
   margin-left: auto; /* Align the cancel button to the right */
