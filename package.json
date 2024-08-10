@@ -62,13 +62,7 @@
     "mac": {
       "category": "public.app-category.games",
       "icon": "build/icon.icns",
-      "extendInfo": {
-        "NSMicrophoneUsageDescription": "We need access to your microphone for voice input.",
-        "com.apple.security.device.audio-input": "We need access to your microphone for voice input.",
-        "com.apple.security.cs.allow-jit": true,
-        "com.apple.security.cs.allow-unsigned-executable-memory": true,
-        "com.apple.security.cs.allow-dyld-environment-variables": true
-      },
+      "entitlements": "build/entitlements.plist",
       "hardenedRuntime": true,
       "target": [
         "dmg"
