@@ -1,88 +1,88 @@
 {
-    "name": "minepal",
-    "version": "0.2.4",
-    "description": "AI minecraft friend",
-    "type": "module",
-    "main": "main.js",
-    "author": "NemosAI",
-    "license": "Proprietary",
-    "dependencies": {
-        "axios": "^1.7.2",
-        "cors": "^2.8.5",
-        "express": "^4.19.2",
-        "mic": "^2.1.2",
-        "minecraft-data": "^3.46.2",
-        "mineflayer": "file:mineflayer",
-        "mineflayer-armor-manager": "^2.0.1",
-        "mineflayer-auto-eat": "file:mineflayer-auto-eat",
-        "mineflayer-pathfinder": "file:mineflayer-pathfinder",
-        "mineflayer-pvp": "^1.3.2",
-        "patch-package": "^8.0.0",
-        "pidusage": "^3.0.2",
-        "prismarine-item": "^1.14.0",
-        "rotating-file-stream": "^3.2.3",
-        "ws": "^8.18.0",
-        "yargs": "^17.7.2"
+  "name": "minepal",
+  "version": "0.2.4",
+  "description": "AI minecraft friend",
+  "type": "module",
+  "main": "main.js",
+  "author": "NemosAI",
+  "license": "Proprietary",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mic": "^2.1.2",
+    "minecraft-data": "^3.46.2",
+    "mineflayer": "file:mineflayer",
+    "mineflayer-armor-manager": "^2.0.1",
+    "mineflayer-auto-eat": "file:mineflayer-auto-eat",
+    "mineflayer-pathfinder": "file:mineflayer-pathfinder",
+    "mineflayer-pvp": "^1.3.2",
+    "patch-package": "^8.0.0",
+    "pidusage": "^3.0.2",
+    "prismarine-item": "^1.14.0",
+    "rotating-file-stream": "^3.2.3",
+    "ws": "^8.18.0",
+    "yargs": "^17.7.2"
+  },
+  "scripts": {
+    "postinstall": "patch-package",
+    "start": "electron .",
+    "clean": "rm -rf dist",
+    "buildLocal": "npm run clean && electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "@electron/notarize": "^2.3.2",
+    "electron": "^31.2.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.nemosai.minepal",
+    "productName": "Minepal",
+    "afterSign": "notarize.js",
+    "directories": {
+      "buildResources": "build"
     },
-    "scripts": {
-        "postinstall": "patch-package",
-        "start": "electron .",
-        "clean": "rm -rf dist",
-        "buildLocal": "npm run clean && electron-builder",
-        "build:mac": "electron-builder --mac",
-        "build:win": "electron-builder --win"
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "main.js",
+      "server.js",
+      "ethan.json",
+      "src/**/*",
+      "frontend/dist/**/*",
+      "bots/**/*",
+      "mineflayer-pathfinder/**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/.bin",
+      "!**/node_modules/*/package-lock.json"
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "icon": "build/icon.icns",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "We need access to your microphone for voice input.",
+        "com.apple.security.device.audio-input": "We need access to your microphone for voice input.",
+        "com.apple.security.cs.allow-jit": true,
+        "com.apple.security.cs.allow-unsigned-executable-memory": true,
+        "com.apple.security.cs.allow-dyld-environment-variables": true
+      },
+      "hardenedRuntime": true,
+      "target": [
+        "dmg"
+      ]
     },
-    "devDependencies": {
-        "@electron/notarize": "^2.3.2",
-        "electron": "^31.2.0",
-        "electron-builder": "^24.13.3"
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
     },
-    "build": {
-        "appId": "com.nemosai.minepal",
-        "productName": "Minepal",
-        "afterSign": "notarize.js",
-        "directories": {
-            "buildResources": "build"
-        },
-        "files": [
-            "dist/**/*",
-            "node_modules/**/*",
-            "main.js",
-            "server.js",
-            "ethan.json",
-            "src/**/*",
-            "frontend/dist/**/*",
-            "bots/**/*",
-            "mineflayer-pathfinder/**/*",
-            "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
-            "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
-            "!**/node_modules/.bin",
-            "!**/node_modules/*/package-lock.json"
-        ],
-        "mac": {
-            "category": "public.app-category.games",
-            "icon": "build/icon.icns",
-            "extendInfo": {
-                "NSMicrophoneUsageDescription": "We need access to your microphone for voice input.",
-                "com.apple.security.device.audio-input": "We need access to your microphone for voice input.",
-                "com.apple.security.cs.allow-jit": true,
-                "com.apple.security.cs.allow-unsigned-executable-memory": true,
-                "com.apple.security.cs.allow-dyld-environment-variables": true
-            },
-            "hardenedRuntime": true,
-            "target": [
-                "dmg"
-            ]
-        },
-        "win": {
-            "target": [
-                "nsis"
-            ],
-            "icon": "build/icon.ico"
-        },
-        "linux": {
-            "target": "AppImage",
-            "icon": "build"
-        }
+    "linux": {
+      "target": "AppImage",
+      "icon": "build"
     }
+  }
 }
