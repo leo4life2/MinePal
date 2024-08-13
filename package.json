@@ -18,7 +18,6 @@
     "mineflayer": "file:mineflayer",
     "mineflayer-armor-manager": "^2.0.1",
     "mineflayer-auto-eat": "file:mineflayer-auto-eat",
-    "mineflayer-collectblock": "file:mineflayer-collectblock",
     "mineflayer-pathfinder": "file:mineflayer-pathfinder",
     "mineflayer-pvp": "^1.3.2",
     "patch-package": "^8.0.0",
