@@ -33,6 +33,7 @@ h1 {
   text-align: center;
   font-size: 2.5rem;
   margin-bottom: 30px;
+  margin-top: 0;
 }
 
 .setting-item {
@@ -51,26 +52,6 @@ input:not([type="checkbox"]) {
   border-radius: 8px;
   color: var(--text-color);
   box-sizing: border-box;
-}
-
-.actions {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 30px;
-}
-
-.action-button {
-  padding: 12px 24px;
-  background: var(--primary-color);
-  color: var(--bg-color);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: transform 0.3s;
-}
-
-.action-button:hover {
-  transform: translateY(-2px);
 }
 
 /* Switch styles */

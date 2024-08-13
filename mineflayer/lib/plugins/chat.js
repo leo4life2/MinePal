@@ -190,7 +190,7 @@ function inject (bot, options) {
     chatWithHeader(`/tell ${username} `, message)
   }
   bot.chat = (message) => {
-    if (bot.whisper && bot.owner && !message.startsWith('/')) {
+    if (bot.whisper_to_player && bot.owner && !message.startsWith('/')) {
       chatWithHeader(`/tell ${bot.owner} `, message)
     } else {
       chatWithHeader('', message)

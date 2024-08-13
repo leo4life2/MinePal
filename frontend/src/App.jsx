@@ -19,7 +19,7 @@ function App() {
     port: "",
     player_username: "",
     profiles: [],
-    whisper_to_player: false, // Added this line
+    whisper_to_player: false,
   });
 
   const [error, setError] = useState(null);
@@ -31,6 +31,8 @@ function App() {
   const [selectedProfiles, setSelectedProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [startTime, setStartTime] = useState(null);
+  const [voiceMode, setVoiceMode] = useState('always_on');
+  const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
 
   const handleProfileSelect = (profile) => {
     setSelectedProfiles(prev => 
@@ -107,9 +109,7 @@ function App() {
         console.log("Agent stopped successfully:", response.data);
         setAgentStarted(false);
         setError(null); // Clear errors on success
-        if (isRecording) {
-          await toggleMic(); // Ensure microphone and WebSocket are shut down
-        }
+        await stopMicrophone(); // Ensure microphone and WebSocket are shut down
 
         // Track the "Bot play time" event
         if (startTime) {
@@ -170,6 +170,11 @@ function App() {
 
         // Set the start time for tracking
         setStartTime(Date.now());
+
+        // Automatically handle microphone based on voice mode
+        if (voiceMode === 'always_on') {
+          startMicrophone();
+        }
       } catch (error) {
         console.error("Failed to start agent:", error);
         setError(error.response?.data || error.message || "An unknown error occurred while starting the agent.");
@@ -216,49 +221,49 @@ function App() {
     }
   };
 
-  const toggleMic = async () => {
-    if (!agentStarted && !isRecording) {
-      setError("Please start the agent first.");
-      return;
-    }
+  const startMicrophone = async () => {
+    const wsUrl = api.defaults.baseURL.replace(/^http/, 'ws');
+    const newSocket = new WebSocket(`${wsUrl}`);
+    setSocket(newSocket);
 
-    if (isRecording) {
-      await closeMicrophone(microphone);
-      if (socket) {
-        socket.close();
-        setSocket(null);
+    newSocket.addEventListener("open", async () => {
+      console.log("WebSocket connection opened");
+      try {
+        const mic = await getMicrophone();
+        setMicrophone(mic);
+        await openMicrophone(mic, newSocket);
+        setIsMicrophoneActive(true); // Set microphone active
+      } catch (error) {
+        console.error("Error opening microphone:", error);
+        setError("Failed to start recording. Please check your microphone permissions.");
       }
-      setMicrophone(null);
+    });
+
+    newSocket.addEventListener("message", (event) => {
+      const transcript = event.data.toString('utf8');
+      if (transcript !== "") {
+        setTranscription(transcript);
+      }
+    });
+
+    newSocket.addEventListener("close", () => {
+      console.log("WebSocket connection closed");
       setIsRecording(false);
-    } else {
-      const wsUrl = api.defaults.baseURL.replace(/^http/, 'ws');
-      const newSocket = new WebSocket(`${wsUrl}`);
-      setSocket(newSocket);
+      setIsMicrophoneActive(false); // Set microphone inactive
+    });
+  };
 
-      newSocket.addEventListener("open", async () => {
-        console.log("WebSocket connection opened");
-        try {
-          const mic = await getMicrophone();
-          setMicrophone(mic);
-          await openMicrophone(mic, newSocket);
-        } catch (error) {
-          console.error("Error opening microphone:", error);
-          setError("Failed to start recording. Please check your microphone permissions.");
-        }
-      });
-
-      newSocket.addEventListener("message", (event) => {
-        const transcript = event.data.toString('utf8');
-        if (transcript !== "") {
-          setTranscription(transcript);
-        }
-      });
-
-      newSocket.addEventListener("close", () => {
-        console.log("WebSocket connection closed");
-        setIsRecording(false);
-      });
+  const stopMicrophone = async () => {
+    if (microphone) {
+      await closeMicrophone(microphone);
+      setMicrophone(null);
     }
+    if (socket) {
+      socket.close();
+      setSocket(null);
+    }
+    setIsRecording(false);
+    setIsMicrophoneActive(false); // Set microphone inactive
   };
 
   const handleBeforeUnload = (event) => {
@@ -304,6 +309,12 @@ function App() {
     fetchDataWithRetry();
   }, []);
 
+  useEffect(() => {
+    if (!agentStarted) {
+      stopMicrophone();
+    }
+  }, [agentStarted]);
+
   if (loading) {
     return <div className="spinner">Loading...</div>;
   }
@@ -323,8 +334,10 @@ function App() {
       <Actions
         agentStarted={agentStarted}
         toggleAgent={toggleAgent}
-        isRecording={isRecording}
-        toggleMic={toggleMic}
+        stopMicrophone={stopMicrophone}
+        voiceMode={voiceMode}
+        setVoiceMode={setVoiceMode}
+        isMicrophoneActive={isMicrophoneActive} // Pass the new state
       />
       {error && <div className="error-message">{error}</div>}
       <Transcription transcription={transcription} />

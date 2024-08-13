@@ -55,7 +55,7 @@ export const actionsList = [
   },
   {
     name: "!goToPlayer",
-    description: "Go to the given player.",
+    description: "Go to the given player. Argument is only player's name.",
     params: {
       player_name: "(string) The name of the player to go to."
     },
