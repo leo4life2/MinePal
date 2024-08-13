@@ -28,7 +28,15 @@ try {
     updateMainJs('main.js');
 
     execSync('git add package.json frontend/package.json main.js');
-    execSync(`git commit -m "Release v${newVersion}"`, { stdio: 'inherit' });
+
+    // Check if there are changes to commit
+    const changes = execSync('git diff-index --cached HEAD').toString().trim();
+    if (changes) {
+        execSync(`git commit -m "Release v${newVersion}"`, { stdio: 'inherit' });
+    } else {
+        console.log('No changes to commit.');
+    }
+
     execSync('git push', { stdio: 'inherit' });
     execSync(`git tag -a v${newVersion} -m "Release v${newVersion}"`, { stdio: 'inherit' });
     execSync(`git push origin v${newVersion}`, { stdio: 'inherit' });
