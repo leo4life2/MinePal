@@ -394,35 +394,6 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
     // Remove duplicates
     blocktypes = [...new Set(blocktypes)];
 
-    // Special case for cobblestone when none is visible
-    if (blocktypes.includes('cobblestone')) {
-        const safeBlocks = ['grass_block', 'dirt', 'sand', 'gravel', 'stone', 'andesite', 'diorite', 'granite'];
-        const currentBlock = bot.blockAt(bot.entity.position.offset(0, -1, 0));
-        
-        // Check if no cobblestone is visible nearby
-        let nearbyBlocks = world.getNearestBlocks(bot, ['cobblestone'], 16);
-        if (nearbyBlocks.length === 0 && safeBlocks.includes(currentBlock.name)) {
-            let depth = 0;
-            while (depth < 64) {  // Limit to avoid digging too deep
-                const blockBelow = bot.blockAt(bot.entity.position.offset(0, -1 - depth, 0));
-                if (blockBelow.name === 'cobblestone') {
-                    break;
-                }
-                if (!safeBlocks.includes(blockBelow.name)) {
-                    break;
-                }
-                await breakBlockAt(bot, blockBelow.position.x, blockBelow.position.y, blockBelow.position.z);
-                // await bot.pathfinder.goto(new pf.goals.GoalBlock(blockBelow.position.x, blockBelow.position.y, blockBelow.position.z));
-                depth++;
-                
-                nearbyBlocks = world.getNearestBlocks(bot, ['cobblestone'], 16);
-                if (nearbyBlocks.length > 0) {
-                    break;
-                }
-            }
-        }
-    }
-
     let collected = 0;
     let retries = 0;
 
