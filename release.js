@@ -29,8 +29,9 @@ try {
 
     execSync('git add package.json frontend/package.json main.js');
     execSync(`git commit -m "Release v${newVersion}"`, { stdio: 'inherit' });
+    execSync('git push', { stdio: 'inherit' });
     execSync(`git tag -a v${newVersion} -m "Release v${newVersion}"`, { stdio: 'inherit' });
-    execSync('git push && git push --tags', { stdio: 'inherit' });
+    execSync(`git push origin v${newVersion}`, { stdio: 'inherit' });
 
     console.log('Release process completed successfully.');
 } catch (error) {

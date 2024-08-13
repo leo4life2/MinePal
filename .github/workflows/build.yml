@@ -18,26 +18,16 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: |
-          npm install --include=dev
-          cd frontend
-          npm install --include=dev
+        <<: *install-deps
+
+      - name: Build mineflayer-collectblock
+        <<: *build-mineflayer
 
       - name: Build frontend with Vite
-        run: |
-          cd frontend
-          npx vite build
+        <<: *build-frontend
 
       - name: Prepare for code signing
-        run: |
-          mkdir -p ~/private_keys/
-          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
-          echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+        <<: *prepare-signing
 
       - name: Build/release Electron app (macOS - x64)
         uses: samuelmeuli/action-electron-builder@v1.6.0
@@ -64,26 +54,16 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: |
-          npm install --include=dev
-          cd frontend
-          npm install --include=dev
+        <<: *install-deps
+
+      - name: Build mineflayer-collectblock
+        <<: *build-mineflayer
 
       - name: Build frontend with Vite
-        run: |
-          cd frontend
-          npx vite build
+        <<: *build-frontend
 
       - name: Prepare for code signing
-        run: |
-          mkdir -p ~/private_keys/
-          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
-          echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+        <<: *prepare-signing
 
       - name: Build/release Electron app (macOS - arm64)
         uses: samuelmeuli/action-electron-builder@v1.6.0
@@ -114,15 +94,13 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: |
-          npm install --include=dev
-          cd frontend
-          npm install --include=dev
+        <<: *install-deps
+
+      - name: Build mineflayer-collectblock
+        <<: *build-mineflayer
 
       - name: Build frontend with Vite
-        run: |
-          cd frontend
-          npx vite build
+        <<: *build-frontend
 
       - name: Build/release Electron app (non-macOS)
         uses: samuelmeuli/action-electron-builder@v1.6.0
@@ -130,3 +108,31 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
           publish: always
+
+# Define reusable steps
+install-deps: &install-deps
+  run: |
+    npm install --include=dev
+    cd frontend
+    npm install --include=dev
+
+build-frontend: &build-frontend
+  run: |
+    cd frontend
+    npx vite build
+
+prepare-signing: &prepare-signing
+  run: |
+    mkdir -p ~/private_keys/
+    echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
+    echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
+    security create-keychain -p "" build.keychain
+    security default-keychain -s build.keychain
+    security unlock-keychain -p "" build.keychain
+    security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
+    security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+build-mineflayer: &build-mineflayer
+  run: |
+    cd mineflayer-collectblock
+    npm run build
