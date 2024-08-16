@@ -79,8 +79,6 @@ export class Prompter {
         prompt = prompt.replaceAll('$LANGUAGE', this.agent.settings.language);
         prompt = prompt.replaceAll('$PERSONALITY', this.profile.personality);
 
-        console.log(prompt);
-
         if (prompt.includes('$STATS')) {
             let stats = await getCommand('!stats').perform(this.agent);
             prompt = prompt.replaceAll('$STATS', stats);

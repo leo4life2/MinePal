@@ -129,6 +129,7 @@ function App() {
       const emptyFields = Object.entries(settings)
         .filter(([key, value]) => {
           if (key === 'profiles') return value.length === 0;
+          if (key === 'key_binding' && settings.voice_mode === 'always_on') return false; // Skip key_binding check
           if (typeof value === 'string') return value.trim() === '';
           if (Array.isArray(value)) return value.length === 0;
           return value === null || value === undefined;
@@ -139,7 +140,6 @@ function App() {
         setError(`Please fill in the following fields: ${emptyFields.join(', ')}`);
         return;
       }
-
       if (selectedProfiles.length === 0) {
         setError("Please select at least one pal to play with.");
         return;

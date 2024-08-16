@@ -159,8 +159,8 @@ function startServer() {
         const settingsData = fs.readFileSync(settingsPath, 'utf8');
         const currentSettings = JSON.parse(settingsData);
         const { voice_mode, key_binding } = currentSettings;
-        // Register global shortcut for push_to_talk and toggle_to_talk
-        if (voice_mode === 'push_to_talk' || voice_mode === 'toggle_to_talk') {
+        // Register global shortcut for push_to_talk and toggle_to_talk if key_binding is provided
+        if ((voice_mode === 'push_to_talk' || voice_mode === 'toggle_to_talk') && key_binding) {
             gkl = new GlobalKeyboardListener();
 
             gkl.addListener((e) => {
@@ -282,10 +282,11 @@ function startServer() {
         }
 
         const newSettings = req.body;
-        // Check for empty fields in newSettings
+        // Check for empty fields in newSettings, except for key_binding if voice_mode is always_on
         const emptyFields = Object.entries(newSettings)
             .filter(([key, value]) => {
                 if (key === 'profiles') return !Array.isArray(value) || value.length === 0;
+                if (key === 'key_binding' && newSettings.voice_mode === 'always_on') return false;
                 return value === "" || value === null || value === undefined;
             })
             .map(([key]) => key);
