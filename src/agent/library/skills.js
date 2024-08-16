@@ -82,8 +82,8 @@ export async function craftRecipe(bot, itemName, num=1) {
     }
 
     const recipe = recipes[0];
-    console.log('crafting...');
-    await bot.craft(recipe, num, craftingTable);
+    const actualNum = Math.ceil(num / recipe.result.count); // Adjust num based on recipe result count
+    await bot.craft(recipe, actualNum, craftingTable);
     log(bot, `Successfully crafted ${itemName}, you now have ${world.getInventoryCounts(bot)[itemName]} ${itemName}.`);
     if (placedTable) {
         await collectBlock(bot, 'crafting_table', 1);

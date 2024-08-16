@@ -8,11 +8,16 @@ import fs from 'fs';
 import cors from 'cors';
 import path from 'path';
 import net from 'net';
+import { GlobalKeyboardListener } from 'node-global-key-listener';
 
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
 let wss; // Declare wss in the outer scope
+
+let isToggleToTalkActive = false; // Global state for toggle_to_talk
+let isKeyDown = false; // Track key state
+let gkl; // Declare the global keyboard listener
 
 function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
@@ -47,9 +52,9 @@ function startServer() {
         settings = {
             "minecraft_version": "1.20.4",
             "host": "localhost",
-            "port": "5555",
+            "port": "25565",
             "auth": "offline",
-            "player_username": "WhosMaCreeper",
+            "player_username": "",
             "profiles": [
                 "./ethan.json"
             ],
@@ -96,26 +101,33 @@ function startServer() {
 
     wss.on("connection", (ws) => {
         logToFile("socket: client connected");
-        const proxyWs = new WebSocket(WSS_BACKEND_URL);
+        const proxyWs = new WebSocket(`${WSS_BACKEND_URL}?language=${settings.language}`);
 
         proxyWs.on('open', () => {
             logToFile(`proxy: connected to ${WSS_BACKEND_URL}`);
         });
 
         proxyWs.on('message', (message) => {
-            const parsedMessage = JSON.parse(message.toString('utf8'));
-            const { is_final, speech_final, transcript } = parsedMessage;
+            if (voice_mode === 'always_on' || 
+                (voice_mode === 'push_to_talk' && isKeyDown) || 
+                (voice_mode === 'toggle_to_talk' && isToggleToTalkActive)) {
 
-            if (is_final) {
-                transcriptBuffer += transcript;
-            }
+                const parsedMessage = JSON.parse(message.toString('utf8'));
+                const { is_final, speech_final, transcript } = parsedMessage;
 
-            if (speech_final) {
-                ws.send(transcriptBuffer); // to frontend
-                agentProcesses.forEach(agentProcess => {
-                    agentProcess.sendTranscription(transcriptBuffer);
-                });
-                transcriptBuffer = "";
+                if (is_final) {
+                    transcriptBuffer += transcript;
+                }
+
+                if (speech_final) {
+                    ws.send(transcriptBuffer); // to frontend
+                    agentProcesses.forEach(agentProcess => {
+                        agentProcess.sendTranscription(transcriptBuffer);
+                    });
+                    transcriptBuffer = "";
+                }
+            } else {
+                ws.send("Voice Disabled");
             }
         });
 
@@ -141,6 +153,30 @@ function startServer() {
             logToFile("socket: client disconnected");
             proxyWs.close();
         });
+
+        // One-time setup logic
+        const settingsPath = path.join(userDataDir, 'settings.json');
+        const settingsData = fs.readFileSync(settingsPath, 'utf8');
+        const currentSettings = JSON.parse(settingsData);
+        const { voice_mode, key_binding } = currentSettings;
+        // Register global shortcut for push_to_talk and toggle_to_talk
+        if (voice_mode === 'push_to_talk' || voice_mode === 'toggle_to_talk') {
+            gkl = new GlobalKeyboardListener();
+
+            gkl.addListener((e) => {
+                if (e.name.toLowerCase() === key_binding.toLowerCase()) {
+                    if (e.state === 'DOWN') {
+                        if (voice_mode === 'push_to_talk') {
+                            isKeyDown = true;
+                        } else if (voice_mode === 'toggle_to_talk') {
+                            isToggleToTalkActive = !isToggleToTalkActive;
+                        }
+                    } else if (e.state === 'UP' && voice_mode === 'push_to_talk') {
+                        isKeyDown = false;
+                    }
+                }
+            });
+        }
     });
 
     app.get('/backend-alive', async (req, res) => {
@@ -160,15 +196,29 @@ function startServer() {
     app.get('/settings', (req, res) => {
         const profilesDir = path.join(userDataDir, 'profiles');
         const updatedProfiles = [];
+        const ethanTemplatePath = path.join(electronApp.getAppPath(), 'ethan.json');
+        const ethanTemplate = JSON.parse(fs.readFileSync(ethanTemplatePath, 'utf8'));
     
         fs.readdirSync(profilesDir).forEach(file => {
             if (file.endsWith('.json')) {
                 const profilePath = path.join(profilesDir, file);
                 const profileData = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+                
+                // Replace fields with those from ethanTemplate
+                profileData.conversing = ethanTemplate.conversing;
+                profileData.coding = ethanTemplate.coding;
+                profileData.saving_memory = ethanTemplate.saving_memory;
+                
+                // Write the updated profile back to the file
+                fs.writeFileSync(profilePath, JSON.stringify(profileData, null, 4));
+                
                 updatedProfiles.push({
                     name: profileData.name,
                     personality: profileData.personality,
-                    init_message: profileData.init_message
+                    init_message: profileData.init_message,
+                    conversing: profileData.conversing,
+                    coding: profileData.coding,
+                    saving_memory: profileData.saving_memory
                 });
             }
         });

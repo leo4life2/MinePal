@@ -1,74 +1,94 @@
 .actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center; /* Center items vertically */
-    margin-top: 20px;
+  display: flex;
+  flex-direction: column; /* Stack elements vertically */
+  align-items: center; /* Center items horizontally */
+  margin-top: 20px;
+}
+
+.action-button {
+  padding: 12px 24px;
+  background: var(--primary-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.3s;
+  height: 50px; /* Fixed height */
+  box-sizing: border-box; /* Ensures padding is included in the height */
+  margin-top: 20px; /* Add space between button and voice settings */
+}
+
+.action-button:hover {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 600px) {
+  .actions {
+    gap: 15px;
   }
-  
+
   .action-button {
-    padding: 12px 24px;
-    background: var(--primary-color);
-    color: var(--bg-color);
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: transform 0.3s;
-    height: 50px; /* Fixed height */
-    box-sizing: border-box; /* Ensures padding is included in the height */
+    width: 100%;
   }
-  
-  .action-button:hover {
-    transform: translateY(-2px);
-  }
-  
-  @media (max-width: 600px) {
-    .actions {
-      flex-direction: column;
-      gap: 15px;
-    }
-    
-    .action-button {
-      width: 100%;
-    }
-  }
-  
-  .voice-settings {
-    display: flex;
-    align-items: center; /* Center items vertically */
-    gap: 10px; /* Space between the elements */
-  }
+}
 
-  .microphone-icon {
-    font-size: 20px;
-  }
+.voice-settings {
+  display: flex;
+  align-items: center; /* Center items vertically */
+  gap: 10px; /* Space between the elements */
+  margin-bottom: 20px; /* Add space between voice settings and language settings */
+}
 
-  .microphone-icon.active {
-    color: green;
-  }
+.microphone-icon {
+  font-size: 20px;
+}
 
-  .microphone-icon.inactive {
-    color: red;
-  }
+.microphone-icon.active {
+  color: green;
+}
 
-  .key-input {
-    width: 130px;
-  }
-  
-  .voice-settings label {
-    display: block;
-  }
-  
-  .voice-settings select,
-  .voice-settings input {
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: var(--text-color);
-    box-sizing: border-box;
-  }
+.microphone-icon.inactive {
+  color: red;
+}
 
-  .voice-settings input[readonly] {
-    background: rgba(255, 255, 255, 0.1);
-    cursor: pointer;
-  }
+.key-input {
+  width: 100px; /* Reduced width */
+}
+
+.voice-settings label {
+  display: block;
+}
+
+.voice-settings select,
+.voice-settings input {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  box-sizing: border-box;
+}
+
+.voice-settings input[readonly] {
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.language-settings {
+  display: flex;
+  align-items: center; /* Center items vertically */
+  gap: 10px; /* Space between the elements */
+}
+
+.language-settings label {
+  display: block;
+}
+
+.language-settings select {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  box-sizing: border-box;
+}

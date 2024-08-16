@@ -20,10 +20,12 @@ function App() {
     player_username: "",
     profiles: [],
     whisper_to_player: false,
+    voice_mode: 'always_on',
+    key_binding: '',
+    language: 'en'
   });
 
   const [error, setError] = useState(null);
-  const [isRecording, setIsRecording] = useState(false);
   const [socket, setSocket] = useState(null);
   const [microphone, setMicrophone] = useState(null);
   const [transcription, setTranscription] = useState("");
@@ -31,7 +33,6 @@ function App() {
   const [selectedProfiles, setSelectedProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [startTime, setStartTime] = useState(null);
-  const [voiceMode, setVoiceMode] = useState('always_on');
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
 
   const handleProfileSelect = (profile) => {
@@ -172,7 +173,7 @@ function App() {
         setStartTime(Date.now());
 
         // Automatically handle microphone based on voice mode
-        if (voiceMode === 'always_on') {
+        if (settings.voice_mode !== 'off') {
           startMicrophone();
         }
       } catch (error) {
@@ -196,13 +197,11 @@ function App() {
     return new Promise((resolve) => {
       mic.onstart = () => {
         console.log("Microphone started");
-        setIsRecording(true);
         resolve();
       };
 
       mic.onstop = () => {
         console.log("Microphone stopped");
-        setIsRecording(false);
       };
 
       mic.ondataavailable = (event) => {
@@ -241,14 +240,18 @@ function App() {
 
     newSocket.addEventListener("message", (event) => {
       const transcript = event.data.toString('utf8');
-      if (transcript !== "") {
-        setTranscription(transcript);
+      if (transcript === "Voice Disabled") {
+        setIsMicrophoneActive(false);
+      } else {
+        setIsMicrophoneActive(true);
+        if (transcript !== "") {
+          setTranscription(transcript);
+        }
       }
     });
 
     newSocket.addEventListener("close", () => {
       console.log("WebSocket connection closed");
-      setIsRecording(false);
       setIsMicrophoneActive(false); // Set microphone inactive
     });
   };
@@ -262,7 +265,6 @@ function App() {
       socket.close();
       setSocket(null);
     }
-    setIsRecording(false);
     setIsMicrophoneActive(false); // Set microphone inactive
   };
 
@@ -335,9 +337,9 @@ function App() {
         agentStarted={agentStarted}
         toggleAgent={toggleAgent}
         stopMicrophone={stopMicrophone}
-        voiceMode={voiceMode}
-        setVoiceMode={setVoiceMode}
         isMicrophoneActive={isMicrophoneActive} // Pass the new state
+        settings={settings}
+        setSettings={setSettings}
       />
       {error && <div className="error-message">{error}</div>}
       <Transcription transcription={transcription} />
