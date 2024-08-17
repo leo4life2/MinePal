@@ -36,6 +36,12 @@ h1 {
   margin-top: 0;
 }
 
+h1 small {
+  font-size: 1rem;
+  color: #888;
+  margin-left: 10px;
+}
+
 .setting-item {
   margin-bottom: 20px;
 }

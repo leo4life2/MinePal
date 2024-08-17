@@ -4,6 +4,8 @@ import { app, BrowserWindow, systemPreferences } from 'electron';
 import path from 'path';
 import { startServer } from './server.js';
 import { createStream } from 'rotating-file-stream';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 
 const copyFile = promisify(fs.copyFile);
 const mkdir = promisify(fs.mkdir);
@@ -45,6 +47,9 @@ async function checkAndCopyProfile() {
 }
 
 function createWindow() {
+    const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    logToFile(`Version: ${packageJson.version}`);
+
     mainWindow = new BrowserWindow({
         width: 650,
         height: 800,
@@ -103,6 +108,16 @@ if (!gotTheLock) {
         logToFile("Failed to start server: " + error);
     }
     await checkAndCopyProfile(); // Check and copy profile
+    autoUpdater.checkForUpdatesAndNotify();
+  });
+
+  autoUpdater.on('update-available', () => {
+    logToFile('Update available.');
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    logToFile('Update downloaded; will install now.');
+    autoUpdater.quitAndInstall();
   });
 }
 

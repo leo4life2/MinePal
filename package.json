@@ -12,6 +12,7 @@
     "@fortawesome/react-fontawesome": "^0.2.2",
     "axios": "^1.7.3",
     "cors": "^2.8.5",
+    "electron-updater": "^6.2.1",
     "express": "^4.19.2",
     "mic": "^2.1.2",
     "minecraft-data": "^3.67.0",
@@ -82,6 +83,13 @@
     "linux": {
       "target": "AppImage",
       "icon": "build"
-    }
+    },
+    "publish": [
+      {
+        "provider": "s3",
+        "bucket": "minepal-installers",
+        "region": "us-east-1"
+      }
+    ]
   }
 }
