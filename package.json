@@ -10,6 +10,7 @@
     "@fortawesome/fontawesome-svg-core": "^6.6.0",
     "@fortawesome/free-solid-svg-icons": "^6.6.0",
     "@fortawesome/react-fontawesome": "^0.2.2",
+    "aws-sdk": "^2.1677.0",
     "axios": "^1.7.3",
     "cors": "^2.8.5",
     "electron-updater": "^6.2.1",
