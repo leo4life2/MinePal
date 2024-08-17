@@ -52,7 +52,6 @@ jobs:
           API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_S3_ACL: ''  # Disable ACLs
 
   build-macos-arm:
     runs-on: macos-latest
@@ -100,7 +99,6 @@ jobs:
           API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_S3_ACL: ''  # Disable ACLs
 
   build-non-macos:
     runs-on: ${{ matrix.os }}
@@ -136,4 +134,3 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_S3_ACL: ''  # Disable ACLs

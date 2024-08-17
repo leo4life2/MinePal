@@ -89,7 +89,8 @@
       {
         "provider": "s3",
         "bucket": "minepal-installers",
-        "region": "us-east-1"
+        "region": "us-east-1",
+        "acl": "private"
       }
     ]
   }

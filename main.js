@@ -108,6 +108,13 @@ if (!gotTheLock) {
         logToFile("Failed to start server: " + error);
     }
     await checkAndCopyProfile(); // Check and copy profile
+    autoUpdater.setFeedURL({
+        provider: 's3',
+        bucket: 'minepal-installers',
+        region: 'us-east-1',
+        path: '',
+        acl: 'public-read'
+    });
     autoUpdater.checkForUpdatesAndNotify();
   });
 
