@@ -1,6 +1,6 @@
 {
   "name": "minepal",
-  "version": "0.2.8",
+  "version": "0.2.7",
   "description": "AI minecraft friend",
   "type": "module",
   "main": "main.js",
@@ -46,6 +46,7 @@
   },
   "build": {
     "appId": "com.nemosai.minepal",
+    "afterSign": "notarize.js",
     "productName": "Minepal",
     "directories": {
       "buildResources": "build"
