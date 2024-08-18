@@ -46,6 +46,7 @@
   },
   "build": {
     "appId": "com.nemosai.minepal",
+    "afterSign": "notarize.js",
     "productName": "Minepal",
     "directories": {
       "buildResources": "build"
@@ -89,8 +90,7 @@
         "provider": "s3",
         "bucket": "minepal-installers",
         "region": "us-east-1",
-        "acl": "private",
-        "path": "${version}/"
+        "acl": "private"
       }
     ]
   }
