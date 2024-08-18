@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  build-macos-intel:
+  build-macos:
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -22,6 +22,12 @@ jobs:
           npm install --include=dev
           cd frontend
           npm install --include=dev
+
+      - name: Clean build directories
+        run: |
+          rm -rf dist
+          cd frontend
+          rm -rf dist
 
       - name: Build frontend with Vite
         run: |
@@ -53,38 +59,9 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-  build-macos-arm:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
+      - name: Clean build directories
         run: |
-          npm install --include=dev
-          cd frontend
-          npm install --include=dev
-
-      - name: Build frontend with Vite
-        run: |
-          cd frontend
-          npx vite build
-
-      - name: Prepare for code signing
-        run: |
-          mkdir -p ~/private_keys/
-          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
-          echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+          rm -rf dist
 
       - name: Build/release Electron app (macOS - arm64)
         uses: samuelmeuli/action-electron-builder@v1.6.0

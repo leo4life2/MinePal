@@ -1,6 +1,11 @@
 import { notarize } from '@electron/notarize';
 
 export default async function afterSign(context) {
+  if (process.env.SKIP_AFTER_SIGN) {
+    console.log("Skipping afterSign step for local build.");
+    return;
+  }
+  
   const { appOutDir, electronPlatformName } = context;
 
   if (electronPlatformName !== 'darwin') {
