@@ -50,25 +50,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          args: --mac --x64  # Build for Intel architecture
-        env:
-          CSC_LINK: file:///Users/runner/private_keys/certs.p12
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
-          API_KEY_ID: ${{ vars.API_KEY_ID }}
-          API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Clean build directories
-        run: |
-          rm -rf dist
-
-      - name: Build/release Electron app (macOS - arm64)
-        uses: samuelmeuli/action-electron-builder@v1.6.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          args: --mac --arm64  # Build for ARM architecture
+          args: --mac --x64 --arm64
         env:
           CSC_LINK: file:///Users/runner/private_keys/certs.p12
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
