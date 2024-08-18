@@ -46,7 +46,6 @@
   },
   "build": {
     "appId": "com.nemosai.minepal",
-    "afterSign": "notarize.js",
     "productName": "Minepal",
     "directories": {
       "buildResources": "build"

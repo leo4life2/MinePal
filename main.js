@@ -147,15 +147,11 @@ if (!gotTheLock) {
 
   autoUpdater.on('update-available', () => {
     logToFile('Update available.');
-    const result = dialog.showMessageBoxSync(mainWindow, {
-        type: 'info',
-        buttons: ['Download Now', 'Later'],
-        title: 'Update Available',
-        message: 'An update is available. Would you like to download it now?',
-    });
-
-    if (result === 0) { // 'Download Now' button pressed
+    try {
         autoUpdater.downloadUpdate();
+        logToFile('Started downloading update.');
+    } catch (error) {
+        logToFile('Error starting download: ' + error);
     }
   });
 
@@ -186,6 +182,10 @@ if (!gotTheLock) {
 
   autoUpdater.on('update-not-available', () => {
     logToFile('No updates available.');
+  });
+
+  autoUpdater.on('error', (error) => {
+    logToFile('Error in autoUpdater: ' + error);
   });
 }
 
