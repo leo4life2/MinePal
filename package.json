@@ -84,13 +84,13 @@
       "target": "AppImage",
       "icon": "build"
     },
-    "afterSign": "notarize.js",
     "publish": [
       {
         "provider": "s3",
         "bucket": "minepal-installers",
         "region": "us-east-1",
-        "acl": "private"
+        "acl": "private",
+        "path": "${version}/"
       }
     ]
   }

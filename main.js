@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { promisify } from 'util';
-import { app, BrowserWindow, systemPreferences } from 'electron';
+import { app, BrowserWindow, systemPreferences, dialog, Menu } from 'electron';
 import path from 'path';
 import { startServer } from './server.js';
 import { createStream } from 'rotating-file-stream';
@@ -76,6 +76,33 @@ function createWindow() {
     });
 }
 
+function createMenu() {
+    const template = [
+        {
+            label: 'Update',
+            submenu: [
+                {
+                    label: 'Check for Updates',
+                    click: () => {
+                        logToFile("Manual check update");
+                        autoUpdater.checkForUpdatesAndNotify();
+                    }
+                },
+            ]
+        },
+    ];
+
+    // Get the default menu template
+    const defaultMenu = Menu.getApplicationMenu();
+
+    // Merge the default menu with the custom template
+    const menu = Menu.buildFromTemplate([
+        ...defaultMenu.items,
+        ...template
+    ]);
+    Menu.setApplicationMenu(menu);
+}
+
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -115,15 +142,46 @@ if (!gotTheLock) {
         acl: 'public-read'
     });
     autoUpdater.checkForUpdatesAndNotify();
+    createMenu(); // Add this line to create the menu
   });
 
   autoUpdater.on('update-available', () => {
     logToFile('Update available.');
+    const result = dialog.showMessageBoxSync(mainWindow, {
+        type: 'info',
+        buttons: ['Download Now', 'Later'],
+        title: 'Update Available',
+        message: 'An update is available. Would you like to download it now?',
+    });
+
+    if (result === 0) { // 'Download Now' button pressed
+        autoUpdater.downloadUpdate();
+    }
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    let logMessage = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}% (${progressObj.transferred}/${progressObj.total})`;
+    logToFile(logMessage);
+    // Optionally, you can log progress to a file or console
+  });
+
+  autoUpdater.on('checking-for-update', () => {
+    logToFile('Checking for update...');
   });
 
   autoUpdater.on('update-downloaded', () => {
-    logToFile('Update downloaded; will install now.');
-    autoUpdater.quitAndInstall();
+    logToFile('Update downloaded; waiting for user to install.');
+    // Show a dialog to the user
+    const result = dialog.showMessageBoxSync(mainWindow, {
+        type: 'info',
+        buttons: ['Install and Relaunch', 'Later'],
+        title: 'Update Ready',
+        message: 'An update has been downloaded. Would you like to install it now?',
+    });
+
+    if (result === 0) { // 'Install and Relaunch' button pressed
+        autoUpdater.quitAndInstall();
+    }
   });
 
   autoUpdater.on('update-not-available', () => {
