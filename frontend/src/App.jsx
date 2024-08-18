@@ -5,7 +5,6 @@ import './App.css';
 import Settings from './components/Settings';
 import Actions from './components/Actions';
 import Transcription from './components/Transcription';
-import packageJson from '../package.json'; // Import package.json
 
 mixpanel.init('a9bdd5c85dab5761be032f1c1650defa');
 
@@ -324,7 +323,7 @@ function App() {
 
   return (
     <div className="container">
-      <h1>MinePal Controls<small>v{packageJson.version}</small></h1>
+      <h1>MinePal Controls<small>v{process.env.PACKAGE_VERSION}</small></h1>
       <Settings
         settings={settings}
         setSettings={setSettings}

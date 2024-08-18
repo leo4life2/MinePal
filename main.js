@@ -47,8 +47,7 @@ async function checkAndCopyProfile() {
 }
 
 function createWindow() {
-    const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-    logToFile(`Version: ${packageJson.version}`);
+    logToFile(`Version: ${app.getVersion()}`);
 
     mainWindow = new BrowserWindow({
         width: 650,
@@ -125,6 +124,10 @@ if (!gotTheLock) {
   autoUpdater.on('update-downloaded', () => {
     logToFile('Update downloaded; will install now.');
     autoUpdater.quitAndInstall();
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    logToFile('No updates available.');
   });
 }
 

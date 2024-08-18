@@ -47,7 +47,6 @@
   "build": {
     "appId": "com.nemosai.minepal",
     "productName": "Minepal",
-    "afterSign": "notarize.js",
     "directories": {
       "buildResources": "build"
     },
@@ -85,6 +84,7 @@
       "target": "AppImage",
       "icon": "build"
     },
+    "afterSign": "notarize.js",
     "publish": [
       {
         "provider": "s3",
