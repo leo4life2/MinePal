@@ -1,22 +1,36 @@
 import { writeFile, readFile, mkdirSync } from 'fs';
-import { EventEmitter } from 'events';
 
-export class Coder extends EventEmitter {
+export class Coder {
     constructor(agent) {
-        super();
         this.agent = agent;
         this.file_counter = 0;
         this.fp = `${this.agent.userDataDir}/bots/${agent.name}/action-code/`;
+        this._executing = false; // Private variable to hold the state
+        this.executingPromise = null; // Promise to resolve when executing becomes false
         this.generating = false;
         this.code_template = '';
         this.timedout = false;
-        this.stopLock = false; // Add a lock flag
         readFile(`${this.agent.appPath}/bots/template.js`, 'utf8', (err, data) => {
             if (err) throw err;
             this.code_template = data;
         });
 
         mkdirSync(this.fp, { recursive: true });
+    }
+
+    get executing() {
+        return this._executing;
+    }
+
+    set executing(value) {
+        this._executing = value;
+        console.log(`Executing set to ${value}`);
+        if (!value && this.executingPromise) {
+            console.log(`Resolving executingPromise with ID: ${this.executingPromise.id}`);
+            clearTimeout(this.executingPromise.timeout);
+            this.executingPromise.resolve();
+            this.executingPromise = null;
+        }
     }
 
     // write custom code to file and import it
@@ -83,7 +97,6 @@ export class Coder extends EventEmitter {
         // wrapper to prevent overlapping code generation loops
         console.log("[CODERSTOP] Generate code.");
         await this.stop();
-        console.log("[CODERSTOP] Generate code stop success.");
         this.generating = true;
         let res = await this.generateCodeLoop(agent_history);
         this.generating = false;
@@ -186,14 +199,17 @@ export class Coder extends EventEmitter {
 
         let TIMEOUT;
         try {
-            console.log('[CODERSTOP] executing code stop\n');
+            console.log('[CODERSTOP] executing code...\n');
             await this.stop();
-            console.log('[CODERSTOP] executing code stop success\n');
             this.clear();
 
+            this.executing = true;
+            console.log('Executing set to true');
             if (timeout > 0)
                 TIMEOUT = this._startTimeout(timeout);
             await func(); // open fire
+            this.executing = false;
+            console.log('Executing set to false');
             clearTimeout(TIMEOUT);
 
             let output = this.formatOutput(this.agent.bot);
@@ -203,13 +219,13 @@ export class Coder extends EventEmitter {
             if (!interrupted && !this.generating) this.agent.bot.emit('idle');
             return {success:true, message: output, interrupted, timedout};
         } catch (err) {
+            this.executing = false;
+            console.log('Executing set to false in catch');
             clearTimeout(TIMEOUT);
             this.cancelResume();
-            console.error(`Process ${process.pid}: Code execution triggered catch:`);
-            console.error(err.stack);
+            console.error(`Process ${process.pid}: Code execution triggered catch: ${err}`);
             console.log("[CODERSTOP] Execute catch.");
             await this.stop();
-            console.log("[CODERSTOP] Execute catch stop success.");
 
             let message = this.formatOutput(this.agent.bot) + '!!Code threw exception!!  Error: ' + err;
             let interrupted = this.agent.bot.interrupt_code;
@@ -234,41 +250,31 @@ export class Coder extends EventEmitter {
     }
 
     async stop() {
-        if (this.stopLock) return; // Check if stop is already executing
-        this.stopLock = true; // Set the lock
-
+        if (!this.executing) return;
         this.agent.bot.interrupt_code = true;
-        this.agent.bot.collectBlock.cancelTask(() => {
-            this.emit('executionStopped');
-        });
-        this.agent.bot.pathfinder.stop(); // sync, oneline
-        this.agent.bot.pvp.stop(); // async
-        this.agent.bot.once('stoppedAttacking', () => {
-            this.emit('executionStopped');
-        });
-
+        this.agent.bot.collectBlock.cancelTask();
+        this.agent.bot.pathfinder.stop();
+        this.agent.bot.pvp.stop();
         console.log('waiting for code to finish executing...');
 
-        // const timeout = setTimeout(() => {
-        //     console.log('[CLEANKILL] Code execution refused to stop after 50 seconds.');
-        //     console.trace('Trace for cleanKill call:');
-        //     this.agent.cleanKill('Code execution refused to stop after 50 seconds. Killing process.');
-        // }, 50 * 1000); // Increased timeout to 50 seconds
+        await new Promise((resolve, reject) => {
+            const promiseId = Date.now(); // Use timestamp as a unique ID
+            const timeout = setTimeout(() => {
+                if (this.executing) {
+                    console.log(`[CLEANKILL] Code execution refused to stop after 20 seconds. Promise ID: ${promiseId}`);
+                    this.agent.cleanKill('Code execution refused to stop after 20 seconds. Killing process.');
+                    reject(new Error('Code execution timeout'));
+                }
+            }, 20 * 1000); // 20 seconds timeout
 
-        // await new Promise(resolve => {
-        //     this.once('executionStopped', () => {
-        //         clearTimeout(timeout);
-        //         console.log("Clearing timeout.");
-        //         resolve();
-        //     });
-        // });
-
-        this.agent.bot.interrupt_code = false; // Clear interrupt_code after execution has stopped
-        this.stopLock = false; // Release the lock after execution
+            this.executingPromise = { resolve, reject, id: promiseId, timeout };
+            console.log(`Creating executingPromise with ID: ${promiseId}`);
+        });
     }
 
     clear() {
         this.agent.bot.output = '';
+        this.agent.bot.interrupt_code = false;
         this.timedout = false;
     }
 
@@ -279,7 +285,6 @@ export class Coder extends EventEmitter {
             this.agent.history.add('system', `Code execution timed out after ${TIMEOUT_MINS} minutes. Attempting force stop.`);
             console.log("[CODERSTOP] Timeout.");
             await this.stop(); // last attempt to stop
-            console.log("[CODERSTOP] Timeout stop success.");
         }, TIMEOUT_MINS*60*1000);
     }
 }
