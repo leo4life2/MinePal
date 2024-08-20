@@ -10,6 +10,8 @@ export class GPT {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(turns);
 
         let res = null;
+        // console.log("---messages---\n", messages,"---end messages---\n");
+
         try {
             const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, {
                 model_name: this.model_name,

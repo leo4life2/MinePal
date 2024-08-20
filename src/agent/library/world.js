@@ -39,12 +39,12 @@ export function getNearestFreeSpace(bot, size=1, distance=8) {
 }
 
 
-export function getNearestBlocks(bot, block_types=null, distance=16, count=10000) {
+export function getNearestBlocks(bot, block_types=null, distance=64, count=10000) {
     /**
      * Get a list of the nearest blocks of the given types.
      * @param {Bot} bot - The bot to get the nearest block for.
      * @param {string[]} block_types - The names of the blocks to search for.
-     * @param {number} distance - The maximum distance to search, default 16.
+     * @param {number} distance - The maximum distance to search, default 64.
      * @param {number} count - The maximum number of blocks to find, default 10000.
      * @returns {Block[]} - The nearest blocks of the given type.
      * @example

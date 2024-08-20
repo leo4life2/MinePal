@@ -222,15 +222,15 @@ function inject (bot, { version, storageBuilder, hideErrors }) {
   // also works on anything with a position value
   function canSeeBlock (block) {
     const headPos = bot.entity.position.offset(0, bot.entity.eyeHeight, 0)
-    const range = headPos.distanceTo(block.position)
-    const dir = block.position.offset(0.5, 0.5, 0.5).minus(headPos)
+    const blockCenter = block.position.offset(0.5, 0.5, 0.5)
+  
     const match = (inputBlock, iter) => {
       const intersect = iter.intersect(inputBlock.shapes, inputBlock.position)
-      if (intersect) { return true }
-      return block.position.equals(inputBlock.position)
+      return intersect && !inputBlock.position.equals(block.position)
     }
-    const blockAtCursor = bot.world.raycast(headPos, dir.normalize(), range, match)
-    return blockAtCursor && blockAtCursor.position.equals(block.position)
+  
+    const blockAtCursor = bot.world.raycast(blockCenter, headPos.minus(blockCenter).normalize(), blockCenter.distanceTo(headPos), match)
+    return !blockAtCursor
   }
 
   bot._client.on('unload_chunk', (packet) => {

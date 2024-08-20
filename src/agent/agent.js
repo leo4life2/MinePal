@@ -8,6 +8,14 @@ import { containsCommand, commandExists, executeCommand, truncCommandMessage } f
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
+import { queryList } from './commands/queries.js';
+
+const queryMap = {
+    stats: queryList.find(query => query.name === "!stats").perform,
+    inventory: queryList.find(query => query.name === "!inventory").perform,
+    nearbyBlocks: queryList.find(query => query.name === "!nearbyBlocks").perform,
+    nearbyEntities: queryList.find(query => query.name === "!entities").perform,
+};
 
 /**
  * Represents an AI agent that can interact with a Minecraft world.
@@ -100,6 +108,19 @@ export class Agent {
     }
 
     /**
+     * Generates a heads-up display (HUD) string with stats, inventory, nearby blocks, and nearby entities.
+     * @returns {string} The HUD string.
+     */
+    async headsUpDisplay() {
+        const stats = queryMap.stats(this);
+        const inventory = queryMap.inventory(this);
+        const nearbyBlocks = queryMap.nearbyBlocks(this);
+        const nearbyEntities = queryMap.nearbyEntities(this);
+
+        return `${stats}\n${inventory}\n${nearbyBlocks}\n${nearbyEntities}`;
+    }
+
+    /**
      * Handles incoming messages and executes appropriate actions.
      * @param {string} source - The source of the message.
      * @param {string} message - The content of the message.
@@ -131,6 +152,10 @@ export class Agent {
         // Process the message and generate responses
         for (let i=0; i<5; i++) {
             let history = this.history.getHistory();
+            // Keep some elements always in sight
+            const hud = await this.headsUpDisplay();
+            this.history.add('system', hud);
+
             let res = await this.prompter.promptConvo(history);
 
             let command_name = containsCommand(res);

@@ -101,11 +101,13 @@ export function getCommandDocs() {
     Use the commands with the syntax: !commandName or !commandName("arg1", 1.2, ...) if the command takes arguments.\n
     Do not use codeblocks. Only use one command in each response, trailing commands and comments will be ignored.\n`;
     for (let command of commandList) {
-        docs += command.name + ': ' + command.description + '\n';
-        if (command.params) {
-            docs += 'Params:\n';
-            for (let param in command.params) {
-                docs += param + ': ' + command.params[param] + '\n';
+        if (command.callable !== false) {
+            docs += command.name + ': ' + command.description + '\n';
+            if (command.params) {
+                docs += 'Params:\n';
+                for (let param in command.params) {
+                    docs += param + ': ' + command.params[param] + '\n';
+                }
             }
         }
     }

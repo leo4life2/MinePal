@@ -400,35 +400,49 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
     console.log("starting collect loop");
 
     while (collected < num && retries < 10) {
+        console.log(`Attempt ${retries + 1}: Collected ${collected}/${num} ${blockType}`);
+        
         let blocks = world.getNearestBlocks(bot, blocktypes, 128);
+        console.log(`Found ${blocks.length} blocks of type ${blockType}`);
+
         if (exclude) {
             for (let position of exclude) {
                 blocks = blocks.filter(
                     block => block.position.x !== position.x || block.position.y !== position.y || block.position.z !== position.z
                 );
             }
+            console.log(`Excluded positions, ${blocks.length} blocks remaining`);
         }
+
         if (blocks.length === 0) {
             retries++;
             // Move around a tiny bit
             const pos = bot.entity.position;
             const randomOffset = () => (Math.random() - 0.5) * 2; // Random offset between -1 and 1
             await goToPosition(bot, pos.x + randomOffset(), pos.y, pos.z + randomOffset(), 1);
-            console.log("no blocks, moving and retrying");
+            console.log("No blocks found, moving and retrying");
             continue;
         }
+
         const block = blocks[0];
+        console.log(`Attempting to collect block at ${block.position}`);
+
         await bot.tool.equipForBlock(block);
         const itemId = bot.heldItem ? bot.heldItem.type : null;
+        console.log('Held item:', JSON.stringify(bot.heldItem, null, 2));
         if (!block.canHarvest(itemId)) {
             log(bot, `Don't have right tools to harvest ${blockType}.`);
             return false;
         }
+
         try {
             await bot.collectBlock.collect(block);
             collected++;
+            console.log(`Successfully collected block at ${block.position}`);
             await autoLight(bot);
         } catch (err) {
+            console.log(`Error collecting block at ${block.position}: ${err.message}`);
+            console.log('Stack trace:', err.stack);
             if (err.name === 'NoChests') {
                 log(bot, `Failed to collect ${blockType}: Inventory full, no place to deposit.`);
                 break;
@@ -437,8 +451,10 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
                 continue;
             }
         }
+
         if (bot.interrupt_code) break;
     }
+
     log(bot, `Collected ${collected} ${blockType}.`);
     return collected > 0;
 }

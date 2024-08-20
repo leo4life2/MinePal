@@ -9,6 +9,7 @@ const pad = (str) => {
 export const queryList = [
   {
     name: "!stats",
+    callable: false,
     description: "Get your bot's location, health, hunger, and time of day.",
     perform: function (agent) {
       let bot = agent.bot;
@@ -48,6 +49,7 @@ export const queryList = [
   },
   {
     name: "!inventory",
+    callable: false,
     description: "Get your bot's inventory.",
     perform: function (agent) {
       const armorSlots = {
@@ -67,7 +69,7 @@ export const queryList = [
       let bot = agent.bot;
       let res = "INVENTORY";
       // Main Inventory
-      res += "\nMain Inventory:";
+      res += "\nBackpack:";
       for (let i = mainInventoryStart; i <= mainInventoryEnd; i++) {
         let item = bot.inventory.slots[i];
         if (item) {
