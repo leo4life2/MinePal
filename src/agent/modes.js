@@ -43,13 +43,13 @@ const modes = [
                 });
             }
             else if (dangerousBlocks.includes(block.name) || dangerousBlocks.includes(blockAbove.name)) {
-                bot.chat('I\'m on fire!'); // TODO: gets stuck in lava
+                await agent.sendMessage('I\'m on fire!');
                 execute(this, agent, async () => {
                     let nearestWater = world.getNearestBlock(bot, 'water', 20);
                     if (nearestWater) {
                         const pos = nearestWater.position;
                         await skills.goToPosition(bot, pos.x, pos.y, pos.z, 0.2);
-                        bot.chat('Ahhhh that\'s better!');
+                        await agent.sendMessage('Ahhhh that\'s better!');
                     }
                     else {
                         await skills.moveAway(bot, 5);
@@ -57,7 +57,7 @@ const modes = [
                 });
             }
             else if (Date.now() - bot.lastDamageTime < 3000 && (bot.health < 5 || bot.lastDamageTaken >= bot.health)) {
-                bot.chat('I\'m dying!');
+                await agent.sendMessage('I\'m dying!');
                 execute(this, agent, async () => {
                     await skills.moveAway(bot, 20);
                 });
@@ -81,7 +81,7 @@ const modes = [
         update: async function (agent) {
             const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 16);
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
-                agent.bot.chat(`Aaa! A ${enemy.name.replace(/_/g, ' ').toLowerCase()}!`);
+                await agent.sendMessage(`Aaa! A ${enemy.name.replace(/_/g, ' ').toLowerCase()}!`);
 
                 execute(this, agent, async () => {
                     await skills.avoidEnemies(agent.bot, 24);
@@ -108,7 +108,7 @@ const modes = [
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
                 const now = Date.now();
                 if (enemy.name !== this.currentEnemyName || now - this.lastMessageTime > this.messageCooldown) {
-                    agent.bot.chat(`Fighting ${enemy.name.replace(/_/g, ' ').toLowerCase()}!`);
+                    await agent.sendMessage(`Fighting ${enemy.name.replace(/_/g, ' ').toLowerCase()}!`);
                     this.lastMessageTime = now;
                     this.currentEnemyName = enemy.name;
                 }
@@ -135,7 +135,7 @@ const modes = [
             const huntable = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHuntable(entity), 8);
             if (huntable && await world.isClearPath(agent.bot, huntable)) {
                 execute(this, agent, async () => {
-                    agent.bot.chat(`Hunting ${huntable.name}!`);
+                    await agent.sendMessage(`Hunting ${huntable.name}!`);
                     await skills.attackEntity(agent.bot, huntable);
                 });
             }
@@ -163,7 +163,10 @@ const modes = [
                     this.noticed_at = Date.now();
                 }
                 if (Date.now() - this.noticed_at > this.wait * 1000) {
-                    agent.bot.chat(`Picking up ${item.name}!`);
+                    const itemName = agent.mcdata.getItemName(item.metadata[8]?.itemId) || 'unknown';
+                    const itemCount = item.metadata[8]?.itemCount || 1;
+                    const formattedItemName = itemName.replace(/_/g, ' ');
+                    await agent.sendMessage(`Picking up ${itemCount} ${formattedItemName}!`);
                     this.prev_item = item;
                     execute(this, agent, async () => {
                         await skills.pickupNearbyItems(agent.bot);

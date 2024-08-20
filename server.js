@@ -108,6 +108,7 @@ function startServer() {
         });
 
         proxyWs.on('message', (message) => {
+            // console.log(`Voice Mode: ${settings.voice_mode}, isKeyDown: ${isKeyDown}, isToggleToTalkActive: ${isToggleToTalkActive}`);
             if (voice_mode === 'always_on' || 
                 (voice_mode === 'push_to_talk' && isKeyDown) || 
                 (voice_mode === 'toggle_to_talk' && isToggleToTalkActive)) {
@@ -168,11 +169,14 @@ function startServer() {
                     if (e.state === 'DOWN') {
                         if (voice_mode === 'push_to_talk') {
                             isKeyDown = true;
+                            // console.log('Push-to-talk key down:', isKeyDown);
                         } else if (voice_mode === 'toggle_to_talk') {
                             isToggleToTalkActive = !isToggleToTalkActive;
+                            // console.log('Toggle-to-talk active:', isToggleToTalkActive);
                         }
                     } else if (e.state === 'UP' && voice_mode === 'push_to_talk') {
                         isKeyDown = false;
+                        // console.log('Push-to-talk key up:', isKeyDown);
                     }
                 }
             });

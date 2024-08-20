@@ -8,7 +8,6 @@ export class GPT {
 
     async sendRequest(turns, systemMessage, stop_seq='***') {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(turns);
-
         let res = null;
         // console.log("---messages---\n", messages,"---end messages---\n");
 

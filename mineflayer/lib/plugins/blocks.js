@@ -510,7 +510,11 @@ function inject (bot, { version, storageBuilder, hideErrors }) {
       for (const [name, listener] of Object.entries(bot._events)) {
         if (name.startsWith('blockUpdate:')) {
           bot.emit(name, null, null)
-          bot.off(name, listener)
+          if (Array.isArray(listener)) {
+            listener.forEach(l => bot.off(name, l))
+          } else {
+            bot.off(name, listener)
+          }
         }
       }
 

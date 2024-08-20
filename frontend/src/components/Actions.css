@@ -60,13 +60,16 @@
 }
 
 .voice-settings select,
-.voice-settings input {
+.voice-settings input,
+.language-settings select {
   padding: 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   color: var(--text-color);
   box-sizing: border-box;
+  background-color: var(--bg-color); /* Ensure background color is set */
+  color: var(--text-color); /* Ensure text color is set */
 }
 
 .voice-settings input[readonly] {
@@ -91,4 +94,6 @@
   border-radius: 8px;
   color: var(--text-color);
   box-sizing: border-box;
+  background-color: var(--bg-color); /* Ensure background color is set */
+  color: var(--text-color); /* Ensure text color is set */
 }

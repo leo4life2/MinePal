@@ -12,7 +12,7 @@ export class History {
         this.memory = '';
 
         // Variables for controlling the agent's memory and knowledge
-        this.max_messages = 20;
+        this.max_messages = 30;
     }
 
     getHistory() { // expects an Examples object

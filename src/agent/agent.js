@@ -86,25 +86,15 @@ export class Agent {
             // Handle initial message or send a greeting
             if (init_message) {
                 // this.handleMessage('system', init_message);
-                this.bot.chat(init_message);
+                await this.sendMessage(init_message);
                 this.bot.emit('finished_executing');
             } else {
-                this.bot.chat('Hello world! I am ' + this.name);
+                await this.sendMessage('Hello world! I am ' + this.name);
                 this.bot.emit('finished_executing');
             }
 
             this.startEvents();
         });
-    }
-
-    /**
-     * Cleans and sends a chat message.
-     * @param {string} message - The message to send.
-     */
-    cleanChat(message) {
-        // Replace newlines with spaces to avoid spam filters
-        message = message.replaceAll('\n', '  ');
-        return this.bot.chat(message);
     }
 
     /**
@@ -133,17 +123,17 @@ export class Agent {
         const user_command_name = containsCommand(message);
         if (user_command_name) {
             if (!commandExists(user_command_name)) {
-                this.bot.chat(`Command '${user_command_name}' does not exist.`);
+                await this.sendMessage(`Command '${user_command_name}' does not exist.`);
                 return;
             }
-            this.bot.chat(`*${source} used ${user_command_name.substring(1)}*`);
+            await this.sendMessage(`*${source} used ${user_command_name.substring(1)}*`);
             if (user_command_name === '!newAction') {
                 // Add context for newAction command
                 this.history.add(source, message);
             }
             let execute_res = await executeCommand(this, message);
             if (execute_res) 
-                this.cleanChat(execute_res);
+                await this.sendMessage(execute_res, true);
             return;
         }
 
@@ -173,7 +163,7 @@ export class Agent {
                 let chat_message = `*used ${command_name.substring(1)}*`;
                 if (pre_message.length > 0)
                     chat_message = `${pre_message}  ${chat_message}`;
-                this.cleanChat(chat_message);
+                await this.sendMessage(chat_message, true);
 
                 let execute_res = await executeCommand(this, res);
 
@@ -186,7 +176,7 @@ export class Agent {
             }
             else {
                 this.history.add(this.name, res);
-                this.cleanChat(res);
+                await this.sendMessage(res, true);
                 console.log('Purely conversational response:', res);
                 break;
             }
@@ -289,7 +279,7 @@ export class Agent {
      */
     cleanKill(msg='Killing agent process...', reason = null) {
         this.history.add('system', msg);
-        this.bot.chat('Goodbye world.')
+        this.sendMessage('Goodbye world.')
         this.history.save();
 
         if (reason === 'KICK') {
@@ -297,5 +287,28 @@ export class Agent {
         } else {
             process.exit(1);
         }
+    }
+
+    /**
+     * Cleans a chat message.
+     * @param {string} message - The message to send.
+     */
+    cleanChat(message) {
+        // Replace newlines with spaces to avoid spam filters
+        message = message.replaceAll('\n', '  ');
+        return message;
+    }
+
+    /**
+     * Sends a chat message and updates the conversation history.
+     * @param {string} message - The message to send.
+     * @param {boolean} clean - Whether to clean the message before sending.
+     */
+    async sendMessage(message, clean = false) {
+        if (clean) {
+            message = this.cleanChat(message);
+        }
+        this.bot.chat(message);
+        await this.history.add(this.name, message);
     }
 }
