@@ -219,7 +219,6 @@ function startServer() {
                 updatedProfiles.push({
                     name: profileData.name,
                     personality: profileData.personality,
-                    init_message: profileData.init_message,
                     conversing: profileData.conversing,
                     coding: profileData.coding,
                     saving_memory: profileData.saving_memory
@@ -276,6 +275,29 @@ function startServer() {
 
         logToFile('API: All agent processes stopped');
         res.send('All agent processes have been stopped.');
+    });
+
+    app.post('/manual-chat', express.json(), (req, res) => {
+        const { botName, message } = req.body;
+
+        if (!botName || !message) {
+            return res.status(400).json({ error: "Both 'botName' and 'message' fields are required." });
+        }
+
+        let botFound = false;
+
+        agentProcesses.forEach(agentProcess => {
+            if (agentProcess.botName === botName) {
+                agentProcess.sendMessage(message);
+                botFound = true;
+            }
+        });
+
+        if (botFound) {
+            res.json({ message: "Message sent to the bot." });
+        } else {
+            res.status(404).json({ error: "Bot is not in game." });
+        }
     });
 
     app.post('/start', express.json(), (req, res) => {
@@ -346,7 +368,6 @@ function startServer() {
             const profileData = JSON.parse(fs.readFileSync(ethanTemplatePath, 'utf8'));
             profileData.name = profile.name;
             profileData.personality = profile.personality;
-            profileData.init_message = profile.init_message || ""; // Set init_message to empty string if not provided
             fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
         });
 

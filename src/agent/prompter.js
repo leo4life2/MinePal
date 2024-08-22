@@ -66,11 +66,13 @@ export class Prompter {
 
     async initExamples() {
         console.log('Loading examples...')
+        const startTime = performance.now();
         this.convo_examples = new Examples(this.embedding_model);
         await this.convo_examples.load(this.profile.conversation_examples);
-        this.coding_examples = new Examples(this.embedding_model);
-        await this.coding_examples.load(this.profile.coding_examples);
-        console.log('Examples loaded.');
+        // this.coding_examples = new Examples(this.embedding_model);
+        // await this.coding_examples.load(this.profile.coding_examples);
+        const endTime = performance.now();
+        console.log(`Examples loaded. Time taken: ${(endTime - startTime).toFixed(2)} ms`);
     }
 
     async replaceStrings(prompt, messages, examples=null, prev_memory=null, to_summarize=[], last_goals=null) {

@@ -1,0 +1,115 @@
+.profile-box {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--primary-color);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+  
+  .profile-box input {
+    margin-right: 10px;
+    width: auto; /* Ensure the checkbox does not take full width */
+  }
+  
+  .profile-box.empty {
+    justify-content: center;
+    font-size: 24px;
+    color: var(--primary-color);
+  }
+  
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .modal-content {
+    background: var(--bg-color);
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 500px;
+  }
+  
+  .modal-content h2 {
+    margin-top: 0;
+  }
+  
+  .modal-content textarea {
+    width: 100%;
+    height: 200px;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--primary-color);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-color);
+    box-sizing: border-box; /* Add this line */
+  }
+  
+  .modal-content input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--primary-color);
+    border-radius: 8px;
+    color: var(--text-color);
+    box-sizing: border-box;
+  }
+  
+  .modal-content .button-group {
+    display: flex;
+    justify-content: space-between;
+  }
+  
+  .modal-content .save-button {
+    background-color: var(--primary-color);
+    color: var(--bg-color);
+    margin-right: 10px;
+  }
+  
+  .modal-content .delete-button {
+    background-color: var(--secondary-color);
+    color: var(--bg-color);
+    margin-left: auto; /* Align the cancel button to the right */
+  }
+  
+  .send-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    margin-top: 5px;
+  }
+  
+  .send-group input {
+    flex-grow: 1;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-color);
+    box-sizing: border-box;
+  }
+  
+  .send-button {
+    margin-left: 10px;
+    padding: 10px 20px;
+    background-color: var(--primary-color);
+    border: none;
+    border-radius: 8px;
+    color: var(--bg-color);
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .send-button:hover {
+    background-color: var(--secondary-color);
+  }

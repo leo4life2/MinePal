@@ -82,16 +82,8 @@ export class Agent {
                 this.handleMessage(username, message);
             });
 
-            const init_message = this.profile.init_message
-            // Handle initial message or send a greeting
-            if (init_message) {
-                // this.handleMessage('system', init_message);
-                await this.sendMessage(init_message);
-                this.bot.emit('finished_executing');
-            } else {
-                await this.sendMessage('Hello world! I am ' + this.name);
-                this.bot.emit('finished_executing');
-            }
+            await this.sendMessage('Hello world! I am ' + this.name);
+            this.bot.emit('finished_executing');
 
             this.startEvents();
         });

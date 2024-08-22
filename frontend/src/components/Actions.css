@@ -52,15 +52,16 @@
 }
 
 .key-input {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  box-sizing: border-box;
   width: 100px; /* Reduced width */
 }
 
-.voice-settings label {
-  display: block;
-}
-
 .voice-settings select,
-.voice-settings input,
 .language-settings select {
   padding: 10px;
   background: rgba(255, 255, 255, 0.05);

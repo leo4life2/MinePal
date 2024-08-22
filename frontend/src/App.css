@@ -36,70 +36,6 @@ h1 {
   margin-top: 0;
 }
 
-.setting-item {
-  margin-bottom: 20px;
-}
-
-label {
-  display: block;
-  margin-bottom: 5px;
-}
-
-input:not([type="checkbox"]) {
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: var(--text-color);
-  box-sizing: border-box;
-}
-
-/* Switch styles */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 60px;
-  height: 34px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: .4s;
-  border-radius: 34px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 26px;
-  width: 26px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: .4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: var(--primary-color);
-}
-
-input:checked + .slider:before {
-  transform: translateX(26px);
-}
-
 @media (max-width: 600px) {
   .actions {
     flex-direction: column;
@@ -109,12 +45,6 @@ input:checked + .slider:before {
   .action-button {
     width: 100%;
   }
-}
-
-.setting-note {
-  font-size: 0.8em;
-  color: #888;
-  font-style: italic;
 }
 
 .error-message {
@@ -171,6 +101,7 @@ input:checked + .slider:before {
   background-color: var(--primary-color);
   border-radius: 10px;
 }
+
 .login-container {
   max-width: 400px;
   width: 90%;
@@ -228,6 +159,7 @@ input:checked + .slider:before {
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(242, 95, 76, 0.3);
 }
+
 .profiles-list {
   display: flex;
   flex-direction: column;
@@ -277,7 +209,6 @@ input:checked + .slider:before {
   transform: translateY(-2px);
 }
 
-/* Add this at the end of your CSS file */
 .resizable-textarea {
   width: 100%;
   padding: 10px;
@@ -288,104 +219,4 @@ input:checked + .slider:before {
   box-sizing: border-box;
   resize: vertical;
   min-height: 100px; /* Minimum height for the textarea */
-}
-
-.profile-box {
-  display: flex;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid var(--primary-color);
-  border-radius: 8px;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-
-.profile-box input {
-  margin-right: 10px;
-  width: auto; /* Ensure the checkbox does not take full width */
-}
-
-.profile-box.empty {
-  justify-content: center;
-  font-size: 24px;
-  color: var(--primary-color);
-}
-
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal-content {
-  background: var(--bg-color);
-  padding: 20px;
-  border-radius: 8px;
-  width: 80%;
-  max-width: 500px;
-}
-
-.modal-content h2 {
-  margin-top: 0;
-}
-
-.modal-content textarea {
-  width: 100%;
-  height: 200px;
-  margin-top: 10px;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid var(--primary-color);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-color);
-}
-
-input,
-textarea {
-  width: 100%;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: var(--text-color);
-  box-sizing: border-box;
-  font-family: 'Poppins', sans-serif;
-}
-
-textarea {
-  resize: vertical; /* Only allow vertical resizing */
-  min-height: 100px; /* Minimum height for the textarea */
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: rgba(255, 255, 255, 0.6);
-  font-family: 'Poppins', sans-serif;
-}
-
-.modal-content input,
-.modal-content textarea {
-  margin-bottom: 15px; /* Add space between textboxes and buttons */
-}
-
-.modal-content .button-group {
-  display: flex;
-  justify-content: space-between;
-}
-
-.modal-content .save-button {
-  background-color: var(--primary-color);
-  color: var(--bg-color);
-}
-
-.modal-content .delete-button {
-  background-color: var(--secondary-color);
-  color: var(--bg-color);
-  margin-left: auto; /* Align the cancel button to the right */
 }

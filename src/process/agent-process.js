@@ -32,6 +32,7 @@ export class AgentProcess {
      * @param {boolean} [load_memory=false] - Whether to load memory from a previous session.
      */
     start(profile, userDataDir, load_memory=false) {
+        this.botName = profile;
         // Prepare arguments for the agent process
         let args = [path.join(app.getAppPath(), 'src/process/init-agent.js')]; // Adjust path
         const logDirectory = app.getPath('userData');
@@ -140,4 +141,24 @@ export class AgentProcess {
             logToFile('Agent process is not initialized.');
         }
     }
+
+    /**
+     * Sends a manual chat message to the agent process.
+     * @param {string} message - The message to send.
+     */
+    sendMessage(message) {
+        if (this.agentProcess && message.trim() !== '') {
+            try {
+                this.agentProcess.send({
+                    type: 'manual_chat',
+                    data: message
+                });
+            } catch (error) {
+                logToFile(`Failed to send message: ${error}`);
+            }
+        } else if (!this.agentProcess) {
+            logToFile('Agent process is not initialized.');
+        }
+    }
+
 }

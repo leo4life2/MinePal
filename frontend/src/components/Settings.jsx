@@ -1,4 +1,5 @@
 import Profiles from './Profiles';
+import './Settings.css';
 
 function Settings({ settings, setSettings, handleSettingChange, settingNotes, selectedProfiles, handleProfileSelect, api }) {
   return (
@@ -11,6 +12,7 @@ function Settings({ settings, setSettings, handleSettingChange, settingNotes, se
         <input
           id="player_username"
           type="text"
+          className="setting-input"
           value={settings.player_username}
           onChange={(e) => handleSettingChange('player_username', e.target.value)}
         />
@@ -20,18 +22,19 @@ function Settings({ settings, setSettings, handleSettingChange, settingNotes, se
           host : port:
           {settingNotes.host && <span className="setting-note"> ({settingNotes.host})</span>}
         </label>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div>
           <input
             id="host"
             type="text"
+            className="setting-input"
             value={settings.host}
             onChange={(e) => handleSettingChange('host', e.target.value)}
-            style={{ flex: '0 0 80%' }}
           />
           <span style={{ margin: '0 8px' }}>:</span>
           <input
             id="port"
             type="number"
+            className="setting-input"
             value={settings.port}
             onChange={(e) => handleSettingChange('port', e.target.value)}
           />
@@ -45,6 +48,7 @@ function Settings({ settings, setSettings, handleSettingChange, settingNotes, se
         <input
           id="minecraft_version"
           type="text"
+          className="setting-input"
           value={settings.minecraft_version}
           onChange={(e) => handleSettingChange('minecraft_version', e.target.value)}
         />

@@ -1,23 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import './Profiles.css';
 
 function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles, api }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [currentProfileIndex, setCurrentProfileIndex] = useState(null);
   const [editableName, setEditableName] = useState('');
   const [editablePersonality, setEditablePersonality] = useState('');
-  const [editableInitMessage, setEditableInitMessage] = useState('');
+  const [editableChatMessage, setEditableChatMessage] = useState('');
+  const [error, setError] = useState(null);
 
-  const openModal = (profile = { name: '', personality: '', init_message: '' }, index = null) => {
+  const sendMessage = async (message) => {
+    try {
+      await api.post('/manual-chat', {
+        botName: editableName,
+        message: message
+      });
+      setEditableChatMessage(''); // Clear the message input after sending
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      setError(`Failed to send message. ${error.response?.data?.error || ''}`);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter' && modalOpen) {
+        sendMessage(editableChatMessage);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [modalOpen, editableChatMessage]);
+
+  const openModal = (profile = { name: '', personality: '' }, index = null) => {
     setCurrentProfileIndex(index);
     setEditableName(profile.name);
     setEditablePersonality(profile.personality);
-    setEditableInitMessage(profile.init_message);
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setCurrentProfileIndex(null);
+    setError(null); // Clear error on modal close
   };
 
   const saveChanges = async () => {
@@ -33,9 +61,9 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
 
     const updatedProfiles = [...profiles];
     if (currentProfileIndex !== null) {
-      updatedProfiles[currentProfileIndex] = { name: editableName, personality: editablePersonality, init_message: editableInitMessage };
+      updatedProfiles[currentProfileIndex] = { name: editableName, personality: editablePersonality };
     } else {
-      updatedProfiles.push({ name: editableName, personality: editablePersonality, init_message: editableInitMessage });
+      updatedProfiles.push({ name: editableName, personality: editablePersonality });
     }
 
     console.log(updatedProfiles);
@@ -107,12 +135,15 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
               onChange={(e) => setEditablePersonality(e.target.value)}
               placeholder="Personality"
             />
-            <input
-              type="text"
-              value={editableInitMessage}
-              onChange={(e) => setEditableInitMessage(e.target.value)}
-              placeholder="Bot's first message (e.g., registration or login command)"
-            />
+            <div className="send-group">
+              <input
+                type="text"
+                value={editableChatMessage}
+                onChange={(e) => setEditableChatMessage(e.target.value)}
+                placeholder="Send messages in the game's chat as the bot"
+              />
+              <button className="send-button" onClick={() => sendMessage(editableChatMessage)}>Send</button>
+            </div>
             <div className="button-group">
               <button className="save-button" onClick={saveChanges}>Save</button>
               <button className="cancel-button" onClick={closeModal}>Cancel</button>
@@ -120,6 +151,7 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
                 <button className="delete-button" onClick={deleteProfile}>Delete Pal</button>
               )}
             </div>
+            {error && <div className="error-message">{error}</div>}
           </div>
         </div>
       )}

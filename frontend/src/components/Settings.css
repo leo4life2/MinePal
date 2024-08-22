@@ -1,0 +1,85 @@
+.setting-item {
+  margin-bottom: 20px;
+  width: 100%; /* Ensure the setting-item takes up full width */
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.setting-input {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  box-sizing: border-box;
+  width: 100%; /* Make input fields take up full width */
+}
+
+.setting-item > div {
+  display: flex;
+  align-items: center;
+  width: 100%; /* Ensure the flex container takes up full width */
+}
+
+.setting-item > div > input[type="text"].setting-input {
+  flex: 1; /* Make the text input take up remaining space */
+}
+
+.setting-item > div > input[type="number"].setting-input {
+  flex: 0 0 20%; /* Adjust the width of the number input */
+}
+
+/* Switch styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.setting-note {
+  font-size: 0.8em;
+  color: #888;
+  font-style: italic;
+}

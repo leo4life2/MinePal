@@ -42,6 +42,8 @@ process.on('message', (e) => {
     if (e.type === 'transcription') {
         // Handle the transcription message
         agent.handleMessage(settings.player_username, e.data);
+    } else if (e.type === 'manual_chat') {
+        agent.sendMessage(e.data);
     }
 });
 
