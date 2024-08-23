@@ -5,6 +5,7 @@ const Move = require("./lib/move");
 const Movements = require("./lib/movements");
 const gotoUtil = require("./lib/goto");
 const Lock = require("./lib/lock");
+const { GoalNear } = require('./lib/goals');
 
 const Vec3 = require("vec3").Vec3;
 
@@ -497,40 +498,36 @@ function inject(bot) {
   });
 
   function monitorMovement() {
-    // Test freemotion
-    if (
-      stateMovements &&
-      stateMovements.allowFreeMotion &&
-      stateGoal &&
-      stateGoal.entity
-    ) {
+    // Check if the bot is allowed free motion and if the goal is an entity
+    if (stateMovements && stateMovements.allowFreeMotion && stateGoal && stateGoal.entity) {
       const target = stateGoal.entity;
+      // Check if the bot can move in a straight line to the target
       if (physics.canStraightLine([target.position])) {
         bot.lookAt(target.position.offset(0, 1.6, 0));
 
-        if (
-          target.position.distanceSquared(bot.entity.position) >
-          stateGoal.rangeSq
-        ) {
+        // Check if the target is within range
+        if (target.position.distanceSquared(bot.entity.position) > stateGoal.rangeSq) {
           if (bot.vehicle) {
-            console.log("vehicle move forward");
+            console.log("Vehicle move forward");
             bot.moveVehicle(0, 1); // Move forward
           } else {
-            console.log("foot move forward");
+            console.log("Foot move forward");
             bot.setControlState("forward", true);
           }
         } else {
           if (bot.vehicle) {
-            console.log("vehicle stop");
+            console.log("Vehicle stop");
             bot.moveVehicle(0, 0); // Stop
           } else {
+            console.log("Foot stop");
             bot.clearControlStates();
-            console.log("foot stop");
           }
         }
         return;
       }
     }
+
+    // Check if the goal is still valid
     if (stateGoal) {
       if (!stateGoal.isValid()) {
         stop();
@@ -539,6 +536,7 @@ function inject(bot) {
       }
     }
 
+    // Check if the A* context exists and if it has timed out
     if (astarContext && astartTimedout) {
       const results = astarContext.compute();
       results.path = postProcessPath(results.path);
@@ -548,11 +546,13 @@ function inject(bot) {
       astartTimedout = results.status === "partial";
     }
 
+    // Check if the bot needs to return to a specific position for placing blocks
     if (bot.pathfinder.LOSWhenPlacingBlocks && returningPos) {
       if (!moveToBlock(returningPos)) return;
       returningPos = null;
     }
 
+    // Check if the path is empty
     if (path.length === 0) {
       lastNodeTime = performance.now();
       if (stateGoal && stateMovements) {
@@ -572,6 +572,7 @@ function inject(bot) {
       }
     }
 
+    // Check if the path is still empty after attempting to update it
     if (path.length === 0) {
       return;
     }
@@ -583,6 +584,33 @@ function inject(bot) {
     if (!nextPoint) {
       resetPath("nextPoint_undefined");
       return;
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function walkTo(x, y, z, range = 3) {
+      bot.pathfinder.setGoal(new GoalNear(x, y, z, range));
+      await sleep(1000);
+      while (bot.pathfinder.isMoving()) {
+        await sleep(100);
+      }
+    }
+
+    async function walkThroughDoor(doorToOpen) {
+      if (!doorToOpen._properties.open) {
+        await bot.activateBlock(doorToOpen);
+      }
+      bot.setControlState("forward", true);
+      await sleep(600);
+      bot.setControlState("forward", false);
+      if (!doorToOpen._properties.open) {
+        await bot.activateBlock(doorToOpen);
+      }
+      resetPath("door_walked_through");
+      lastNodeTime = performance.now();
+      digging = false;
     }
 
     // Handle digging
@@ -606,7 +634,9 @@ function inject(bot) {
             });
         };
 
-        if (!tool) {
+        if (block.name.includes('door') || block.name.includes('gate') && !block.name.includes('iron')) {
+          walkThroughDoor(block);
+        } else if (!tool) {
           digBlock();
         } else {
           bot
@@ -617,8 +647,8 @@ function inject(bot) {
       }
       return;
     }
+
     // Handle block placement
-    // TODO: sneak when placing or make sure the block is not interactive
     if (placing || nextPoint.toPlace.length > 0) {
       if (!placing) {
         placing = true;

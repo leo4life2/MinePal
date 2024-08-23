@@ -301,6 +301,13 @@ class Movements {
     const digTime = block.digTime(tool ? tool.type : null, false, false, false, enchants, effects)
     const laborCost = (1 + 3 * digTime / 1000) * this.digCost
     cost += laborCost
+
+    // Prioritize gates and doors by reducing their cost
+    const name = block.name.toLowerCase()
+    if (name.includes('gate') || name.includes('door') || name.includes('trapdoor')) {
+      cost = 0; // assume opening & moving thru is free
+    }
+
     return cost
   }
 
