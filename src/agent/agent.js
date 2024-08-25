@@ -94,6 +94,10 @@ export class Agent {
      * @returns {string} The HUD string.
      */
     async headsUpDisplay() {
+        if (!this.bot.entity) {
+            return '';
+        }
+
         const stats = queryMap.stats(this);
         const inventory = queryMap.inventory(this);
         const nearbyBlocks = queryMap.nearbyBlocks(this);

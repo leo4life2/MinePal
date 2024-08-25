@@ -353,11 +353,13 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
      * @example
      * await skills.collectBlock(bot, "oak_log");
      **/
+    console.log(`Starting collectBlock with blockType: ${blockType}, num: ${num}, exclude: ${exclude}`);
+
     if (num < 1) {
         log(bot, `Invalid number of blocks to collect: ${num}.`);
         return false;
     }
-    // Define common block types where the block and drop are different
+
     const blockDropMap = {
         'stone': ['cobblestone'],
         'coal_ore': ['coal', 'deepslate_coal_ore'],
@@ -378,26 +380,27 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
     };
 
     let blocktypes = [blockType];
+    console.log(`Initial blocktypes: ${blocktypes}`);
 
-    // Check if the requested block type has a different drop or deepslate variant
     if (blockDropMap[blockType]) {
         blocktypes = [...blocktypes, ...blockDropMap[blockType]];
+        console.log(`Updated blocktypes with blockDropMap: ${blocktypes}`);
     }
 
-    // Check if we're looking for a drop instead of a block
     for (const [block, drops] of Object.entries(blockDropMap)) {
         if (drops.includes(blockType)) {
             blocktypes.push(block);
         }
     }
+    console.log(`Final blocktypes after checking drops: ${blocktypes}`);
 
-    // Remove duplicates
     blocktypes = [...new Set(blocktypes)];
+    console.log(`Unique blocktypes: ${blocktypes}`);
 
     let collected = 0;
     let retries = 0;
 
-    console.log("starting collect loop");
+    console.log("Starting collect loop");
 
     while (collected < num && retries < 10) {
         console.log(`Attempt ${retries + 1}: Collected ${collected}/${num} ${blockType}`);
@@ -416,9 +419,8 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
 
         if (blocks.length === 0) {
             retries++;
-            // Move around a tiny bit
             const pos = bot.entity.position;
-            const randomOffset = () => (Math.random() - 0.5) * 2; // Random offset between -1 and 1
+            const randomOffset = () => (Math.random() - 0.5) * 2;
             await goToPosition(bot, pos.x + randomOffset(), pos.y, pos.z + randomOffset(), 1);
             console.log("No blocks found, moving and retrying");
             continue;

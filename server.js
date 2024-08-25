@@ -308,11 +308,11 @@ function startServer() {
         }
 
         const newSettings = req.body;
-        // Check for empty fields in newSettings, except for key_binding if voice_mode is always_on
+        // Check for empty fields in newSettings, except for key_binding if voice_mode is always_on or off
         const emptyFields = Object.entries(newSettings)
             .filter(([key, value]) => {
                 if (key === 'profiles') return !Array.isArray(value) || value.length === 0;
-                if (key === 'key_binding' && newSettings.voice_mode === 'always_on') return false;
+                if (key === 'key_binding' && (newSettings.voice_mode === 'always_on' || newSettings.voice_mode === 'off')) return false;
                 return value === "" || value === null || value === undefined;
             })
             .map(([key]) => key);

@@ -105,6 +105,8 @@ const modes = [
          */
         update: async function (agent) {
             const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 8);
+            if (enemy && enemy.name.toLowerCase().trim() === "item") return;
+
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
                 const now = Date.now();
                 if (enemy.name !== this.currentEnemyName || now - this.lastMessageTime > this.messageCooldown) {
@@ -163,8 +165,9 @@ const modes = [
                     this.noticed_at = Date.now();
                 }
                 if (Date.now() - this.noticed_at > this.wait * 1000) {
-                    const itemName = agent.mcdata.getItemName(item.metadata[8]?.itemId) || 'unknown';
-                    const itemCount = item.metadata[8]?.itemCount || 1;
+                    const metadataIndex = agent.settings.minecraft_version && agent.settings.minecraft_version <= '1.16.5' ? 7 : 8;
+                    const itemName = agent.mcdata.getItemName(item.metadata[metadataIndex]?.itemId) || 'unknown';
+                    const itemCount = item.metadata[metadataIndex]?.itemCount || 1;
                     const formattedItemName = itemName.replace(/_/g, ' ');
                     await agent.sendMessage(`Picking up ${itemCount} ${formattedItemName}!`);
                     this.prev_item = item;

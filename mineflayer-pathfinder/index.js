@@ -601,6 +601,8 @@ function inject(bot) {
     async function walkThroughDoor(doorToOpen) {
       if (!doorToOpen._properties.open) {
         await bot.activateBlock(doorToOpen);
+      } else {
+        await bot.lookAt(doorToOpen.position.offset(0.5, 0.5, 0.5), false)
       }
       bot.setControlState("forward", true);
       await sleep(600);
