@@ -2,6 +2,7 @@ import MCData from "../../utils/mcdata.js";
 import * as world from "./world.js";
 import pf from 'mineflayer-pathfinder';
 import Vec3 from 'vec3';
+import { queryList } from '../commands/queries.js';
 
 
 export function log(bot, message, chat=false) {
@@ -48,11 +49,9 @@ export async function craftRecipe(bot, itemName, num=1) {
     let recipes = bot.recipesFor(MCData.getInstance().getItemId(itemName), null, 1, null); 
     let craftingTable = null;
     if (!recipes || recipes.length === 0) {
-
         // Look for crafting table
         craftingTable = world.getNearestBlock(bot, 'crafting_table', 8);
         if (craftingTable === null){
-
             // Try to place crafting table
             let hasTable = world.getInventoryCounts(bot)['crafting_table'] > 0;
             if (hasTable) {
@@ -61,20 +60,20 @@ export async function craftRecipe(bot, itemName, num=1) {
                 craftingTable = world.getNearestBlock(bot, 'crafting_table', 8);
                 if (craftingTable) {
                     recipes = bot.recipesFor(MCData.getInstance().getItemId(itemName), null, 1, craftingTable);
+                    console.log(`Recipes for ${itemName} with crafting table:`, recipes);
                     placedTable = true;
                 }
-            }
-            else {
-                log(bot, `You either do not have enough resources to craft ${itemName} or it requires a crafting table.`)
+            } else {
+                log(bot, `You do not have a crafting table to craft ${itemName}.`);
                 return false;
             }
-        }
-        else {
+        } else {
             recipes = bot.recipesFor(MCData.getInstance().getItemId(itemName), null, 1, craftingTable);
         }
     }
     if (!recipes || recipes.length === 0) {
-        log(bot, `You do not have the resources to craft a ${itemName}.`);
+        const craftableItems = queryList.find(query => query.name === "!craftable").perform({ bot });
+        log(bot, `You do not have the resources to craft ${itemName}. You can craft the following items: ${craftableItems}`);
         if (placedTable) {
             await collectBlock(bot, 'crafting_table', 1);
         }
@@ -431,7 +430,6 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
 
         await bot.tool.equipForBlock(block);
         const itemId = bot.heldItem ? bot.heldItem.type : null;
-        console.log('Held item:', JSON.stringify(bot.heldItem, null, 2));
         if (!block.canHarvest(itemId)) {
             log(bot, `Don't have right tools to harvest ${blockType}.`);
             return false;
@@ -1391,5 +1389,74 @@ export async function dismount(bot) {
         log(bot, `Failed to dismount: ${err.message}`);
         return false;
     }
+}
+
+export async function lookInFurnace(bot) {
+  /**
+   * Look in the nearest furnace and log its contents.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @returns {Promise<boolean>} true if the furnace contents were logged, false if no furnace was found.
+   * @example
+   * await skills.lookInFurnace(bot);
+   */
+  const furnaceBlock = world.getNearestBlock(bot, 'furnace', 6);
+  if (!furnaceBlock) {
+    log(bot, 'No furnace found nearby.');
+    return false;
+  }
+
+  const furnace = await bot.openFurnace(furnaceBlock);
+  const inputItem = furnace.inputItem();
+  const fuelItem = furnace.fuelItem();
+  const outputItem = furnace.outputItem();
+
+  log(bot, `Furnace contents:`);
+  log(bot, `Input: ${inputItem ? `${inputItem.count} ${inputItem.name}` : 'None'}`);
+  log(bot, `Fuel: ${fuelItem ? `${fuelItem.count} ${fuelItem.name}` : 'None'}`);
+  log(bot, `Output: ${outputItem ? `${outputItem.count} ${outputItem.name}` : 'None'}`);
+
+  furnace.close();
+  return true;
+}
+
+export async function takeFromFurnace(bot, itemType) {
+  /**
+   * Take items from the nearest furnace.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} itemType - The type of item to take (input, fuel, output).
+   * @returns {Promise<boolean>} true if the items were taken, false otherwise.
+   * @example
+   * await skills.takeFromFurnace(bot, "input");
+   */
+  const furnaceBlock = world.getNearestBlock(bot, 'furnace', 6);
+  if (!furnaceBlock) {
+    log(bot, 'No furnace found nearby.');
+    return false;
+  }
+
+  const furnace = await bot.openFurnace(furnaceBlock);
+  let item;
+
+  try {
+    if (itemType === 'input') {
+      item = await furnace.takeInput();
+    } else if (itemType === 'fuel') {
+      item = await furnace.takeFuel();
+    } else if (itemType === 'output') {
+      item = await furnace.takeOutput();
+    } else {
+      log(bot, `Invalid item type: ${itemType}`);
+      furnace.close();
+      return false;
+    }
+  } catch (err) {
+    log(bot, `Failed to take ${itemType} from furnace: ${err.message}`);
+    furnace.close();
+    return false;
+  }
+
+  log(bot, `Successfully took ${item.count} ${item.name} from furnace.`);
+  furnace.close();
+  return true;
 }
 

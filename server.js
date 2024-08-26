@@ -14,10 +14,10 @@ const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
 let wss; // Declare wss in the outer scope
-
 let isToggleToTalkActive = false; // Global state for toggle_to_talk
 let isKeyDown = false; // Track key state
 let gkl; // Declare the global keyboard listener
+let voice_mode = 'off'; // Global voice_mode variable with default value
 
 function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
@@ -36,11 +36,35 @@ function notifyBotKicked() {
     broadcastMessage("Error: Bot kicked.");
 }
 
+function setupVoice(settings) {
+    voice_mode = settings.voice_mode; // Assign voice_mode from settings
+    const { key_binding } = settings;
+
+    if ((voice_mode === 'push_to_talk' || voice_mode === 'toggle_to_talk') && key_binding) {
+        gkl = new GlobalKeyboardListener();
+
+        gkl.addListener((e) => {
+            if (e.name.toLowerCase() === key_binding.toLowerCase()) {
+                if (e.state === 'DOWN') {
+                    if (voice_mode === 'push_to_talk') {
+                        isKeyDown = true;
+                        console.log('Push-to-talk key down:', isKeyDown);
+                    } else if (voice_mode === 'toggle_to_talk') {
+                        isToggleToTalkActive = !isToggleToTalkActive;
+                        console.log('Toggle-to-talk active:', isToggleToTalkActive);
+                    }
+                } else if (e.state === 'UP' && voice_mode === 'push_to_talk') {
+                    isKeyDown = false;
+                    console.log('Push-to-talk key up:', isKeyDown);
+                }
+            }
+        });
+    }
+}
+
 function startServer() {
     logToFile("Starting server...");
-    
     const userDataDir = electronApp.getPath('userData');
-
     if (!userDataDir || !fs.existsSync(userDataDir)) {
         throw new Error("userDataDir must be provided and must exist");
     }
@@ -66,6 +90,9 @@ function startServer() {
     } else {
         settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     }
+
+    // Setup global keyboard listener with the current settings
+    setupVoice(settings);
 
     let profiles = settings.profiles;
     let load_memory = settings.load_memory;
@@ -154,33 +181,6 @@ function startServer() {
             logToFile("socket: client disconnected");
             proxyWs.close();
         });
-
-        // One-time setup logic
-        const settingsPath = path.join(userDataDir, 'settings.json');
-        const settingsData = fs.readFileSync(settingsPath, 'utf8');
-        const currentSettings = JSON.parse(settingsData);
-        const { voice_mode, key_binding } = currentSettings;
-        // Register global shortcut for push_to_talk and toggle_to_talk if key_binding is provided
-        if ((voice_mode === 'push_to_talk' || voice_mode === 'toggle_to_talk') && key_binding) {
-            gkl = new GlobalKeyboardListener();
-
-            gkl.addListener((e) => {
-                if (e.name.toLowerCase() === key_binding.toLowerCase()) {
-                    if (e.state === 'DOWN') {
-                        if (voice_mode === 'push_to_talk') {
-                            isKeyDown = true;
-                            // console.log('Push-to-talk key down:', isKeyDown);
-                        } else if (voice_mode === 'toggle_to_talk') {
-                            isToggleToTalkActive = !isToggleToTalkActive;
-                            // console.log('Toggle-to-talk active:', isToggleToTalkActive);
-                        }
-                    } else if (e.state === 'UP' && voice_mode === 'push_to_talk') {
-                        isKeyDown = false;
-                        // console.log('Push-to-talk key up:', isKeyDown);
-                    }
-                }
-            });
-        }
     });
 
     app.get('/backend-alive', async (req, res) => {

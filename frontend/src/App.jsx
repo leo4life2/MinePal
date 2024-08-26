@@ -61,6 +61,15 @@ function App() {
       const filteredSettings = Object.fromEntries(
         Object.entries(response.data).filter(([key]) => expectedFields.includes(key))
       );
+
+      // Filter profiles to only include name and personality fields
+      if (filteredSettings.profiles) {
+        filteredSettings.profiles = filteredSettings.profiles.map(profile => ({
+          name: profile.name,
+          personality: profile.personality
+        }));
+      }
+
       setSettings(prevSettings => ({ ...prevSettings, ...filteredSettings }));
     } catch (err) {
       console.error("Failed to fetch settings:", err);

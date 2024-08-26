@@ -129,8 +129,6 @@ export const queryList = [
         res += ": none";
       }
 
-      console.log(pad(res));
-
       return pad(res);
     },
   },

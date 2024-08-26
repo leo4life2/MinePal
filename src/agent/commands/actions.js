@@ -57,7 +57,7 @@ export const actionsList = [
     name: "!goToPlayer",
     description: "Go to the given player. Argument is only player's name.",
     params: {
-      player_name: "(string) The name of the player to go to."
+      player_name: "(string) The name of the player to go to.",
     },
     perform: wrapExecution(async (agent, player_name) => {
       return await skills.goToPlayer(agent.bot, player_name);
@@ -110,6 +110,16 @@ export const actionsList = [
     },
   },
   {
+    name: "!deletePlace",
+    description: "Delete a saved location.",
+    params: {
+      name: "(string) The name of the location to delete.",
+    },
+    perform: async function (agent, name) {
+      return agent.memory_bank.deletePlace(name);
+    },
+  },
+  {
     name: "!goToPlace",
     description: "Go to a saved location.",
     params: { name: "(string) The name of the location to go to." },
@@ -117,7 +127,12 @@ export const actionsList = [
       const pos = agent.memory_bank.recallPlace(name);
       if (!pos) {
         const allLocations = agent.memory_bank.getKeys();
-        skills.log(agent.bot, `Could not find location "${name}", but we have: ${allLocations.join(', ')}`);
+        skills.log(
+          agent.bot,
+          `Could not find location "${name}", but we have: ${allLocations.join(
+            ", "
+          )}`
+        );
         return;
       }
       await skills.goToPosition(agent.bot, pos[0], pos[1], pos[2], 1);
@@ -209,9 +224,10 @@ export const actionsList = [
   {
     name: "!attack",
     description: "Attack and kill the nearest entity of a given type.",
-    params: { 
+    params: {
       type: "(string) The type of entity to attack. If it's a player, give the player's name.",
-      isPlayer: "(boolean) Whether the target is a player or not. If type is not a Minecraft mob type, this is true."
+      isPlayer:
+        "(boolean) Whether the target is a player or not. If type is not a Minecraft mob type, this is true.",
     },
     perform: wrapExecution(async (agent, type, isPlayer) => {
       await skills.attackNearest(agent.bot, type, true, isPlayer);
@@ -227,7 +243,7 @@ export const actionsList = [
   {
     name: "!activateBlock",
     description:
-      "DO NOT use this with chests or containers. Activate the nearest object of a given type.",
+      "DO NOT use this with chests, furnace, or containers. Activate the nearest object of a given type.",
     params: { type: "(string) The type of object to activate." },
     perform: wrapExecution(async (agent, type) => {
       await skills.activateNearestBlock(agent.bot, type);
@@ -235,14 +251,18 @@ export const actionsList = [
   },
   {
     name: "!activateItem",
-    description: "Use item, activate the currently held item in main or off hand.",
+    description:
+      "Use item, activate the currently held item in main or off hand.",
     params: {
-      offHand: "(boolean, optional) Whether to activate the item in the off hand. Defaults to false (main hand).",
+      offHand:
+        "(boolean, optional) Whether to activate the item in the off hand. Defaults to false (main hand).",
     },
     perform: wrapExecution(async (agent, offHand = false) => {
       const success = await skills.activateItem(agent.bot, offHand);
       const handName = offHand ? "off hand" : "main hand";
-      return success ? `Activated item in ${handName}.` : `Failed to activate item in ${handName}.`;
+      return success
+        ? `Activated item in ${handName}.`
+        : `Failed to activate item in ${handName}.`;
     }),
   },
   {
@@ -326,7 +346,9 @@ export const actionsList = [
     description: "Dismount the bot from any entity it is currently riding.",
     perform: wrapExecution(async (agent) => {
       const success = await skills.dismount(agent.bot);
-      return success ? "Successfully dismounted." : "Failed to dismount or not riding any entity.";
+      return success
+        ? "Successfully dismounted."
+        : "Failed to dismount or not riding any entity.";
     }),
   },
   {
@@ -345,14 +367,38 @@ export const actionsList = [
   },
   {
     name: "!activateEntity",
-    description: "Activate the nearest entity of a given type. E.g. boat, horse.",
+    description:
+      "Activate the nearest entity of a given type. E.g. boat, horse.",
     params: { type: "(string) The type of entity to activate." },
     perform: wrapExecution(async (agent, type) => {
       const success = await skills.activateNearestEntity(agent.bot, type);
-      return success ? `Activated nearest ${type}.` : `No ${type} found nearby.`;
+      return success
+        ? `Activated nearest ${type}.`
+        : `No ${type} found nearby.`;
     }),
   },
-    // {
+  {
+    name: "!lookInFurnace",
+    description: "Look in the nearest furnace and log its contents.",
+    perform: wrapExecution(async (agent) => {
+      const success = await skills.lookInFurnace(agent.bot);
+      return success ? "Furnace contents seen." : "No furnace found nearby.";
+    }),
+  },
+  {
+    name: "!takeFromFurnace",
+    description: "Take items from the nearest furnace.",
+    params: {
+      itemType: "(string) The type of item to take (input, fuel, output).",
+    },
+    perform: wrapExecution(async (agent, itemType) => {
+      const success = await skills.takeFromFurnace(agent.bot, itemType);
+      return success
+        ? `Successfully took ${itemType} from furnace.`
+        : `Failed to take ${itemType} from furnace.`;
+    }),
+  },
+  // {
   //   name: "!goal",
   //   description: "Set a goal to automatically work towards.",
   //   params: {
@@ -365,7 +411,7 @@ export const actionsList = [
   //     return "Set goal: " + agent.npc.data.curr_goal.name;
   //   },
   // },
-    // {
+  // {
   //   name: "!newAction",
   //   description:
   //     "Perform new and unknown custom behaviors that are not available as a command by writing code.",

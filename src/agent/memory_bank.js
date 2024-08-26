@@ -29,4 +29,13 @@ export class MemoryBank {
 			delete this.memory[oldName];
 		}
 	}
+
+	deletePlace(name) {
+		if (this.memory[name]) {
+			delete this.memory[name];
+			return `Location "${name}" has been deleted.`;
+		} else {
+			return `Location "${name}" does not exist.`;
+		}
+	}
 }
