@@ -1,6 +1,6 @@
 {
   "name": "minepal",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "AI minecraft friend",
   "type": "module",
   "main": "main.js",
