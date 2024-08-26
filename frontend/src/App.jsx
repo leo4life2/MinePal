@@ -34,6 +34,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [startTime, setStartTime] = useState(null);
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
+  const [inputDevices, setInputDevices] = useState([]);
+  const [selectedInputDevice, setSelectedInputDevice] = useState('');
 
   const handleProfileSelect = (profile) => {
     setSelectedProfiles(prev => 
@@ -43,7 +45,6 @@ function App() {
   };
 
   const handleSettingChange = (key, value) => {
-    console.log(`Changing ${key} to ${value}`);
     setSettings(prevSettings => ({ ...prevSettings, [key]: value }));
   };
 
@@ -149,6 +150,18 @@ function App() {
         setError(`Please fill in the following fields: ${emptyFields.join(', ')}`);
         return;
       }
+
+      if (!isValidMinecraftUsername(settings.player_username)) {
+        setError("Invalid Minecraft username. It should be 3-16 characters long and can only contain letters, numbers, and underscores.");
+        return;
+    }
+
+      const invalidProfileNames = selectedProfiles.filter(profile => !isValidMinecraftUsername(profile.name));
+      if (invalidProfileNames.length > 0) {
+          setError(`Invalid profile names: ${invalidProfileNames.map(profile => profile.name).join(', ')}. They should be 3-16 characters long and can only contain letters, numbers, and underscores.`);
+          return;
+      }
+
       if (selectedProfiles.length === 0) {
         setError("Please select at least one pal to play with.");
         return;
@@ -192,9 +205,16 @@ function App() {
     }
   };
 
+  const isValidMinecraftUsername = (username) => {
+    const regex = /^[a-zA-Z0-9_]{3,16}$/;
+    return regex.test(username);
+  };
+
   const getMicrophone = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: selectedInputDevice ? { exact: selectedInputDevice } : undefined }
+      });
       return new MediaRecorder(stream);
     } catch (error) {
       console.error("Error accessing microphone:", error);
@@ -326,6 +346,23 @@ function App() {
     }
   }, [agentStarted]);
 
+  useEffect(() => {
+    const getInputDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+        setInputDevices(audioInputDevices);
+        if (audioInputDevices.length > 0) {
+          setSelectedInputDevice(audioInputDevices[0].deviceId);
+        }
+      } catch (error) {
+        console.error("Error fetching input devices:", error);
+      }
+    };
+
+    getInputDevices();
+  }, []);
+
   if (loading) {
     return <div className="spinner">Loading...</div>;
   }
@@ -349,6 +386,9 @@ function App() {
         isMicrophoneActive={isMicrophoneActive} // Pass the new state
         settings={settings}
         setSettings={setSettings}
+        inputDevices={inputDevices} // Pass input devices
+        selectedInputDevice={selectedInputDevice} // Pass selected input device
+        setSelectedInputDevice={setSelectedInputDevice} // Pass setter for selected input device
       />
       {error && <div className="error-message">{error}</div>}
       <Transcription transcription={transcription} />

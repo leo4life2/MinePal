@@ -36,7 +36,7 @@
   display: flex;
   align-items: center; /* Center items vertically */
   gap: 10px; /* Space between the elements */
-  margin-bottom: 20px; /* Add space between voice settings and language settings */
+  margin-bottom: 10px;
 }
 
 .microphone-icon {
@@ -62,7 +62,8 @@
 }
 
 .voice-settings select,
-.language-settings select {
+.language-settings select,
+.input-device-settings select { /* Added input-device-settings select */
   padding: 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -71,6 +72,7 @@
   box-sizing: border-box;
   background-color: var(--bg-color); /* Ensure background color is set */
   color: var(--text-color); /* Ensure text color is set */
+  margin-bottom: 10px;
 }
 
 .voice-settings input[readonly] {

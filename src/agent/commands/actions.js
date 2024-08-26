@@ -152,14 +152,13 @@ export const actionsList = [
   },
   {
     name: "!givePlayer",
-    description: "Give the specified item to the given player.",
+    description: "Give the specified items to the given player.",
     params: {
-      player_name: "(string) The name of the player to give the item to.",
-      item_name: "(string) The name of the item to give.",
-      num: "(number) The number of items to give.",
+      player_name: "(string) The name of the player to give the items to.",
+      items: "(string) The items to give in the format 'item1:quantity1,item2:quantity2,...'.",
     },
-    perform: wrapExecution(async (agent, player_name, item_name, num) => {
-      await skills.giveToPlayer(agent.bot, item_name, player_name, num);
+    perform: wrapExecution(async (agent, player_name, items) => {
+      await skills.giveToPlayer(agent.bot, player_name, items);
     }),
   },
   {
@@ -305,22 +304,20 @@ export const actionsList = [
     name: "!depositToChest",
     description: "Deposit items into the nearest chest.",
     params: {
-      itemName: "(string) The name of the item to deposit.",
-      amount: "(number) The amount of items to deposit.",
+      items: "(string) The items to deposit in the format 'item1:quantity1,item2:quantity2,...'.",
     },
-    perform: wrapExecution(async (agent, itemName, amount) => {
-      return await skills.depositToChest(agent.bot, itemName, amount);
+    perform: wrapExecution(async (agent, items) => {
+      await skills.depositToChest(agent.bot, items);
     }),
   },
   {
     name: "!withdrawFromChest",
     description: "Withdraw items from the nearest chest.",
     params: {
-      itemName: "(string) The name of the item to withdraw.",
-      amount: "(number) The amount of items to withdraw.",
+      items: "(string) The items to withdraw in the format 'item1:quantity1,item2:quantity2,...'.",
     },
-    perform: wrapExecution(async (agent, itemName, amount) => {
-      return await skills.withdrawFromChest(agent.bot, itemName, amount);
+    perform: wrapExecution(async (agent, items) => {
+      await skills.withdrawFromChest(agent.bot, items);
     }),
   },
   {

@@ -113,3 +113,8 @@
   .send-button:hover {
     background-color: var(--secondary-color);
   }
+  
+  .profile-box input[type="checkbox"] {
+    width: 20px; /* Adjust the size as needed */
+    height: 20px; /* Adjust the size as needed */
+  }

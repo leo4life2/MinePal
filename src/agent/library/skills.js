@@ -4,6 +4,10 @@ import pf from 'mineflayer-pathfinder';
 import Vec3 from 'vec3';
 import { queryList } from '../commands/queries.js';
 
+const NEAR_DISTANCE = 4.5;
+const MID_DISTANCE = 8;
+const FAR_DISTANCE = 32;
+const VERY_FAR_DISTANCE = 128;
 
 export function log(bot, message, chat=false) {
     bot.output += message + '\n';
@@ -50,14 +54,14 @@ export async function craftRecipe(bot, itemName, num=1) {
     let craftingTable = null;
     if (!recipes || recipes.length === 0) {
         // Look for crafting table
-        craftingTable = world.getNearestBlock(bot, 'crafting_table', 8);
+        craftingTable = world.getNearestBlock(bot, 'crafting_table', MID_DISTANCE);
         if (craftingTable === null){
             // Try to place crafting table
             let hasTable = world.getInventoryCounts(bot)['crafting_table'] > 0;
             if (hasTable) {
                 let pos = world.getNearestFreeSpace(bot, 1, 6);
                 await placeBlock(bot, 'crafting_table', pos.x, pos.y, pos.z);
-                craftingTable = world.getNearestBlock(bot, 'crafting_table', 8);
+                craftingTable = world.getNearestBlock(bot, 'crafting_table', MID_DISTANCE);
                 if (craftingTable) {
                     recipes = bot.recipesFor(MCData.getInstance().getItemId(itemName), null, 1, craftingTable);
                     console.log(`Recipes for ${itemName} with crafting table:`, recipes);
@@ -109,22 +113,27 @@ export async function smeltItem(bot, itemName, num=1) {
     } // TODO: allow cobblestone, sand, clay, etc.
 
     let placedFurnace = false;
-    let furnaceBlock = undefined;
-    furnaceBlock = world.getNearestBlock(bot, 'furnace', 6);
-    if (!furnaceBlock){
+    let furnaceBlock = world.getNearestBlock(bot, 'furnace', FAR_DISTANCE);
+    if (!furnaceBlock) {
         // Try to place furnace
         let hasFurnace = world.getInventoryCounts(bot)['furnace'] > 0;
         if (hasFurnace) {
             let pos = world.getNearestFreeSpace(bot, 1, 6);
             await placeBlock(bot, 'furnace', pos.x, pos.y, pos.z);
-            furnaceBlock = world.getNearestBlock(bot, 'furnace', 6);
+            furnaceBlock = world.getNearestBlock(bot, 'furnace', MID_DISTANCE);
             placedFurnace = true;
         }
     }
-    if (!furnaceBlock){
-        log(bot, `There is no furnace nearby and you have no furnace.`)
+    if (!furnaceBlock) {
+        log(bot, `There is no furnace nearby and you have no furnace.`);
         return false;
     }
+
+    // Move closer to the furnace if too far
+    if (bot.entity.position.distanceTo(furnaceBlock.position) > NEAR_DISTANCE) {
+        await goToPosition(bot, furnaceBlock.position.x, furnaceBlock.position.y, furnaceBlock.position.z, 2);
+    }
+
     await bot.lookAt(furnaceBlock.position);
 
     console.log('smelting...');
@@ -212,10 +221,15 @@ export async function clearNearestFurnace(bot) {
      * @example
      * await skills.clearNearestFurnace(bot);
      **/
-    let furnaceBlock = world.getNearestBlock(bot, 'furnace', 6); 
+    let furnaceBlock = world.getNearestBlock(bot, 'furnace', FAR_DISTANCE); 
     if (!furnaceBlock){
         log(bot, `There is no furnace nearby.`)
         return false;
+    }
+
+    // Move closer to the furnace if too far
+    if (bot.entity.position.distanceTo(furnaceBlock.position) > NEAR_DISTANCE) {
+        await goToPosition(bot, furnaceBlock.position.x, furnaceBlock.position.y, furnaceBlock.position.z, 2);
     }
 
     console.log('clearing furnace...');
@@ -280,7 +294,7 @@ export async function attackEntity(bot, entity, kill=true) {
     await equipHighestAttack(bot)
 
     if (!kill) {
-        if (bot.entity.position.distanceTo(pos) > 4) {
+        if (bot.entity.position.distanceTo(pos) > NEAR_DISTANCE) {
             console.log('moving to mob...')
             await goToPosition(bot, pos.x, pos.y, pos.z);
         }
@@ -317,7 +331,7 @@ export async function defendSelf(bot, range=9) {
     let enemy = world.getNearestEntityWhere(bot, entity => MCData.getInstance().isHostile(entity), range);
     while (enemy) {
         await equipHighestAttack(bot);
-        if (bot.entity.position.distanceTo(enemy.position) > 4 && enemy.name !== 'creeper' && enemy.name !== 'phantom') {
+        if (bot.entity.position.distanceTo(enemy.position) > NEAR_DISTANCE && enemy.name !== 'creeper' && enemy.name !== 'phantom') {
             try {
                 bot.pathfinder.setMovements(new pf.Movements(bot));
                 await bot.pathfinder.goto(new pf.goals.GoalFollow(enemy, 2), true);
@@ -404,7 +418,7 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
     while (collected < num && retries < 10) {
         console.log(`Attempt ${retries + 1}: Collected ${collected}/${num} ${blockType}`);
         
-        let blocks = world.getNearestBlocks(bot, blocktypes, 128);
+        let blocks = world.getNearestBlocks(bot, blocktypes, VERY_FAR_DISTANCE);
         console.log(`Found ${blocks.length} blocks of type ${blockType}`);
 
         if (exclude) {
@@ -467,7 +481,7 @@ export async function pickupNearbyItems(bot) {
      * @example
      * await skills.pickupNearbyItems(bot);
      **/
-    const distance = 8;
+    const distance = MID_DISTANCE;
     const getNearestItem = bot => bot.nearestEntity(entity => entity.name === 'item' && bot.entity.position.distanceTo(entity.position) < distance);
     let nearestItem = getNearestItem(bot);
     let pickedUp = 0;
@@ -509,13 +523,13 @@ export async function breakBlockAt(bot, x, y, z) {
             return true;
         }
 
-        if (bot.entity.position.distanceTo(block.position) > 4.5) {
+        if (bot.entity.position.distanceTo(block.position) > NEAR_DISTANCE) {
             let pos = block.position;
             let movements = new pf.Movements(bot);
             movements.canPlaceOn = false;
             movements.allow1by1towers = false;
             bot.pathfinder.setMovements(movements);
-            await bot.pathfinder.goto(new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+            await bot.pathfinder.goto(new pf.goals.GoalNear(pos.x, pos.y, pos.z, NEAR_DISTANCE));
         }
         if (bot.game.gameMode !== 'creative') {
             await bot.tool.equipForBlock(block);
@@ -665,12 +679,12 @@ export async function placeBlock(bot, blockType, x, y, z, placeOn='bottom', dont
         bot.pathfinder.setMovements(new pf.Movements(bot));
         await bot.pathfinder.goto(inverted_goal);
     }
-    if (bot.entity.position.distanceTo(targetBlock.position) > 4.5) {
+    if (bot.entity.position.distanceTo(targetBlock.position) > NEAR_DISTANCE) {
         // too far
         let pos = targetBlock.position;
         let movements = new pf.Movements(bot);
         bot.pathfinder.setMovements(movements);
-        await bot.pathfinder.goto(new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+        await bot.pathfinder.goto(new pf.goals.GoalNear(pos.x, pos.y, pos.z, NEAR_DISTANCE));
     }
     
     await bot.equip(block, 'hand');
@@ -768,17 +782,25 @@ export async function eat(bot, foodName="") {
 }
 
 
-export async function giveToPlayer(bot, itemType, username, num=1) {
+export async function giveToPlayer(bot, username, items) {
     /**
-     * Give one of the specified item to the specified player
-     * @param {MinecraftBot} bot, reference to the minecraft bot.
-     * @param {string} itemType, the name of the item to give.
-     * @param {string} username, the username of the player to give the item to.
-     * @param {number} num, the number of items to give. Defaults to 1.
-     * @returns {Promise<boolean>} true if the item was given, false otherwise.
+     * Give the specified items to the given player.
+     * @param {MinecraftBot} bot - Reference to the minecraft bot.
+     * @param {string} username - The name of the player to give the items to.
+     * @param {string} items - The items to give in the format 'item1:quantity1,item2:quantity2,...'.
+     * @returns {Promise<boolean>} true if the items were given, false otherwise.
      * @example
-     * await skills.giveToPlayer(bot, "oak_log", "player1");
+     * await skills.giveToPlayer(bot, "player_name", "oak_log:10,stone:5");
      **/
+    const itemsList = items.split(',').map(item => {
+        const [name, quantity] = item.split(':');
+        if (!name || isNaN(quantity)) {
+            log(bot, `Invalid items format. Use 'item1:quantity1,item2:quantity2,...'`);
+            return null;
+        }
+        return { name, quantity: parseInt(quantity, 10) };
+    }).filter(item => item !== null);
+
     let player = bot.players[username].entity
     if (!player){
         log(bot, `Could not find ${username}.`);
@@ -786,10 +808,11 @@ export async function giveToPlayer(bot, itemType, username, num=1) {
     }
     await goToPlayer(bot, username);
     await bot.lookAt(player.position);
-    discard(bot, itemType, num);
+    for (const { name, quantity } of itemsList) {
+        await discard(bot, name, quantity);
+    }
     return true;
 }
-
 
 export async function goToPosition(bot, x, y, z, min_distance=2) {
     /**
@@ -818,7 +841,6 @@ export async function goToPosition(bot, x, y, z, min_distance=2) {
     log(bot, `You have reached at ${x}, ${y}, ${z}.`);
     return true;
 }
-
 
 export async function goToPlayer(bot, username, distance=1) {
     /**
@@ -1212,12 +1234,17 @@ export async function lookInChest(bot) {
      */
     const chestToOpen = bot.findBlock({
         matching: bot.registry.blocksByName.chest.id,
-        maxDistance: 6
+        maxDistance: FAR_DISTANCE
     });
 
     if (!chestToOpen) {
         log(bot, 'No chest found nearby.');
         return false;
+    }
+
+    // Move closer to the chest if too far
+    if (bot.entity.position.distanceTo(chestToOpen.position) > NEAR_DISTANCE) {
+        await goToPosition(bot, chestToOpen.position.x, chestToOpen.position.y, chestToOpen.position.z, 2);
     }
 
     const chest = await bot.openContainer(chestToOpen);
@@ -1234,19 +1261,27 @@ export async function lookInChest(bot) {
     return true;
 }
 
-export async function depositToChest(bot, itemName, amount) {
+export async function depositToChest(bot, items) {
     /**
-     * Deposit the specified amount of items into the nearest chest.
+     * Deposit the specified items into the nearest chest.
      * @param {MinecraftBot} bot - Reference to the minecraft bot.
-     * @param {string} itemName - The name of the item to deposit.
-     * @param {number} amount - The amount of items to deposit.
+     * @param {string} items - The items to deposit in the format 'item1:quantity1,item2:quantity2,...'.
      * @returns {Promise<boolean>} true if the items were deposited, false otherwise.
      * @example
-     * await skills.depositToChest(bot, "oak_log", 10);
-     */
+     * await skills.depositToChest(bot, "oak_log:10,stone:5");
+     **/
+    const itemsList = items.split(',').map(item => {
+        const [name, quantity] = item.split(':');
+        if (!name || isNaN(quantity)) {
+            log(bot, `Invalid items format. Use 'item1:quantity1,item2:quantity2,...'`);
+            return null;
+        }
+        return { name, quantity: parseInt(quantity, 10) };
+    }).filter(item => item !== null);
+
     const chestToOpen = bot.findBlock({
         matching: bot.registry.blocksByName.chest.id,
-        maxDistance: 6
+        maxDistance: FAR_DISTANCE
     });
 
     if (!chestToOpen) {
@@ -1254,42 +1289,49 @@ export async function depositToChest(bot, itemName, amount) {
         return false;
     }
 
+    if (bot.entity.position.distanceTo(chestToOpen.position) > NEAR_DISTANCE) {
+        await goToPosition(bot, chestToOpen.position.x, chestToOpen.position.y, chestToOpen.position.z, 2);
+    }
+
     const chest = await bot.openContainer(chestToOpen);
-    const itemsInChest = chest.containerItems().map(item => `${item.name} x${item.count}`).join(', ');
-    log(bot, `Opened chest containing: ${itemsInChest}`);
-
-    const item = bot.inventory.items().find(item => item.name === itemName);
-    if (!item) {
-        log(bot, `You do not have any ${itemName} to deposit.`);
-        chest.close();
-        return false;
+    for (const { name, quantity } of itemsList) {
+        const item = bot.inventory.items().find(item => item.name === name);
+        if (!item) {
+            log(bot, `You do not have any ${name} to deposit.`);
+            continue;
+        }
+        try {
+            await chest.deposit(item.type, null, quantity);
+            log(bot, `Deposited ${quantity} ${name}`);
+        } catch (err) {
+            log(bot, `Unable to deposit ${quantity} ${name}`);
+        }
     }
-
-    try {
-        await chest.deposit(item.type, null, amount);
-        log(bot, `Deposited ${amount} ${itemName}`);
-        chest.close();
-        return true;
-    } catch (err) {
-        log(bot, `Unable to deposit ${amount} ${itemName}`);
-        chest.close();
-        return false;
-    }
+    chest.close();
+    return true;
 }
 
-export async function withdrawFromChest(bot, itemName, amount) {
+export async function withdrawFromChest(bot, items) {
     /**
-     * Withdraw the specified amount of items from the nearest chest.
+     * Withdraw the specified items from the nearest chest.
      * @param {MinecraftBot} bot - Reference to the minecraft bot.
-     * @param {string} itemName - The name of the item to withdraw.
-     * @param {number} amount - The amount of items to withdraw.
+     * @param {string} items - The items to withdraw in the format 'item1:quantity1,item2:quantity2,...'.
      * @returns {Promise<boolean>} true if the items were withdrawn, false otherwise.
      * @example
-     * await skills.withdrawFromChest(bot, "oak_log", 10);
-     */
+     * await skills.withdrawFromChest(bot, "oak_log:10,stone:5");
+     **/
+    const itemsList = items.split(',').map(item => {
+        const [name, quantity] = item.split(':');
+        if (!name || isNaN(quantity)) {
+            log(bot, `Invalid items format. Use 'item1:quantity1,item2:quantity2,...'`);
+            return null;
+        }
+        return { name, quantity: parseInt(quantity, 10) };
+    }).filter(item => item !== null);
+
     const chestToOpen = bot.findBlock({
         matching: bot.registry.blocksByName.chest.id,
-        maxDistance: 6
+        maxDistance: FAR_DISTANCE
     });
 
     if (!chestToOpen) {
@@ -1297,27 +1339,26 @@ export async function withdrawFromChest(bot, itemName, amount) {
         return false;
     }
 
+    if (bot.entity.position.distanceTo(chestToOpen.position) > NEAR_DISTANCE) {
+        await goToPosition(bot, chestToOpen.position.x, chestToOpen.position.y, chestToOpen.position.z, 2);
+    }
+
     const chest = await bot.openContainer(chestToOpen);
-    const itemsInChest = chest.containerItems().map(item => `${item.name} x${item.count}`).join(', ');
-    log(bot, `Opened chest containing: ${itemsInChest}`);
-
-    const item = chest.containerItems().find(item => item.name === itemName);
-    if (!item) {
-        log(bot, `No ${itemName} found in the chest.`);
-        chest.close();
-        return false;
+    for (const { name, quantity } of itemsList) {
+        const item = chest.containerItems().find(item => item.name === name);
+        if (!item) {
+            log(bot, `No ${name} found in the chest.`);
+            continue;
+        }
+        try {
+            await chest.withdraw(item.type, null, quantity);
+            log(bot, `Withdrew ${quantity} ${name}`);
+        } catch (err) {
+            log(bot, `Unable to withdraw ${quantity} ${name}`);
+        }
     }
-
-    try {
-        await chest.withdraw(item.type, null, amount);
-        log(bot, `Withdrew ${amount} ${itemName}`);
-        chest.close();
-        return true;
-    } catch (err) {
-        log(bot, `Unable to withdraw ${amount} ${itemName}`);
-        chest.close();
-        return false;
-    }
+    chest.close();
+    return true;
 }
 
 export function startCrouching(bot) {
@@ -1399,10 +1440,15 @@ export async function lookInFurnace(bot) {
    * @example
    * await skills.lookInFurnace(bot);
    */
-  const furnaceBlock = world.getNearestBlock(bot, 'furnace', 6);
+  const furnaceBlock = world.getNearestBlock(bot, 'furnace', FAR_DISTANCE);
   if (!furnaceBlock) {
     log(bot, 'No furnace found nearby.');
     return false;
+  }
+
+  // Move closer to the furnace if too far
+  if (bot.entity.position.distanceTo(furnaceBlock.position) > NEAR_DISTANCE) {
+    await goToPosition(bot, furnaceBlock.position.x, furnaceBlock.position.y, furnaceBlock.position.z, 2);
   }
 
   const furnace = await bot.openFurnace(furnaceBlock);
@@ -1428,10 +1474,15 @@ export async function takeFromFurnace(bot, itemType) {
    * @example
    * await skills.takeFromFurnace(bot, "input");
    */
-  const furnaceBlock = world.getNearestBlock(bot, 'furnace', 6);
+  const furnaceBlock = world.getNearestBlock(bot, 'furnace', MID_DISTANCE);
   if (!furnaceBlock) {
     log(bot, 'No furnace found nearby.');
     return false;
+  }
+
+  // Move closer to the furnace if too far
+  if (bot.entity.position.distanceTo(furnaceBlock.position) > NEAR_DISTANCE) {
+    await goToPosition(bot, furnaceBlock.position.x, furnaceBlock.position.y, furnaceBlock.position.z, 2);
   }
 
   const furnace = await bot.openFurnace(furnaceBlock);

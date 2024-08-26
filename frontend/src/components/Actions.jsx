@@ -13,6 +13,9 @@ function Actions({
   settings,
   setSettings,
   isMicrophoneActive,
+  inputDevices, // Add inputDevices prop
+  selectedInputDevice, // Add selectedInputDevice prop
+  setSelectedInputDevice // Add setSelectedInputDevice prop
 }) {
   const handleVoiceModeChange = (event) => {
     setSettings(prevSettings => ({ ...prevSettings, voice_mode: event.target.value }));
@@ -28,6 +31,10 @@ function Actions({
 
   const handleLanguageChange = (event) => {
     setSettings(prevSettings => ({ ...prevSettings, language: event.target.value }));
+  };
+
+  const handleInputDeviceChange = (event) => {
+    setSelectedInputDevice(event.target.value);
   };
 
   useEffect(() => {
@@ -69,6 +76,21 @@ function Actions({
             className="key-input"
           />
         )}
+      </div>
+      <div className="input-device-settings">
+        <span htmlFor="input-device">Input Device: </span>
+        <select
+          id="input-device"
+          value={selectedInputDevice}
+          onChange={handleInputDeviceChange}
+          disabled={agentStarted} // Disable when agentStarted is true
+        >
+          {inputDevices.map(device => (
+            <option key={device.deviceId} value={device.deviceId}>
+              {device.label || `Device ${device.deviceId}`}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="language-settings">
         <span htmlFor="language">Language/Accent:</span>

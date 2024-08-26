@@ -84,15 +84,16 @@ function startServer() {
             ],
             "load_memory": true,
             "allow_insecure_coding": false,
-            "code_timeout_mins": 10
+            "code_timeout_mins": 10,
+            "whisper_to_player": false,
+            "voice_mode": "always_on",
+            "key_binding": "",
+            "language": "en"
         };
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
     } else {
         settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     }
-
-    // Setup global keyboard listener with the current settings
-    setupVoice(settings);
 
     let profiles = settings.profiles;
     let load_memory = settings.load_memory;
@@ -129,6 +130,11 @@ function startServer() {
     wss.on("connection", (ws) => {
         logToFile("socket: client connected");
         const proxyWs = new WebSocket(`${WSS_BACKEND_URL}?language=${settings.language}`);
+        
+        // Update settings
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+        voice_mode = settings.voice_mode;
+        setupVoice(settings);
 
         proxyWs.on('open', () => {
             logToFile(`proxy: connected to ${WSS_BACKEND_URL}`);
@@ -301,7 +307,7 @@ function startServer() {
     });
 
     app.post('/start', express.json(), (req, res) => {
-        logToFile('API: POST /start called')
+        logToFile('API: POST /start called');
         if (agentProcessStarted) {
             logToFile('API: Agent process already started');
             return res.status(409).send('Agent process already started. Restart not allowed.');
@@ -332,8 +338,8 @@ function startServer() {
 
         Object.assign(settings, newSettings);
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
-        profiles = settings.profiles;
-        load_memory = settings.load_memory;
+        profiles = newSettings.profiles;
+        load_memory = newSettings.load_memory;
 
         for (let profile of profiles) {
             const profileBotName = profile.name;
