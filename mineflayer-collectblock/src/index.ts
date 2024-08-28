@@ -1,5 +1,5 @@
 import { Bot } from "mineflayer";
-import { CollectBlock } from "./CollectBlock";
+import { CollectBlock, Callback, CollectOptions } from "./CollectBlock";
 import { pathfinder as pathfinderPlugin } from "mineflayer-pathfinder";
 import { plugin as toolPlugin } from "mineflayer-tool";
 
@@ -27,4 +27,4 @@ function loadToolPlugin(bot: Bot): void {
 	bot.loadPlugin(toolPlugin);
 }
 
-export { CollectBlock, Callback, CollectOptions } from "./CollectBlock";
+export { CollectBlock, Callback, CollectOptions };

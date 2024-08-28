@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CollectBlock = exports.plugin = void 0;
 const CollectBlock_1 = require("./CollectBlock");
+Object.defineProperty(exports, "CollectBlock", { enumerable: true, get: function () { return CollectBlock_1.CollectBlock; } });
 const mineflayer_pathfinder_1 = require("mineflayer-pathfinder");
 const mineflayer_tool_1 = require("mineflayer-tool");
 function plugin(bot) {
@@ -21,5 +22,3 @@ function loadToolPlugin(bot) {
         return;
     bot.loadPlugin(mineflayer_tool_1.plugin);
 }
-var CollectBlock_2 = require("./CollectBlock");
-Object.defineProperty(exports, "CollectBlock", { enumerable: true, get: function () { return CollectBlock_2.CollectBlock; } });
