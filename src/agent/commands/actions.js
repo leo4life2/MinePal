@@ -64,6 +64,16 @@ export const actionsList = [
     }),
   },
   {
+    name: "!teleportToPlayer",
+    description: "Teleport to the given player. Argument is only player's name.",
+    params: {
+        player_name: "(string) The name of the player to teleport to.",
+    },
+    perform: wrapExecution(async (agent, player_name) => {
+        return await skills.teleportToPlayer(agent.bot, player_name);
+    }),
+  },
+  {
     name: "!followPlayer",
     description:
       "Endlessly follow the given player. Will defend that player if self_defense mode is on.",

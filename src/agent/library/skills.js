@@ -863,7 +863,7 @@ export async function goToPlayer(bot, username, distance=1) {
     bot.modes.pause('cowardice');
     let player = bot.players[username]?.entity;
     if (!player) {
-        log(bot, `Could not find ${username}.`);
+        log(bot, `${username} is too far for me to detect. Ask if player wants me to teleport directly, or press F3 and tell me your coordinates in chat.`);
         return false;
     }
 
@@ -872,6 +872,27 @@ export async function goToPlayer(bot, username, distance=1) {
     await bot.pathfinder.goto(new pf.goals.GoalFollow(player, distance), true);
 
     log(bot, `You have reached ${username}.`);
+}
+
+export async function teleportToPlayer(bot, username) {
+    /**
+     * Teleport to the given player.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {string} username, the username of the player to teleport to.
+     * @returns {Promise<boolean>} true if the player was found and teleported to, false otherwise.
+     * @example
+     * await skills.teleportToPlayer(bot, "player");
+     **/
+    bot.chat('/tp @s ' + username);
+    await new Promise(resolve => setTimeout(resolve, 500)); // wait for tp to complete
+    let player = bot.players[username]?.entity;
+    if (player && bot.entity.position.distanceTo(player.position) <= NEAR_DISTANCE) {
+        log(bot, `Teleported to ${username}.`);
+        return true;
+    } else {
+        log(bot, "Cannot teleport, is cheats on?");
+        return false;
+    }
 }
 
 export async function followPlayer(bot, username, distance=4) {
