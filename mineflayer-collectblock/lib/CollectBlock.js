@@ -8,9 +8,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CollectBlock = void 0;
 const mineflayer_pathfinder_1 = require("mineflayer-pathfinder");
@@ -19,7 +16,6 @@ const Util_1 = require("./Util");
 const Inventory_1 = require("./Inventory");
 const BlockVeins_1 = require("./BlockVeins");
 const Targets_1 = require("./Targets");
-const minecraft_data_1 = __importDefault(require("minecraft-data"));
 const events_1 = require("events");
 const util_1 = require("util");
 function collectAll(bot, options) {
@@ -30,20 +26,20 @@ function collectAll(bot, options) {
             if (closest == null)
                 break;
             switch (closest.constructor.name) {
-                case 'Block': {
+                case "Block": {
                     const goal = new mineflayer_pathfinder_1.goals.GoalLookAtBlock(closest.position, bot.world);
                     yield bot.pathfinder.goto(goal);
                     yield mineBlock(bot, closest, options);
                     // TODO: options.ignoreNoPath
                     break;
                 }
-                case 'Entity': {
+                case "Entity": {
                     // Don't collect any entities that are marked as 'invalid'
                     if (!closest.isValid)
                         break;
                     const tempEvents = new TemporarySubscriber_1.TemporarySubscriber(bot);
-                    const waitForPickup = new Promise(resolve => {
-                        tempEvents.subscribeTo('entityGone', (entity) => {
+                    const waitForPickup = new Promise((resolve) => {
+                        tempEvents.subscribeTo("entityGone", (entity) => {
                             if (entity === closest) {
                                 tempEvents.cleanup();
                                 resolve();
@@ -55,7 +51,7 @@ function collectAll(bot, options) {
                     break;
                 }
                 default: {
-                    throw (0, Util_1.error)('UnknownType', `Target ${closest.constructor.name} is not a Block or Entity!`);
+                    throw (0, Util_1.error)("UnknownType", `Target ${closest.constructor.name} is not a Block or Entity!`);
                 }
             }
             options.targets.removeTarget(closest);
@@ -65,7 +61,7 @@ function collectAll(bot, options) {
 const equipToolOptions = {
     requireHarvest: true,
     getFromChest: true,
-    maxTools: 2
+    maxTools: 2,
 };
 function mineBlock(bot, block, options) {
     var _a, _b;
@@ -76,14 +72,12 @@ function mineBlock(bot, block, options) {
             return;
         }
         yield bot.tool.equipForBlock(block, equipToolOptions);
-        // @ts-expect-error
-        const heldItemType = bot.heldItem?.type;
-        if (!block.canHarvest(heldItemType)) {
+        if (bot.heldItem !== null && !block.canHarvest(bot.heldItem.type)) {
             options.targets.removeTarget(block);
             return;
         }
         const tempEvents = new TemporarySubscriber_1.TemporarySubscriber(bot);
-        tempEvents.subscribeTo('itemDrop', (entity) => {
+        tempEvents.subscribeTo("itemDrop", (entity) => {
             if (entity.position.distanceTo(block.position.offset(0.5, 0.5, 0.5)) <= 0.5) {
                 options.targets.appendTarget(entity);
             }
@@ -91,9 +85,9 @@ function mineBlock(bot, block, options) {
         try {
             yield bot.dig(block);
             // Waiting for items to drop
-            yield new Promise(resolve => {
+            yield new Promise((resolve) => {
                 let remainingTicks = 10;
-                tempEvents.subscribeTo('physicTick', () => {
+                tempEvents.subscribeTo("physicsTick", () => {
                     remainingTicks--;
                     if (remainingTicks <= 0) {
                         tempEvents.cleanup();
@@ -112,70 +106,70 @@ function mineBlock(bot, block, options) {
  */
 class CollectBlock {
     /**
-       * Creates a new instance of the create block plugin.
-       *
-       * @param bot - The bot this plugin is acting on.
-       */
+     * Creates a new instance of the create block plugin.
+     *
+     * @param bot - The bot this plugin is acting on.
+     */
     constructor(bot) {
         /**
-           * A list of chest locations which the bot is allowed to empty their inventory into
-           * if it becomes full while the bot is collecting resources.
-           */
+         * A list of chest locations which the bot is allowed to empty their inventory into
+         * if it becomes full while the bot is collecting resources.
+         */
         this.chestLocations = [];
         /**
-           * When collecting items, this filter is used to determine what items should be placed
-           * into a chest if the bot's inventory becomes full. By default, returns true for all
-           * items except for tools, weapons, and armor.
-           *
-           * @param item - The item stack in the bot's inventory to check.
-           *
-           * @returns True if the item should be moved into the chest. False otherwise.
-           */
+         * When collecting items, this filter is used to determine what items should be placed
+         * into a chest if the bot's inventory becomes full. By default, returns true for all
+         * items except for tools, weapons, and armor.
+         *
+         * @param item - The item stack in the bot's inventory to check.
+         *
+         * @returns True if the item should be moved into the chest. False otherwise.
+         */
         this.itemFilter = (item) => {
-            if (item.name.includes('helmet'))
+            if (item.name.includes("helmet"))
                 return false;
-            if (item.name.includes('chestplate'))
+            if (item.name.includes("chestplate"))
                 return false;
-            if (item.name.includes('leggings'))
+            if (item.name.includes("leggings"))
                 return false;
-            if (item.name.includes('boots'))
+            if (item.name.includes("boots"))
                 return false;
-            if (item.name.includes('shield'))
+            if (item.name.includes("shield"))
                 return false;
-            if (item.name.includes('sword'))
+            if (item.name.includes("sword"))
                 return false;
-            if (item.name.includes('pickaxe'))
+            if (item.name.includes("pickaxe"))
                 return false;
-            if (item.name.includes('axe'))
+            if (item.name.includes("axe"))
                 return false;
-            if (item.name.includes('shovel'))
+            if (item.name.includes("shovel"))
                 return false;
-            if (item.name.includes('hoe'))
+            if (item.name.includes("hoe"))
                 return false;
             return true;
         };
         this.bot = bot;
         this.targets = new Targets_1.Targets(bot);
-        this.movements = new mineflayer_pathfinder_1.Movements(bot, (0, minecraft_data_1.default)(bot.version));
+        this.movements = new mineflayer_pathfinder_1.Movements(bot);
     }
     /**
-       * If target is a block:
-       * Causes the bot to break and collect the target block.
-       *
-       * If target is an item drop:
-       * Causes the bot to collect the item drop.
-       *
-       * If target is an array containing items or blocks, preforms the correct action for
-       * all targets in that array sorting dynamically by distance.
-       *
-       * @param target - The block(s) or item(s) to collect.
-       * @param options - The set of options to use when handling these targets
-       * @param cb - The callback that is called finished.
-       */
+     * If target is a block:
+     * Causes the bot to break and collect the target block.
+     *
+     * If target is an item drop:
+     * Causes the bot to collect the item drop.
+     *
+     * If target is an array containing items or blocks, preforms the correct action for
+     * all targets in that array sorting dynamically by distance.
+     *
+     * @param target - The block(s) or item(s) to collect.
+     * @param options - The set of options to use when handling these targets
+     * @param cb - The callback that is called finished.
+     */
     collect(target, options = {}, cb) {
         var _a, _b, _c, _d;
         return __awaiter(this, void 0, void 0, function* () {
-            if (typeof options === 'function') {
+            if (typeof options === "function") {
                 cb = options;
                 options = {};
             }
@@ -187,13 +181,13 @@ class CollectBlock {
                 ignoreNoPath: (_b = options.ignoreNoPath) !== null && _b !== void 0 ? _b : false,
                 chestLocations: (_c = options.chestLocations) !== null && _c !== void 0 ? _c : this.chestLocations,
                 itemFilter: (_d = options.itemFilter) !== null && _d !== void 0 ? _d : this.itemFilter,
-                targets: this.targets
+                targets: this.targets,
             };
             if (this.bot.pathfinder == null) {
-                throw (0, Util_1.error)('UnresolvedDependency', 'The mineflayer-collectblock plugin relies on the mineflayer-pathfinder plugin to run!');
+                throw (0, Util_1.error)("UnresolvedDependency", "The mineflayer-collectblock plugin relies on the mineflayer-pathfinder plugin to run!");
             }
             if (this.bot.tool == null) {
-                throw (0, Util_1.error)('UnresolvedDependency', 'The mineflayer-collectblock plugin relies on the mineflayer-tool plugin to run!');
+                throw (0, Util_1.error)("UnresolvedDependency", "The mineflayer-collectblock plugin relies on the mineflayer-tool plugin to run!");
             }
             if (this.movements != null) {
                 this.bot.pathfinder.setMovements(this.movements);
@@ -213,12 +207,12 @@ class CollectBlock {
                 this.targets.clear();
                 // Ignore path stopped error for cancelTask to work properly (imo we shouldn't throw any pathing errors)
                 // @ts-expect-error
-                if (err.name !== 'PathStopped')
+                if (err.name !== "PathStopped")
                     throw err;
             }
             finally {
                 // @ts-expect-error
-                this.bot.emit('collectBlock_finished');
+                this.bot.emit("collectBlock_finished");
             }
         });
     }
@@ -249,9 +243,9 @@ class CollectBlock {
             this.bot.pathfinder.stop();
             if (cb != null) {
                 // @ts-expect-error
-                this.bot.once('collectBlock_finished', cb);
+                this.bot.once("collectBlock_finished", cb);
             }
-            yield (0, events_1.once)(this.bot, 'collectBlock_finished');
+            yield (0, events_1.once)(this.bot, "collectBlock_finished");
         });
     }
 }

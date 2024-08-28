@@ -91,7 +91,6 @@ function placeItems(bot, chestPos, itemFilter, cb) {
         for (const item of bot.inventory.items()) {
             if (!itemFilter(item))
                 continue;
-            // @ts-expect-error; A workaround for checking if the chest is already full
             if (chest.firstEmptyContainerSlot() === null) {
                 // We have items that didn't fit.
                 return true;

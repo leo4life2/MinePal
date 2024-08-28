@@ -1,7 +1,7 @@
-import { Bot } from 'mineflayer';
-import { Block } from 'prismarine-block';
-import { Entity } from 'prismarine-entity';
-export declare type Collectable = Block | Entity;
+import { Bot } from "mineflayer";
+import { Block } from "prismarine-block";
+import { Entity } from "prismarine-entity";
+export type Collectable = Block | Entity;
 export declare class Targets {
     private readonly bot;
     private targets;

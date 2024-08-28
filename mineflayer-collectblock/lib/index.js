@@ -5,7 +5,6 @@ const CollectBlock_1 = require("./CollectBlock");
 const mineflayer_pathfinder_1 = require("mineflayer-pathfinder");
 const mineflayer_tool_1 = require("mineflayer-tool");
 function plugin(bot) {
-    // @ts-expect-error
     bot.collectBlock = new CollectBlock_1.CollectBlock(bot);
     // Load plugins if not loaded manually.
     setTimeout(() => loadPathfinderPlugin(bot), 0);

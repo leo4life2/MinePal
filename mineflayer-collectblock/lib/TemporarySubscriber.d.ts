@@ -1,4 +1,4 @@
-import { Bot } from 'mineflayer';
+import { Bot } from "mineflayer";
 export declare class TemporarySubscriber {
     readonly bot: Bot;
     private readonly subscriptions;

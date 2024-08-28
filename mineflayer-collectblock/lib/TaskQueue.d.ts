@@ -1,6 +1,6 @@
-import type { Callback } from './index';
-export declare type Task = (cb: Callback) => void;
-export declare type SyncTask = () => void;
+import type { Callback } from "./index";
+export type Task = (cb: Callback) => void;
+export type SyncTask = () => void;
 /**
  * A simple utility class for queuing up a series of async tasks to execute.
  */
