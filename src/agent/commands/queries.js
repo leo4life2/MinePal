@@ -14,7 +14,8 @@ export const queryList = [
     perform: function (agent) {
       let bot = agent.bot;
       let res = "STATS";
-      let pos = bot.entity.position;
+      let pos = bot.entity?.position;
+      if (!pos) return '';
       // display position to 2 decimal places
       res += `\n- Position: x: ${pos.x.toFixed(2)}, y: ${pos.y.toFixed(
         2
