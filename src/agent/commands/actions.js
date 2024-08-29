@@ -3,7 +3,7 @@ import * as skills from "../library/skills.js";
 function wrapExecution(func, timeout = -1, resume_name = null) {
   return async function (agent, ...args) {
     let code_return;
-    if (resume_name != null) {
+    if (resume_name != null) { // not used afaik
       code_return = await agent.coder.executeResume(
         async () => {
           await func(agent, ...args);
@@ -15,6 +15,9 @@ function wrapExecution(func, timeout = -1, resume_name = null) {
       code_return = await agent.coder.execute(async () => {
         await func(agent, ...args);
       }, timeout);
+    if (agent.followPlayerName) {
+      await skills.followPlayer(agent.bot, agent.followPlayerName);
+    }
     }
     if (code_return.interrupted && !code_return.timedout) return;
     return code_return.message;
@@ -29,6 +32,7 @@ export const actionsList = [
     perform: async function (agent) {
       console.log("[CODERSTOP] Stop command.");
       await agent.coder.stop();
+      agent.followPlayerName = null;
       agent.coder.clear();
       agent.coder.cancelResume();
       agent.bot.emit("idle");
@@ -83,7 +87,10 @@ export const actionsList = [
     },
     perform: wrapExecution(
       async (agent, player_name, follow_dist) => {
-        await skills.followPlayer(agent.bot, player_name, follow_dist);
+        const success = await skills.followPlayer(agent.bot, player_name, follow_dist);
+        if (success) {
+            agent.followPlayerName = player_name;
+        }
       },
       -1,
       "followPlayer"
@@ -279,6 +286,8 @@ export const actionsList = [
     description:
       "Stay in the current location no matter what. Pauses all modes.",
     perform: wrapExecution(async (agent) => {
+      agent.followPlayerName = null;
+      await agent.coder.stop();
       await skills.stay(agent.bot);
     }),
   },

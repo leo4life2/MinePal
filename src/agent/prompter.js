@@ -131,44 +131,16 @@ export class Prompter {
     async promptConvo(messages) {
         let prompt = this.profile.conversing;
         prompt = await this.replaceStrings(prompt, messages, this.convo_examples);
-        return await this.chat_model.sendRequest(messages, prompt);
-    }
-
-    async promptCoding(messages) {
-        let prompt = this.profile.coding;
-        prompt = await this.replaceStrings(prompt, messages, this.coding_examples);
-        return await this.chat_model.sendRequest(messages, prompt);
+        const { chat_response, execute_command } = await this.chat_model.sendRequest(messages, prompt);
+        
+        console.log('Chat Response:', chat_response);
+        console.log('Execute Command:', execute_command); 
+        return chat_response + " " + execute_command;
     }
 
     async promptMemSaving(prev_mem, to_summarize) {
         let prompt = this.profile.saving_memory;
         prompt = await this.replaceStrings(prompt, null, null, prev_mem, to_summarize);
-        return await this.chat_model.sendRequest([], prompt);
-    }
-
-    async promptGoalSetting(messages, last_goals) {
-        let system_message = this.profile.goal_setting;
-        system_message = await this.replaceStrings(system_message, messages);
-
-        let user_message = 'Use the below info to determine what goal to target next\n\n';
-        user_message += '$LAST_GOALS\n$STATS\n$INVENTORY\n$CONVO'
-        user_message = await this.replaceStrings(user_message, messages, null, null, null, last_goals);
-        let user_messages = [{role: 'user', content: user_message}];
-
-        let res = await this.chat_model.sendRequest(user_messages, system_message);
-
-        let goal = null;
-        try {
-            let data = res.split('```')[1].replace('json', '').trim();
-            goal = JSON.parse(data);
-        } catch (err) {
-            console.log('Failed to parse goal:', res, err);
-        }
-        if (!goal || !goal.name || !goal.quantity || isNaN(parseInt(goal.quantity))) {
-            console.log('Failed to set goal:', res);
-            return null;
-        }
-        goal.quantity = parseInt(goal.quantity);
-        return goal;
+        return await this.chat_model.sendRequest([], prompt, '***', true);
     }
 }

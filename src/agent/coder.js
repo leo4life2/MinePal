@@ -6,7 +6,7 @@ export class Coder {
         this.file_counter = 0;
         this.fp = `${this.agent.userDataDir}/bots/${agent.name}/action-code/`;
         this._executing = false; // Private variable to hold the state
-        this.executingPromise = null; // Promise to resolve when executing becomes false
+        this.executingQueue = []; // Queue to hold executing promises
         this.generating = false;
         this.code_template = '';
         this.timedout = false;
@@ -24,12 +24,11 @@ export class Coder {
 
     set executing(value) {
         this._executing = value;
-        console.log(`Executing set to ${value}`);
-        if (!value && this.executingPromise) {
-            console.log(`Resolving executingPromise with ID: ${this.executingPromise.id}`);
-            clearTimeout(this.executingPromise.timeout);
-            this.executingPromise.resolve();
-            this.executingPromise = null;
+        if (!value && this.executingQueue.length > 0) {
+            const { resolve, id, timeout } = this.executingQueue.shift();
+            console.log(`Resolving executingPromise with ID: ${id}`);
+            clearTimeout(timeout);
+            resolve();
         }
     }
 
@@ -204,12 +203,10 @@ export class Coder {
             this.clear();
 
             this.executing = true;
-            console.log('Executing set to true');
             if (timeout > 0)
                 TIMEOUT = this._startTimeout(timeout);
             await func(); // open fire
             this.executing = false;
-            console.log('Executing set to false');
             clearTimeout(TIMEOUT);
 
             let output = this.formatOutput(this.agent.bot);
@@ -267,7 +264,7 @@ export class Coder {
                 }
             }, 20 * 1000); // 20 seconds timeout
 
-            this.executingPromise = { resolve, reject, id: promiseId, timeout };
+            this.executingQueue.push({ resolve, reject, id: promiseId, timeout });
             console.log(`Creating executingPromise with ID: ${promiseId}`);
         });
     }
