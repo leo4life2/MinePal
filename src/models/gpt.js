@@ -9,7 +9,14 @@ export class GPT {
     async sendRequest(turns, systemMessage, stop_seq='***') {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(turns);
         let res = null;
-        // console.log("---messages---\n", messages,"---end messages---\n");
+        console.log("=== BEGIN MESSAGES ===");
+        messages.forEach((msg, index) => {
+            console.log(`Message ${index + 1}:`);
+            console.log(`Role: ${msg.role}`);
+            console.log(`Content: ${msg.content}`);
+            console.log("---");
+        });
+        console.log("=== END MESSAGES ===");
 
         try {
             const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, {

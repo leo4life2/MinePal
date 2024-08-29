@@ -20,6 +20,11 @@ function inject (bot) {
       throw new Error('dig was called with an undefined or null block')
     }
 
+    const distance = block.position.distanceTo(bot.entity.position.offset(0, bot.entity.eyeHeight, 0))
+    if (distance > 4.5) {
+      return false
+    }
+
     if (!digFace || typeof digFace === 'function') {
       digFace = 'auto'
     }
@@ -203,6 +208,8 @@ function inject (bot) {
     }
 
     await diggingTask.promise
+
+    return true // Ensure the function always returns a boolean
   }
 
   bot.on('death', () => {

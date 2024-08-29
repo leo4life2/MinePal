@@ -227,7 +227,7 @@ export class Coder {
             console.log("[CODERSTOP] Execute catch.");
             await this.stop();
 
-            let message = this.formatOutput(this.agent.bot) + '!!Code threw exception!!  Error: ' + err;
+            let message = this.formatOutput(this.agent.bot) + '!!Code threw exception!!  Error: ' + err + '\nStack trace:\n' + err.stack;
             let interrupted = this.agent.bot.interrupt_code;
             this.clear();
             if (!interrupted && !this.generating) this.agent.bot.emit('idle');

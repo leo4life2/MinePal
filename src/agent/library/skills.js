@@ -415,11 +415,15 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
 
     console.log("Starting collect loop");
 
-    while (collected < num && retries < 10) {
+    while (collected < num && retries < 3) {
         console.log(`Attempt ${retries + 1}: Collected ${collected}/${num} ${blockType}`);
         
         let blocks = world.getNearestBlocks(bot, blocktypes, VERY_FAR_DISTANCE);
         console.log(`Found ${blocks.length} blocks of type ${blockType}`);
+        if (blocks.length === 0) {
+            log(bot, `You collected ${collected} ${blockType}, and don't see more ${blockType} around`);
+            return collected;
+        }
 
         if (exclude) {
             for (let position of exclude) {
@@ -430,18 +434,7 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
             console.log(`Excluded positions, ${blocks.length} blocks remaining`);
         }
 
-        if (blocks.length === 0) {
-            retries++;
-            const pos = bot.entity.position;
-            const randomOffset = () => (Math.random() - 0.5) * 2;
-            await goToPosition(bot, pos.x + randomOffset(), pos.y, pos.z + randomOffset(), 1);
-            console.log("No blocks found, moving and retrying");
-            continue;
-        }
-
         const block = blocks[0];
-        console.log(`Attempting to collect block at ${block.position}`);
-
         await bot.tool.equipForBlock(block);
         const itemId = bot.heldItem ? bot.heldItem.type : null;
         if (!block.canHarvest(itemId)) {
@@ -450,10 +443,14 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
         }
 
         try {
-            await bot.collectBlock.collect(block);
-            collected++;
-            console.log(`Successfully collected block at ${block.position}`);
-            await autoLight(bot);
+            const success = await bot.collectBlock.collect(block);
+            if (success) {
+                collected++;
+                console.log(`Successfully collected block at ${block.position}`);
+            } else {
+                console.log(`Failed to collect block at ${block.position}`);
+                retries++;
+            }
         } catch (err) {
             console.log(`Error collecting block at ${block.position}: ${err.message}`);
             console.log('Stack trace:', err.stack);

@@ -81,14 +81,12 @@ export class Prompter {
         prompt = prompt.replaceAll('$LANGUAGE', this.agent.settings.language);
         prompt = prompt.replaceAll('$PERSONALITY', this.profile.personality);
 
-        if (prompt.includes('$STATS')) {
-            let stats = await getCommand('!stats').perform(this.agent);
-            prompt = prompt.replaceAll('$STATS', stats);
+
+        if (prompt.includes('$HUD')) {
+            const { hudString } = await this.agent.headsUpDisplay();
+            prompt = prompt.replaceAll('$HUD', `Your heads up display: \n${hudString}`);
         }
-        if (prompt.includes('$INVENTORY')) {
-            let inventory = await getCommand('!inventory').perform(this.agent);
-            prompt = prompt.replaceAll('$INVENTORY', inventory);
-        }
+
         if (prompt.includes('$COMMAND_DOCS'))
             prompt = prompt.replaceAll('$COMMAND_DOCS', getCommandDocs());
         if (prompt.includes('$CODE_DOCS'))

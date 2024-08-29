@@ -10,7 +10,8 @@ export declare class CollectBlock {
     private readonly bot;
     private readonly targets;
     constructor(bot: Bot);
-    collect(target: Block | Entity | (Block | Entity)[], options?: CollectOptions | Callback, cb?: Callback): Promise<void>;
+    collect(target: Block | Entity | (Block | Entity)[], options?: CollectOptions | Callback, cb?: Callback): Promise<boolean>;
     private collectAll;
     private mineBlock;
+    cancelTask(cb?: Callback): Promise<void>;
 }

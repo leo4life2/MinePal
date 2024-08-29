@@ -3,6 +3,7 @@ import { Block } from "prismarine-block";
 import { goals, SafeBlock } from "mineflayer-pathfinder";
 import { Entity } from "prismarine-entity";
 import { callbackify } from "util";
+import { once } from 'events'
 import FastPriorityQueue from "fastpriorityqueue";
 
 export type Callback = (err?: Error) => void;
@@ -84,12 +85,12 @@ export class CollectBlock {
         this.targets = new Targets(bot);
     }
 
-    async collect(target: Block | Entity | (Block | Entity)[], options: CollectOptions | Callback = {}, cb?: Callback): Promise<void> {
+    async collect(target: Block | Entity | (Block | Entity)[], options: CollectOptions | Callback = {}, cb?: Callback): Promise<boolean> {
         if (typeof options === "function") {
             cb = options;
             options = {};
         }
-        if (cb != null) return callbackify(() => this.collect(target, options))(cb);
+        if (cb != null) return callbackify(() => this.collect(target, options))(cb) as unknown as boolean;
 
         const optionsFull: CollectOptionsFull = {
             append: options.append ?? false,
@@ -101,7 +102,7 @@ export class CollectBlock {
             throw new Error("The mineflayer-pathfinder plugin is required!");
         }
 
-        if (!optionsFull.append) this.targets.clear();
+        if (!optionsFull.append) await this.cancelTask(); // Re-added cancelTask logic
         if (Array.isArray(target)) {
             this.targets.appendTargets(target);
         } else {
@@ -109,7 +110,8 @@ export class CollectBlock {
         }
 
         try {
-            await this.collectAll(optionsFull);
+            const success = await this.collectAll(optionsFull);
+            return success;
         } catch (err) {
             this.targets.clear();
             throw err;
@@ -119,16 +121,23 @@ export class CollectBlock {
         }
     }
 
-    private async collectAll(options: CollectOptionsFull): Promise<void> {
+    private async collectAll(options: CollectOptionsFull): Promise<boolean> {
         while (!options.targets.empty) {
             const closest = options.targets.getClosest();
             if (closest == null) break;
 
+            let success = false;
             switch (closest.constructor.name) {
                 case "Block": {
-                    const goal = new goals.GoalLookAtBlock(closest.position, this.bot.world);
+                    const closestBlock = closest as Block;
+                    let goal;
+                    if (closestBlock.boundingBox === "empty") {
+                        goal = new goals.GoalGetToBlock(closestBlock.position.x, closestBlock.position.y, closestBlock.position.z);
+                    } else {
+                        goal = new goals.GoalLookAtBlock(closestBlock.position, this.bot.world);
+                    }
                     await this.bot.pathfinder.goto(goal);
-                    await this.mineBlock(closest as Block, options);
+                    success = await this.mineBlock(closestBlock as Block, options);
                     break;
                 }
                 case "Entity": {
@@ -140,6 +149,7 @@ export class CollectBlock {
                     });
                     await this.bot.pathfinder.goto(new goals.GoalFollow(closest as Entity, 0));
                     await waitForPickup;
+                    success = true;
                     break;
                 }
                 default: {
@@ -147,16 +157,37 @@ export class CollectBlock {
                 }
             }
             options.targets.removeTarget(closest);
+            if (!success) return false;
         }
+        return true;
     }
 
-    private async mineBlock(block: Block, options: CollectOptionsFull): Promise<void> {
+    private async mineBlock(block: Block, options: CollectOptionsFull): Promise<boolean> {
         const safeBlock = block as unknown as SafeBlock;
         if (this.bot.blockAt(block.position)?.type !== block.type || !this.bot.pathfinder.movements.safeToBreak(safeBlock)) {
             options.targets.removeTarget(block);
-            return;
+            return false;
         }
 
-        await this.bot.dig(block);
+        const success = await this.bot.dig(block);
+        if (!success) return false;
+
+        // Move to the location of the block dug
+        const goal = new goals.GoalBlock(block.position.x, block.position.y, block.position.z);
+        await this.bot.pathfinder.goto(goal);
+        return true;
+    }
+
+    async cancelTask(cb?: Callback): Promise<void> {
+        if (this.targets.empty) {
+            if (cb != null) cb();
+            return await Promise.resolve();
+        }
+        this.bot.pathfinder.stop();
+        if (cb != null) {
+            // @ts-expect-error
+            this.bot.once('collectBlock_finished', cb);
+        }
+        await once(this.bot, 'collectBlock_finished');
     }
 }

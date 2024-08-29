@@ -9,6 +9,7 @@ import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
 import { queryList } from './commands/queries.js';
+import * as world from "./library/world.js";
 
 const queryMap = {
     stats: queryList.find(query => query.name === "!stats").perform,
@@ -21,6 +22,28 @@ const queryMap = {
  * Represents an AI agent that can interact with a Minecraft world.
  */
 export class Agent {
+    constructor() {
+        // Initialize the latest HUD as an empty map
+        this.latestHUD = {
+            position: '',
+            gamemode: '',
+            health: '',
+            hunger: '',
+            biome: '',
+            weather: '',
+            timeOfDay: '',
+            otherPlayers: [],
+            backpack: [],
+            hotbar: [],
+            offHand: [],
+            armor: [],
+            nearbyBlocks: [],
+            nearbyEntities: [],
+            empty: true // for easy detect, on first use only
+        };
+        this.hudListFields = ['otherPlayers', 'backpack', 'hotbar', 'offHand', 'armor', 'nearbyBlocks', 'nearbyEntities'];
+    }
+
     /**
      * Initializes and starts the agent.
      * @param {string} profile_fp - File path to the agent's profile.
@@ -91,21 +114,133 @@ export class Agent {
 
     /**
      * Generates a heads-up display (HUD) string with stats, inventory, nearby blocks, and nearby entities.
-     * @returns {string} The HUD string.
+     * @returns {string} The HUD string with changes highlighted.
      */
     async headsUpDisplay() {
         if (!this.bot.entity) {
             return '';
         }
 
-        const stats = queryMap.stats(this);
-        const inventory = queryMap.inventory(this);
-        const nearbyBlocks = queryMap.nearbyBlocks(this);
-        const nearbyEntities = queryMap.nearbyEntities(this);
+        // Initialize new HUD elements
+        let newHUD = {
+            position: '',
+            gamemode: '',
+            health: '',
+            hunger: '',
+            biome: '',
+            weather: '',
+            timeOfDay: '',
+            otherPlayers: [],
+            backpack: [],
+            hotbar: [],
+            offHand: [],
+            armor: [],
+            nearbyBlocks: [],
+            nearbyEntities: []
+        };
 
-        return `${stats}\n${inventory}\n${nearbyBlocks}\n${nearbyEntities}`;
+        const armorSlots = {
+            head: 5,
+            torso: 6,
+            legs: 7,
+            feet: 8,
+        };
+
+        const mainInventoryStart = 9;
+        const mainInventoryEnd = 35;
+
+        const hotbarStart = 36;
+        const hotbarEnd = 44;
+
+        const offHandSlot = 45;
+
+        // Initializing basic stats
+        newHUD.position = `x: ${this.bot.entity.position.x.toFixed(2)}, y: ${this.bot.entity.position.y.toFixed(2)}, z: ${this.bot.entity.position.z.toFixed(2)}`;
+        newHUD.gamemode = this.bot.game.gameMode;
+        newHUD.health = `${Math.round(this.bot.health)} / 20`;
+        newHUD.hunger = `${Math.round(this.bot.food)} / 20`;
+        newHUD.biome = world.getBiomeName(this.bot);
+
+        newHUD.weather = "Clear";
+        if (this.bot.rainState > 0) newHUD.weather = "Rain";
+        if (this.bot.thunderState > 0) newHUD.weather = "Thunderstorm";
+
+        if (this.bot.time.timeOfDay < 6000) {
+            newHUD.timeOfDay = "Morning";
+        } else if (this.bot.time.timeOfDay < 12000) {
+            newHUD.timeOfDay = "Afternoon";
+        } else {
+            newHUD.timeOfDay = "Night";
+        }
+
+        newHUD.otherPlayers = world.getNearbyPlayerNames(this.bot);
+
+        // Initializing inventory
+        for (let i = mainInventoryStart; i <= mainInventoryEnd; i++) {
+            let item = this.bot.inventory.slots[i];
+            if (item) {
+                newHUD.backpack.push(`${item.name}: ${item.count}`);
+            }
+        }
+
+        for (let i = hotbarStart; i <= hotbarEnd; i++) {
+            let item = this.bot.inventory.slots[i];
+            if (item) {
+                newHUD.hotbar.push(`${item.name}: ${item.count}`);
+            }
+        }
+
+        if (!this.bot.supportFeature("doesntHaveOffHandSlot")) {
+            let offHandItem = this.bot.inventory.slots[offHandSlot];
+            newHUD.offHand.push(offHandItem ? `${offHandItem.name}: ${offHandItem.count}` : "empty");
+        }
+
+        for (const [slotName, slotIndex] of Object.entries(armorSlots)) {
+            let item = this.bot.inventory.slots[slotIndex];
+            newHUD.armor.push(`${slotName}: ${item ? `${item.name}: ${item.count}` : "empty"}`);
+        }
+
+        // Initializing nearby blocks and entities
+        newHUD.nearbyBlocks = world.getNearbyBlockTypes(this.bot);
+        newHUD.nearbyEntities = world.getNearbyEntityTypes(this.bot);
+
+        // Construct HUD string
+        let statsRes = "STATS";
+        statsRes += `\n- Position: ${newHUD.position}`;
+        statsRes += `\n- Gamemode: ${newHUD.gamemode}`;
+        statsRes += `\n- Health: ${newHUD.health}`;
+        statsRes += `\n- Hunger: ${newHUD.hunger}`;
+        statsRes += `\n- Biome: ${newHUD.biome}`;
+        statsRes += `\n- Weather: ${newHUD.weather}`;
+        statsRes += `\n- Time: ${newHUD.timeOfDay}`;
+
+        if (newHUD.otherPlayers.length > 0) {
+            statsRes += "\n- Other Players: " + newHUD.otherPlayers.join(", ");
+        }
+
+        let inventoryRes = "INVENTORY";
+        inventoryRes += "\nBackpack:" + (newHUD.backpack.length ? `\n- ${newHUD.backpack.join("\n- ")}` : " none");
+        inventoryRes += "\nHotbar:" + (newHUD.hotbar.length ? `\n- ${newHUD.hotbar.join("\n- ")}` : " none");
+        inventoryRes += "\nOff Hand Slot:" + (newHUD.offHand.length ? `\n- ${newHUD.offHand.join("\n- ")}` : " none");
+        inventoryRes += "\nArmor Slots:" + (newHUD.armor.length ? `\n- ${newHUD.armor.join("\n- ")}` : " none");
+
+        if (this.bot.game.gameMode === "creative") {
+            inventoryRes += "\n(You have infinite items in creative mode)";
+        }
+
+        let blocksRes = "NEARBY_BLOCKS";
+        blocksRes += newHUD.nearbyBlocks.length ? `\n- ${newHUD.nearbyBlocks.join("\n- ")}` : ": none";
+
+        let entitiesRes = "NEARBY_ENTITIES";
+        entitiesRes += newHUD.nearbyEntities.length ? `\n- mob: ${newHUD.nearbyEntities.join("\n- mob: ")}` : ": none";
+
+        // Return both newHUD and the HUD string
+        return {
+            newHUD,
+            hudString: `${statsRes}\n${inventoryRes}\n${blocksRes}\n${entitiesRes}`
+        };
     }
-
+    
     /**
      * Handles incoming messages and executes appropriate actions.
      * @param {string} source - The source of the message.
@@ -116,49 +251,61 @@ export class Agent {
             return;
         }
 
-        const user_command_name = containsCommand(message);
-        if (user_command_name) {
-            if (!commandExists(user_command_name)) {
-                await this.sendMessage(`Command '${user_command_name}' does not exist.`);
-                return;
-            }
-            await this.sendMessage(`*${source} used ${user_command_name.substring(1)}*`);
-            if (user_command_name === '!newAction') {
-                // Add context for newAction command
-                this.history.add(source, message);
-            }
-            let execute_res = await executeCommand(this, message);
-            if (execute_res) 
-                await this.sendMessage(execute_res, true);
-            return;
-        }
-
+        await this.history.add("system", "When you wish to do something, never just say you're doing it, you must pick a command from the docs and call it like !commandName(params). NEVER say anything like this: 'Sure, I've stopped.', instead say this: 'Sure, I'll stop. !stop'");
         await this.history.add(source, message);
-
         // Process the message and generate responses
-        for (let i=0; i<5; i++) {
+        for (let i = 0; i < 5; i++) {
             let history = this.history.getHistory();
-            // Keep some elements always in sight
-            const hud = await this.headsUpDisplay();
-            this.history.add('system', hud);
 
+            // Check if latestHUD is empty
+            const { newHUD } = await this.headsUpDisplay();
+            if (!this.latestHUD.empty) { // if no longer an empty latest hud, we do diff and tell bot diff
+                // Compare newHUD and latestHUD
+                let diffText = '';
+
+                this.hudListFields.forEach(field => {
+                    const oldList = this.latestHUD[field];
+                    const newList = newHUD[field];
+
+                    const goneItems = oldList.filter(item => !newList.includes(item));
+                    const newItems = newList.filter(item => !oldList.includes(item));
+
+                    if (goneItems.length > 0) {
+                        diffText += `**GONE: ${field} - ${goneItems.join(', ')}\n`;
+                    }
+                    if (newItems.length > 0) {
+                        diffText += `**NEW: ${field} - ${newItems.join(', ')}\n`;
+                    }
+                });
+
+                if (diffText) {
+                    console.log(`\n\nINVENTORY/STATUS UPDATE:\n${diffText}\n\n`);
+                    this.history.add('system', `Your inventory or status has updated. Here are the changes:\n${diffText}`);
+                }
+            }
+            this.latestHUD = newHUD; // Update latestHUD
+
+            history = this.history.getHistory(); // Get updated history
             let res = await this.prompter.promptConvo(history);
 
+            // Now we parse and execute commands.
             let command_name = containsCommand(res);
-
+            // add user message
             if (command_name) {
                 console.log(`Full response: ""${res}""`)
                 res = truncCommandMessage(res);
-                this.history.add(this.name, res);
                 if (!commandExists(command_name)) {
                     this.history.add('system', `Command ${command_name} does not exist. Use !newAction to perform custom actions.`);
                     console.log('Agent hallucinated command:', command_name)
                     continue;
                 }
                 let pre_message = res.substring(0, res.indexOf(command_name)).trim();
-                let chat_message = `*used ${command_name.substring(1)}*`;
+                let chat_message = "";
+                // let chat_message = `*used ${command_name.substring(1)}*`;
+                // if (pre_message.length > 0)
+                //     chat_message = `${pre_message}  ${chat_message}`;
                 if (pre_message.length > 0)
-                    chat_message = `${pre_message}  ${chat_message}`;
+                    chat_message = `${pre_message}`;
                 await this.sendMessage(chat_message, true);
 
                 let execute_res = await executeCommand(this, res);
@@ -171,7 +318,6 @@ export class Agent {
                     break;
             }
             else {
-                this.history.add(this.name, res);
                 await this.sendMessage(res, true);
                 console.log('Purely conversational response:', res);
                 break;

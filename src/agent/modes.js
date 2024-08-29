@@ -260,7 +260,38 @@ const modes = [
          * @param {Object} agent - The agent object containing the bot.
          */
         update: function (agent) { /* do nothing */ }
-    }
+    },
+    // {
+    //     name: 'farming',
+    //     description: 'Plant wheat seeds on hoed dirt.',
+    //     interrupts: ['defaults'],
+    //     on: true,
+    //     active: false,
+    //     /**
+    //      * Update function for farming mode.
+    //      * Detects hoed dirt and plants wheat seeds if available.
+    //      * @param {Object} agent - The agent object containing the bot.
+    //      */
+    //     update: async function (agent) {
+    //         const bot = agent.bot;
+    //         const hoedDirt = bot.findBlock({
+    //             matching: bot.registry.blocksByName.farmland.id,
+    //             maxDistance: 6,
+    //             useExtraInfo: (block) => {
+    //                 const blockAbove = bot.blockAt(block.position.offset(0, 1, 0));
+    //                 return !blockAbove || blockAbove.type === 0;
+    //             }
+    //         });
+
+    //         if (hoedDirt) {
+    //             const seeds = bot.inventory.items().find(item => item.name === 'wheat_seeds');
+    //             if (seeds) {
+    //                 await bot.equip(seeds, 'hand');
+    //                 await bot.placeBlock(hoedDirt, new Vec3(0, 1, 0));
+    //             }
+    //         }
+    //     }
+    // }
 ];
 
 /**

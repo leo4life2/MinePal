@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CollectBlock = void 0;
 const mineflayer_pathfinder_1 = require("mineflayer-pathfinder");
 const util_1 = require("util");
+const events_1 = require("events");
 const fastpriorityqueue_1 = __importDefault(require("fastpriorityqueue"));
 class Targets {
     constructor(bot) {
@@ -90,7 +91,7 @@ class CollectBlock {
                 throw new Error("The mineflayer-pathfinder plugin is required!");
             }
             if (!optionsFull.append)
-                this.targets.clear();
+                yield this.cancelTask(); // Re-added cancelTask logic
             if (Array.isArray(target)) {
                 this.targets.appendTargets(target);
             }
@@ -98,7 +99,8 @@ class CollectBlock {
                 this.targets.appendTarget(target);
             }
             try {
-                yield this.collectAll(optionsFull);
+                const success = yield this.collectAll(optionsFull);
+                return success;
             }
             catch (err) {
                 this.targets.clear();
@@ -116,11 +118,19 @@ class CollectBlock {
                 const closest = options.targets.getClosest();
                 if (closest == null)
                     break;
+                let success = false;
                 switch (closest.constructor.name) {
                     case "Block": {
-                        const goal = new mineflayer_pathfinder_1.goals.GoalLookAtBlock(closest.position, this.bot.world);
+                        const closestBlock = closest;
+                        let goal;
+                        if (closestBlock.boundingBox === "empty") {
+                            goal = new mineflayer_pathfinder_1.goals.GoalGetToBlock(closestBlock.position.x, closestBlock.position.y, closestBlock.position.z);
+                        }
+                        else {
+                            goal = new mineflayer_pathfinder_1.goals.GoalLookAtBlock(closestBlock.position, this.bot.world);
+                        }
                         yield this.bot.pathfinder.goto(goal);
-                        yield this.mineBlock(closest, options);
+                        success = yield this.mineBlock(closestBlock, options);
                         break;
                     }
                     case "Entity": {
@@ -134,6 +144,7 @@ class CollectBlock {
                         });
                         yield this.bot.pathfinder.goto(new mineflayer_pathfinder_1.goals.GoalFollow(closest, 0));
                         yield waitForPickup;
+                        success = true;
                         break;
                     }
                     default: {
@@ -141,7 +152,10 @@ class CollectBlock {
                     }
                 }
                 options.targets.removeTarget(closest);
+                if (!success)
+                    return false;
             }
+            return true;
         });
     }
     mineBlock(block, options) {
@@ -150,9 +164,30 @@ class CollectBlock {
             const safeBlock = block;
             if (((_a = this.bot.blockAt(block.position)) === null || _a === void 0 ? void 0 : _a.type) !== block.type || !this.bot.pathfinder.movements.safeToBreak(safeBlock)) {
                 options.targets.removeTarget(block);
-                return;
+                return false;
             }
-            yield this.bot.dig(block);
+            const success = yield this.bot.dig(block);
+            if (!success)
+                return false;
+            // Move to the location of the block dug
+            const goal = new mineflayer_pathfinder_1.goals.GoalBlock(block.position.x, block.position.y, block.position.z);
+            yield this.bot.pathfinder.goto(goal);
+            return true;
+        });
+    }
+    cancelTask(cb) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.targets.empty) {
+                if (cb != null)
+                    cb();
+                return yield Promise.resolve();
+            }
+            this.bot.pathfinder.stop();
+            if (cb != null) {
+                // @ts-expect-error
+                this.bot.once('collectBlock_finished', cb);
+            }
+            yield (0, events_1.once)(this.bot, 'collectBlock_finished');
         });
     }
 }
