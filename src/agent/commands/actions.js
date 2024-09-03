@@ -82,12 +82,11 @@ export const actionsList = [
     description:
       "Endlessly follow the given player. Will defend that player if self_defense mode is on.",
     params: {
-      player_name: "(string) The name of the player to follow.",
-      follow_dist: "(number) The distance to follow from.",
+      player_name: "(string) The name of the player to follow."
     },
     perform: wrapExecution(
       async (agent, player_name, follow_dist) => {
-        const success = await skills.followPlayer(agent.bot, player_name, follow_dist);
+        const success = await skills.followPlayer(agent.bot, player_name, 1);
         if (success) {
             agent.followPlayerName = player_name;
         }
