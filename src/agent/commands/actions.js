@@ -183,9 +183,10 @@ export const actionsList = [
     params: {
       type: "(string) The block type to collect.",
       num: "(number) The number of blocks to collect.",
+      grownCropsOnly: "(boolean) Whether to collect only fully grown crops.",
     },
-    perform: wrapExecution(async (agent, type, num) => {
-      await skills.collectBlock(agent.bot, type, num);
+    perform: wrapExecution(async (agent, type, num, grownCropsOnly = false) => {
+      await skills.collectBlock(agent.bot, type, num, null, grownCropsOnly);
     }, 10), // 10 minute timeout
   },
   {
@@ -413,6 +414,16 @@ export const actionsList = [
         : `Failed to take ${itemType} from furnace.`;
     }),
   },
+  {
+    name: "!sow",
+    description: "Sow seeds on nearby tilled soil.",
+    params: {
+      seed_type: "(string) The type of seed to sow.",
+    },
+    perform: wrapExecution(async (agent, seed_type) => {
+      return await skills.sowSeeds(agent.bot, seed_type);
+    }),
+  }
   // {
   //   name: "!goal",
   //   description: "Set a goal to automatically work towards.",

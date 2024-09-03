@@ -356,7 +356,7 @@ export async function defendSelf(bot, range=9) {
 
 
 
-export async function collectBlock(bot, blockType, num=1, exclude=null) {
+export async function collectBlock(bot, blockType, num=1, exclude=null, grownCropsOnly=false) {
     /**
      * Collect one of the given block type.
      * @param {MinecraftBot} bot, reference to the minecraft bot.
@@ -415,6 +415,13 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
 
     console.log("Starting collect loop");
 
+    const cropAgeMap = {
+        wheat: 7,
+        beetroot: 3,
+        carrot: 7,
+        potato: 7,
+    };
+
     while (collected < num && retries < 3) {
         console.log(`Attempt ${retries + 1}: Collected ${collected}/${num} ${blockType}`);
         
@@ -432,6 +439,10 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
                 );
             }
             console.log(`Excluded positions, ${blocks.length} blocks remaining`);
+        }
+
+        if (grownCropsOnly && cropAgeMap[blockType]) {
+            blocks = blocks.filter(block => block._properties.age === cropAgeMap[blockType]);
         }
 
         const block = blocks[0];
@@ -1529,3 +1540,51 @@ export async function takeFromFurnace(bot, itemType) {
   return true;
 }
 
+export async function sowSeeds(bot, seedType) {
+    /**
+     * Sow seeds on nearby tilled soil.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {string} seedType, the type of seed to sow.
+     * @returns {Promise<boolean>} true if the seeds were sown, false otherwise.
+     * @example
+     * await skills.sowSeeds(bot, "wheat_seeds");
+     **/
+    if (seedType.endsWith('seed') && !seedType.endsWith('seeds'))
+      seedType += 's'; // fixes common mistake
+  
+    let seeds = bot.inventory.items().find(item => item.name === seedType);
+    if (!seeds) {
+      log(bot, `No ${seedType} to plant.`);
+      return false;
+    }
+  
+    await bot.equip(seeds, 'hand');
+  
+    const tilledSoilBlocks = bot.findBlocks({
+      matching: block => block.name === 'farmland',
+      maxDistance: 16,
+      count: 64,
+      useExtraInfo: (block) => {
+        const blockAbove = bot.blockAt(block.position.offset(0, 1, 0))
+        return !blockAbove || blockAbove.type === 0
+      }
+    });
+  
+    if (tilledSoilBlocks.length === 0) {
+      log(bot, `No tilled soil found nearby.`);
+      return false;
+    }
+  
+    for (const toSowBlock of tilledSoilBlocks) {
+        const block = bot.blockAt(new Vec3(toSowBlock.x, toSowBlock.y, toSowBlock.z));
+        const distance = bot.entity.position.distanceTo(block.position);
+        if (distance > NEAR_DISTANCE) {
+            await goToPosition(bot, block.position.x, block.position.y, block.position.z, 2);
+        }
+        
+        await bot.placeBlock(block, new Vec3(0, 1, 0));
+    }
+    log(bot, `Planted ${seedType} on ${tilledSoilBlocks.length} blocks.`);
+  
+    return true;
+  }

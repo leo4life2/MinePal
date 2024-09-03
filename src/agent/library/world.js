@@ -67,8 +67,8 @@ export function getNearestBlocks(bot, block_types=null, distance=64, count=10000
     let blocks = [];
     for (let i = 0; i < positions.length; i++) {
         let block = bot.blockAt(positions[i]);
-        if (bot.canSeeBlock(block)) { // Check if the bot can see the block
-            let distance = positions[i].distanceTo(bot.entity.position);
+        let distance = positions[i].distanceTo(bot.entity.position);
+        if (['chest', 'trapped_chest', 'furnace', 'wheat', 'carrots', 'potatoes', 'beetroots', 'melon', 'pumpkin'].includes(block.name) || bot.canSeeBlock(block)) {
             blocks.push({ block: block, distance: distance });
         }
     }
