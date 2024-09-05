@@ -8,12 +8,12 @@
             ["", "planks", "planks", "planks", ""],
             ["", "planks", "planks", "planks", ""],
             ["", "planks", "planks", "planks", ""],
-            ["", "", "planks", "", ""],
+            ["", "planks", "planks", "planks", ""],
             ["", "", "", "", ""]
         ],
         [
             ["log", "planks", "planks", "planks", "log"],
-            ["planks", "chest", "bed", "air", "planks"],
+            ["planks", "air", "air", "air", "planks"],
             ["planks", "air", "bed", "air", "planks"],
             ["planks", "air", "air", "air", "planks"],
             ["planks", "air", "air", "air", "planks"],
@@ -26,7 +26,7 @@
             ["planks", "air", "air", "air", "planks"],
             ["planks", "air", "air", "air", "planks"],
             ["planks", "torch", "air", "torch", "planks"],
-            ["log", "planks", "door", "planks", "log"],
+            ["log", "planks", "air", "planks", "log"],
             ["", "air", "air", "air", ""]
         ],
         [

@@ -3,17 +3,17 @@
     "offset": -1,
     "blocks": [
         [
-            ["", "", "", "", ""],
-            ["", "planks", "planks", "planks", ""],
-            ["", "planks", "planks", "planks", ""],
-            ["", "planks", "planks", "planks", ""],
-            ["", "planks", "planks", "planks", ""],
-            ["", "", "planks", "", ""],
+            ["cobblestone", "cobblestone", "cobblestone", "cobblestone", "cobblestone"],
+            ["cobblestone", "planks", "planks", "planks", "cobblestone"],
+            ["cobblestone", "planks", "planks", "planks", "cobblestone"],
+            ["cobblestone", "planks", "planks", "planks", "cobblestone"],
+            ["cobblestone", "planks", "planks", "planks", "cobblestone"],
+            ["cobblestone", "cobblestone", "cobblestone", "cobblestone", "cobblestone"],
             ["", "", "", "", ""]
         ],
         [
             ["cobblestone", "cobblestone", "cobblestone", "cobblestone", "cobblestone"],
-            ["cobblestone", "chest", "bed", "air", "cobblestone"],
+            ["cobblestone", "air", "air", "air", "cobblestone"],
             ["cobblestone", "air", "bed", "air", "cobblestone"],
             ["cobblestone", "air", "air", "air", "cobblestone"],
             ["cobblestone", "air", "air", "air", "cobblestone"],
@@ -26,7 +26,7 @@
             ["cobblestone", "air", "air", "air", "cobblestone"],
             ["cobblestone", "air", "air", "air", "cobblestone"],
             ["cobblestone", "torch", "air", "torch", "cobblestone"],
-            ["cobblestone", "cobblestone", "door", "cobblestone", "cobblestone"],
+            ["cobblestone", "cobblestone", "air", "cobblestone", "cobblestone"],
             ["", "air", "air", "air", ""]
         ],
         [

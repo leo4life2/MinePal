@@ -1,5 +1,7 @@
-import { writeFileSync, readFileSync } from 'fs';
-import { NPCData } from './npc/data.js';
+import { Low } from 'lowdb';
+import { JSONFile } from 'lowdb/node';
+import { join } from 'path';
+import { readFileSync, existsSync, unlinkSync } from 'fs';
 
 export class History {
     constructor(agent) {
@@ -13,6 +15,36 @@ export class History {
 
         // Variables for controlling the agent's memory and knowledge
         this.max_messages = 30;
+    }
+
+    async initDB() {
+        const file = join(this.agent.userDataDir, 'bots', this.name, 'lowdb.json');
+        const defaultData = { memory: '', turns: [], modes: {}, memory_bank: {} };
+        const adapter = new JSONFile(file);
+        this.db = new Low(adapter, defaultData);
+
+        await this.db.read();
+
+        // Check if memory.json exists and LowDB is empty
+        if (existsSync(this.memory_fp) && this.db.data.memory === '' && this.db.data.turns.length === 0) {
+            try {
+                const data = readFileSync(this.memory_fp, 'utf8');
+                const obj = JSON.parse(data);
+                this.db.data.memory = obj.memory;
+                this.db.data.turns = obj.turns;
+                if (obj.modes) this.db.data.modes = obj.modes;
+                if (obj.memory_bank) this.db.data.memory_bank = obj.memory_bank;
+                await this.db.write();
+                unlinkSync(this.memory_fp); // Delete the old memory.json file
+            } catch (err) {
+                console.error(`Error reading ${this.name}'s memory file: ${err.message}`);
+            }
+        }
+
+        this.memory = this.db.data.memory;
+        this.turns = this.db.data.turns;
+        if (this.db.data.modes) this.agent.bot.modes.loadJson(this.db.data.modes);
+        if (this.db.data.memory_bank) this.agent.memory_bank.loadJson(this.db.data.memory_bank);
     }
 
     getHistory() { // expects an Examples object
@@ -45,49 +77,24 @@ export class History {
         }
     }
 
-    save() {
-        // save history object to json file
-        let data = {
-            'name': this.name,
-            'memory': this.memory,
-            'turns': this.turns
-        };
-        if (this.agent.npc.data !== null)
-            data.npc = this.agent.npc.data.toObject();
-        const modes = this.agent.bot.modes.getJson();
-        if (modes !== null)
-            data.modes = modes;
-        const memory_bank = this.agent.memory_bank.getJson();
-        if (memory_bank !== null)
-            data.memory_bank = memory_bank;
-        const json_data = JSON.stringify(data, null, 4);
-        writeFileSync(this.memory_fp, json_data, (err) => {
-            if (err) {
-                throw err;
-            }
-            console.log("JSON data is saved.");
-        });
+    async save() {
+        this.db.data.memory = this.memory;
+        this.db.data.turns = this.turns;
+        
+        // Save agent.bot.modes and memory_bank
+        this.db.data.modes = this.agent.bot.modes.getJson();
+        this.db.data.memory_bank = this.agent.memory_bank.getJson();
+        
+        await this.db.write();
     }
 
-    load() {
-        try {
-            // load history object from json file
-            const data = readFileSync(this.memory_fp, 'utf8');
-            const obj = JSON.parse(data);
-            this.memory = obj.memory;
-            this.agent.npc.data = NPCData.fromObject(obj.npc);
-            if (obj.modes)
-                this.agent.bot.modes.loadJson(obj.modes);
-            if (obj.memory_bank)
-                this.agent.memory_bank.loadJson(obj.memory_bank);
-            this.turns = obj.turns;
-        } catch (err) {
-            console.error(`Error reading ${this.name}'s memory file: ${err.message}`);
-        }
+    async load() {
+        await this.initDB();
     }
 
     clear() {
         this.turns = [];
         this.memory = '';
+        this.save();
     }
 }

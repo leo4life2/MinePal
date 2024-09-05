@@ -145,9 +145,7 @@ export const actionsList = [
         const allLocations = agent.memory_bank.getKeys();
         skills.log(
           agent.bot,
-          `Could not find location "${name}", but we have: ${allLocations.join(
-            ", "
-          )}`
+          `Could not find location "${name}", but we have: ${allLocations}`
         );
         return;
       }
@@ -304,19 +302,14 @@ export const actionsList = [
     }),
   },
   {
-    name: "!useOn",
-    description: "Use the currently held item on a specified entity.",
+    name: "!useItemOnEntity",
+    description: "Use the specified item on a specified entity.",
     params: {
       entityName: "(string) The name of the entity to use the item on.",
+      itemName: "(string) The name of the item to use.",
     },
-    perform: wrapExecution(async (agent, entityName) => {
-      const targetEntity = agent.bot.nearestEntity(
-        (entity) => entity.name === entityName
-      );
-      if (!targetEntity) {
-        return `No entity named ${entityName} found nearby.`;
-      }
-      return await skills.useOn(agent.bot, targetEntity);
+    perform: wrapExecution(async (agent, entityName, itemName) => {
+      return await skills.useItemOnEntity(agent.bot, entityName, itemName);
     }),
   },
   {
@@ -422,6 +415,16 @@ export const actionsList = [
     },
     perform: wrapExecution(async (agent, seed_type) => {
       return await skills.sowSeeds(agent.bot, seed_type);
+    }),
+  },
+  {
+    name: "!buildHouse",
+    description: "Build a house of the specified type.",
+    params: {
+      house_type: "(string) The type of house to build.",
+    },
+    perform: wrapExecution(async (agent, house_type) => {
+      return await skills.buildHouse(agent.bot, house_type);
     }),
   }
   // {

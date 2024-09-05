@@ -131,7 +131,8 @@ export class Prompter {
     async promptConvo(messages) {
         let prompt = this.profile.conversing;
         prompt = await this.replaceStrings(prompt, messages, this.convo_examples);
-        const { chat_response, execute_command } = await this.chat_model.sendRequest(messages, prompt);
+        let chat_response, execute_command;
+        ({ chat_response, execute_command } = await this.chat_model.sendRequest(messages, prompt));
         console.log('Chat Response:', chat_response);
         console.log('Execute Command:', execute_command);
         
@@ -139,7 +140,11 @@ export class Prompter {
             return "Oops! OpenAI's server took an arrow to the knee. Mind trying that prompt again?";
         }
         
-        return chat_response + " " + execute_command;
+        if (execute_command && !execute_command.startsWith('!')) {
+            execute_command = '!' + execute_command;
+        }
+        
+        return (chat_response || "On it.") + " " + execute_command;
     }
 
     async promptMemSaving(prev_mem, to_summarize) {
