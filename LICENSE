@@ -1,23 +1,21 @@
-NemosAI
-Proprietary License
+MIT License
 
-This software is licensed under the NemosAI Proprietary License (the "License"). By using this software, you agree to the following terms and conditions:
+Copyright (c) 2024 NemosAI
 
-1. **Grant of License**: NemosAI grants you a non-exclusive, non-transferable, revocable license to use the software solely for your internal business purposes.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-2. **Restrictions**:
-   - You may not modify, reverse engineer, decompile, or disassemble the software.
-   - You may not distribute, sublicense, rent, lease, or lend the software to any third party.
-   - You may not use the software to create derivative works.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-3. **Ownership**: NemosAI retains all rights, title, and interest in and to the software, including all intellectual property rights.
-
-4. **Termination**: This License is effective until terminated. Your rights under this License will terminate automatically without notice if you fail to comply with any term(s) of this License. Upon termination, you must cease all use of the software and destroy all copies, full or partial, of the software.
-
-5. **Disclaimer of Warranties**: The software is provided "as is" without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement.
-
-6. **Limitation of Liability**: In no event shall NemosAI be liable for any special, incidental, indirect, or consequential damages whatsoever arising out of the use of or inability to use the software.
-
-7. **Governing Law**: This License shall be governed by and construed in accordance with the laws of [Your Jurisdiction], without regard to its conflict of laws principles.
-
-For any questions regarding this License, please contact NemosAI at leo@nemos.ai.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
