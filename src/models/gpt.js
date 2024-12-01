@@ -67,7 +67,11 @@ export class GPT {
             });
             return response.data;
         } catch (err) {
-            console.log(err);
+            if (err.response && err.response.status === 500) {
+                console.log('Error 500:', err.response.data);
+            } else {
+                console.log('Error:', err.message);
+            }
             throw new Error('Failed to get embedding');
         }
     }

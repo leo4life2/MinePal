@@ -10,6 +10,7 @@
     "@fortawesome/fontawesome-svg-core": "^6.6.0",
     "@fortawesome/free-solid-svg-icons": "^6.6.0",
     "@fortawesome/react-fontawesome": "^0.2.2",
+    "@supabase/supabase-js": "^2.46.2",
     "axios": "^1.7.3",
     "cors": "^2.8.5",
     "express": "^4.19.2",

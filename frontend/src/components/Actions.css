@@ -100,3 +100,52 @@
   background-color: var(--bg-color); /* Ensure background color is set */
   color: var(--text-color); /* Ensure text color is set */
 }
+
+.feedback-button {
+  background: none;
+  color: orange;
+  text-decoration: underline;
+  border: none;
+  cursor: pointer;
+  margin-top: 10px; /* Add space between buttons */
+}
+
+.submit-button {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-right: 10px; /* Optional: Add space between buttons */
+}
+
+.submit-button:hover {
+  background-color: var(--secondary-color);
+}
+
+.discord-link {
+  color: orange;
+  text-decoration: underline;
+}
+
+.ok-button {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.ok-button:hover {
+  background-color: var(--secondary-color);
+}
+
+.modal-content .button-group {
+  display: flex;
+  justify-content: center; /* Center the button horizontally */
+  margin-top: 20px; /* Optional: Add some space above the button */
+}

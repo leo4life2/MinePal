@@ -5,6 +5,12 @@ import {
   faMicrophoneSlash,
 } from "@fortawesome/free-solid-svg-icons";
 import "./Actions.css";
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://wwcgmpbfypiagjfeixmn.supabase.co';
+// Hardcoded API key (not recommended for production)
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3Y2dtcGJmeXBpYWdqZmVpeG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMwNTMwNjAsImV4cCI6MjA0ODYyOTA2MH0.7L7IeDKmuSmI7qKLXgylmwihpM6sLsljv32FsK-sbf4';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 function Actions({
   agentStarted,
@@ -35,6 +41,48 @@ function Actions({
 
   const handleInputDeviceChange = (event) => {
     setSelectedInputDevice(event.target.value);
+  };
+
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackContent, setFeedbackContent] = useState('');
+  const [discordModalOpen, setDiscordModalOpen] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  const handleFeedbackClick = () => {
+    setFeedbackModalOpen(true);
+  };
+
+  const closeFeedbackModal = () => {
+    setFeedbackModalOpen(false);
+    setFeedbackContent(''); // Clear feedback content on close
+  };
+
+  const submitFeedback = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('Feedback')
+        .insert([{ feedback: { message: feedbackContent } }]);
+
+      if (error) {
+        console.error('Error inserting feedback:', error);
+        setFeedbackMessage(`Error: ${error.message}`);
+      } else {
+        console.log('Feedback submitted:', data);
+        setFeedbackMessage(
+          'Feedback submitted successfully! Consider joining our Discord: ' +
+          '<a href="https://discord.gg/zTn25X24w2" target="_blank" rel="noopener noreferrer">Join Discord</a>'
+        );
+        setDiscordModalOpen(true); // Open the Discord modal
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      setFeedbackMessage(`Unexpected error: ${error.message}`);
+    }
+    closeFeedbackModal();
+  };
+
+  const closeDiscordModal = () => {
+    setDiscordModalOpen(false);
   };
 
   useEffect(() => {
@@ -155,6 +203,41 @@ function Actions({
       <button className="action-button" onClick={toggleAgent}>
         {agentStarted ? "Stop Bot" : "Start Bot"}
       </button>
+      <button className="feedback-button" onClick={handleFeedbackClick}>
+        Leave Feedback
+      </button>
+
+      {feedbackModalOpen && (
+        <div className="modal">
+          <div className="modal-content">
+            <textarea
+              value={feedbackContent}
+              onChange={(e) => setFeedbackContent(e.target.value)}
+              placeholder="Enter your feedback here"
+              rows="10"
+              style={{ width: '100%' }}
+            />
+            <div className="button-group">
+              <button className="submit-button" onClick={submitFeedback}>Submit</button>
+              <button className="cancel-button" onClick={closeFeedbackModal}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {discordModalOpen && (
+        <div className="modal">
+          <div className="modal-content">
+            <p
+              className="feedback-message"
+              dangerouslySetInnerHTML={{ __html: feedbackMessage }}
+            />
+            <div className="button-group">
+              <button className="ok-button" onClick={closeDiscordModal}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
