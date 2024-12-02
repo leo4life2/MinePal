@@ -4,6 +4,14 @@ import { app, BrowserWindow, systemPreferences } from 'electron';
 import path from 'path';
 import { startServer } from './server.js';
 import { createStream } from 'rotating-file-stream';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
+
+autoUpdater.setFeedURL({
+    provider: 's3',
+    bucket: 'minepal-installers',
+    region: 'us-east-1',
+});
 
 const copyFile = promisify(fs.copyFile);
 const mkdir = promisify(fs.mkdir);
@@ -103,6 +111,29 @@ if (!gotTheLock) {
         logToFile("Failed to start server: " + error);
     }
     await checkAndCopyProfile(); // Check and copy profile
+    autoUpdater.checkForUpdatesAndNotify();
+  });
+
+  autoUpdater.on('error', (err) => {
+    logToFile('Error in auto-updater. ' + err);
+  })
+  autoUpdater.on('download-progress', (progressObj) => {
+    let log_message = "Download speed: " + progressObj.bytesPerSecond;
+    log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+    logToFile(log_message);
+  })
+  autoUpdater.on('update-available', () => {
+    logToFile('Update available.');
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    logToFile('No update available.');
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    logToFile('Update downloaded; will install now');
+    autoUpdater.quitAndInstall();
   });
 }
 

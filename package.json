@@ -1,6 +1,6 @@
 {
   "name": "minepal",
-  "version": "0.3.3",
+  "version": "0.3.11",
   "description": "AI minecraft friend",
   "type": "module",
   "main": "main.js",
@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.46.2",
     "axios": "^1.7.3",
     "cors": "^2.8.5",
+    "electron-updater": "^6.3.9",
     "express": "^4.19.2",
     "lowdb": "^7.0.1",
     "mic": "^2.1.2",
@@ -73,12 +74,12 @@
       "entitlements": "build/entitlements.plist",
       "hardenedRuntime": true,
       "target": [
-        "dmg"
+        "default"
       ]
     },
     "win": {
       "target": [
-        "nsis"
+        "default"
       ],
       "icon": "build/icon.ico"
     },
