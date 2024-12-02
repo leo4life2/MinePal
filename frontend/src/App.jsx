@@ -369,7 +369,7 @@ function App() {
 
   return (
     <div className="container">
-      <h1>MinePal 0.3.5 test</h1>
+      <h1>MinePal 0.3.7 test</h1>
       <Settings
         settings={settings}
         setSettings={setSettings}
