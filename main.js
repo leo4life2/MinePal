@@ -115,11 +115,15 @@ if (!gotTheLock) {
   });
 
   autoUpdater.on('update-available', () => {
-    console.log('Update available.');
+    logToFile('Update available.');
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    logToFile('No update available.');
   });
 
   autoUpdater.on('update-downloaded', () => {
-    console.log('Update downloaded; will install now');
+    logToFile('Update downloaded; will install now');
     autoUpdater.quitAndInstall();
   });
 }
