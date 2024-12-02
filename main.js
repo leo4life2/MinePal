@@ -7,6 +7,12 @@ import { createStream } from 'rotating-file-stream';
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
 
+autoUpdater.setFeedURL({
+    provider: 's3',
+    bucket: 'minepal-installers',
+    region: 'us-east-1',
+});
+
 const copyFile = promisify(fs.copyFile);
 const mkdir = promisify(fs.mkdir);
 const access = promisify(fs.access);

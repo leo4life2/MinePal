@@ -86,13 +86,6 @@
     "linux": {
       "target": "AppImage",
       "icon": "build"
-    },
-    "publish": [
-      {
-        "provider": "s3",
-        "bucket": "minepal-installers",
-        "region": "us-east-1"
-      }
-    ]
+    }
   }
 }
