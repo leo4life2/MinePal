@@ -74,12 +74,12 @@
       "entitlements": "build/entitlements.plist",
       "hardenedRuntime": true,
       "target": [
-        "dmg"
+        "default"
       ]
     },
     "win": {
       "target": [
-        "nsis"
+        "default"
       ],
       "icon": "build/icon.ico"
     },
