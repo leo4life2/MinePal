@@ -220,3 +220,133 @@ h1 {
   resize: vertical;
   min-height: 100px; /* Minimum height for the textarea */
 }
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--bg-color);
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-color);
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.feedback-modal {
+  color: var(--text-color);
+}
+
+.feedback-modal h2,
+.feedback-modal h3 {
+  color: var(--primary-color);
+  text-align: center;
+  margin: 15px 0 25px 0;
+  font-size: 1.5em;
+  padding-top: 15px;
+}
+
+.feedback-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.feedback-item {
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background-color: #2a2a2a;
+  color: #b0b0b0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  font-size: 1em;
+}
+
+.feedback-item:hover {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+}
+
+.feedback-textarea,
+.feedback-input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  background-color: #2a2a2a;
+  border: 1px solid var(--primary-color);
+  color: var(--text-color);
+  box-sizing: border-box;
+}
+
+.feedback-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.submit-button,
+.cancel-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.submit-button {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+  border: none;
+}
+
+.cancel-button {
+  background: none;
+  border: 1px solid var(--primary-color);
+  color: var(--text-color);
+}
+
+.submit-button:hover {
+  background-color: var(--secondary-color);
+}
+
+.cancel-button:hover {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+}

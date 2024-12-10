@@ -1,16 +1,12 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMicrophone,
   faMicrophoneSlash,
 } from "@fortawesome/free-solid-svg-icons";
 import "./Actions.css";
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = 'https://wwcgmpbfypiagjfeixmn.supabase.co';
-// Hardcoded API key (not recommended for production)
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3Y2dtcGJmeXBpYWdqZmVpeG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMwNTMwNjAsImV4cCI6MjA0ODYyOTA2MH0.7L7IeDKmuSmI7qKLXgylmwihpM6sLsljv32FsK-sbf4';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { insertFeedback } from '../utils/supabase';
+import PropTypes from 'prop-types';
 
 function Actions({
   agentStarted,
@@ -19,9 +15,9 @@ function Actions({
   settings,
   setSettings,
   isMicrophoneActive,
-  inputDevices, // Add inputDevices prop
-  selectedInputDevice, // Add selectedInputDevice prop
-  setSelectedInputDevice // Add setSelectedInputDevice prop
+  inputDevices,
+  selectedInputDevice,
+  setSelectedInputDevice
 }) {
   const handleVoiceModeChange = (event) => {
     setSettings(prevSettings => ({ ...prevSettings, voice_mode: event.target.value }));
@@ -58,25 +54,23 @@ function Actions({
   };
 
   const submitFeedback = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('Feedback')
-        .insert([{ feedback: { message: feedbackContent } }]);
+    // Skip network request if no content
+    if (!feedbackContent?.trim()) {
+      closeFeedbackModal();
+      return;
+    }
 
-      if (error) {
-        console.error('Error inserting feedback:', error);
-        setFeedbackMessage(`Error: ${error.message}`);
-      } else {
-        console.log('Feedback submitted:', data);
-        setFeedbackMessage(
-          'Feedback submitted successfully! Consider joining our Discord: ' +
-          '<a href="https://discord.gg/zTn25X24w2" target="_blank" rel="noopener noreferrer">Join Discord</a>'
-        );
-        setDiscordModalOpen(true); // Open the Discord modal
-      }
+    try {
+      await insertFeedback({ message: feedbackContent });
+      console.log('Feedback submitted successfully');
+      setFeedbackMessage(
+        'Feedback submitted successfully! Consider joining our Discord: ' +
+        '<a href="https://discord.gg/zTn25X24w2" target="_blank" rel="noopener noreferrer">Join Discord</a>'
+      );
+      setDiscordModalOpen(true);
     } catch (error) {
-      console.error('Unexpected error:', error);
-      setFeedbackMessage(`Unexpected error: ${error.message}`);
+      console.error('Failed to submit feedback:', error);
+      setFeedbackMessage(`Failed to submit feedback: ${error.message}`);
     }
     closeFeedbackModal();
   };
@@ -241,5 +235,24 @@ function Actions({
     </div>
   );
 }
+
+Actions.propTypes = {
+    agentStarted: PropTypes.bool.isRequired,
+    toggleAgent: PropTypes.func.isRequired,
+    stopMicrophone: PropTypes.func.isRequired,
+    settings: PropTypes.shape({
+        voice_mode: PropTypes.string.isRequired,
+        key_binding: PropTypes.string.isRequired,
+        language: PropTypes.string.isRequired
+    }).isRequired,
+    setSettings: PropTypes.func.isRequired,
+    isMicrophoneActive: PropTypes.bool.isRequired,
+    inputDevices: PropTypes.arrayOf(PropTypes.shape({
+        deviceId: PropTypes.string.isRequired,
+        label: PropTypes.string
+    })).isRequired,
+    selectedInputDevice: PropTypes.string.isRequired,
+    setSelectedInputDevice: PropTypes.func.isRequired
+};
 
 export default Actions;

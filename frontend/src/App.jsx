@@ -5,6 +5,7 @@ import './App.css';
 import Settings from './components/Settings';
 import Actions from './components/Actions';
 import Transcription from './components/Transcription';
+import { insertFeedback } from './utils/supabase';
 
 mixpanel.init('a9bdd5c85dab5761be032f1c1650defa');
 
@@ -36,6 +37,11 @@ function App() {
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
   const [inputDevices, setInputDevices] = useState([]);
   const [selectedInputDevice, setSelectedInputDevice] = useState('');
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showDetailedFeedbackModal, setShowDetailedFeedbackModal] = useState(false);
+  const [feedbackType, setFeedbackType] = useState(null);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackEmail, setFeedbackEmail] = useState('');
 
   const handleProfileSelect = (profile) => {
     setSelectedProfiles(prev => 
@@ -50,9 +56,10 @@ function App() {
 
   const settingNotes = {
     minecraft_version: "supports up to 1.20.4",
-    host: "or \"localhost\", \"your.ip.address.here\"",
+    host: "\"localhost\" for singleplayer LAN; server address for multiplayer",
     port: "default is 25565",
     player_username: "your Minecraft username",
+    profiles: "if you spawn more than one pal, you need to /msg each bot",
   }
 
   const fetchSettings = async () => {
@@ -363,12 +370,68 @@ function App() {
     getInputDevices();
   }, []);
 
+  useEffect(() => {
+    let feedbackTimer;
+    if (agentStarted && !localStorage.getItem('feedbackModalShown')) {
+      feedbackTimer = setTimeout(() => {
+        console.log("Showing Feedback Modal");
+        setShowFeedbackModal(true);
+        localStorage.setItem('feedbackModalShown', 'true');
+      }, 1000 * 60 * 15); // show after 15 minutes of gameplay
+    }
+    return () => clearTimeout(feedbackTimer);
+  }, [agentStarted]);
+
+  const handleFeedbackSelect = (type) => {
+    setFeedbackType(type);
+    if (type === "love" || type === "unexpected") {
+      setShowDetailedFeedbackModal(true);
+      setShowFeedbackModal(false);
+    } else {
+      // For "okay" and "checking", submit immediately
+      handleSimpleFeedback(type);
+      setShowFeedbackModal(false);
+    }
+  };
+
+  const handleSimpleFeedback = async (type) => {
+    try {
+      const feedbackData = {
+        sentiment: type === "okay" ? "it's okay" : "just checking things out"
+      };
+      await insertFeedback(feedbackData);
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      // You might want to show this error to the user through your UI
+      setError(`Failed to submit feedback: ${error.message}`);
+    }
+  };
+
+  const handleDetailedFeedbackSubmit = async () => {
+    try {
+      const feedbackData = {
+        sentiment: feedbackType === "love" ? "love" : "unexpected",
+        message: feedbackText || null,
+        email: feedbackEmail || null
+      };
+      
+      await insertFeedback(feedbackData);
+      setShowDetailedFeedbackModal(false);
+      setFeedbackText('');
+      setFeedbackEmail('');
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      setError(`Failed to submit feedback: ${error.message}`);
+      // Keep the modal open so user can try again
+    }
+  };
+
   if (loading) {
     return <div className="spinner">Loading...</div>;
   }
 
   return (
-    <div className="container">
+    <div className="app">
       <h1>MinePal Control Panel</h1>
       <Settings
         settings={settings}
@@ -392,6 +455,52 @@ function App() {
       />
       {error && <div className="error-message">{error}</div>}
       <Transcription transcription={transcription} />
+      
+      {showFeedbackModal && (
+        <div className="modal-overlay">
+          <div className="modal-content feedback-modal">
+            <button className="modal-close" onClick={() => setShowFeedbackModal(false)}>×</button>
+            <h2>How&apos;s your experience so far?</h2>
+            <div className="feedback-options">
+              <button className="feedback-item" onClick={() => handleFeedbackSelect("love")}>I love it</button>
+              <button className="feedback-item" onClick={() => handleFeedbackSelect("okay")}>It&apos;s okay</button>
+              <button className="feedback-item" onClick={() => handleFeedbackSelect("unexpected")}>It&apos;s not what I expected</button>
+              <button className="feedback-item" onClick={() => handleFeedbackSelect("checking")}>Just checking things out</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDetailedFeedbackModal && (
+        <div className="modal-overlay">
+          <div className="modal-content feedback-modal">
+            <button className="modal-close" onClick={handleDetailedFeedbackSubmit}>×</button>
+            <h3>
+              {feedbackType === "love" 
+                ? "That's great! Could you tell us what you love most or any ideas you have?"
+                : "We'd love to understand what was off. Could you tell us why?"}
+            </h3>
+            <textarea
+              className="feedback-textarea"
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="Share your thoughts (optional)"
+              rows="4"
+            />
+            <input
+              className="feedback-input"
+              type="email"
+              value={feedbackEmail}
+              onChange={(e) => setFeedbackEmail(e.target.value)}
+              placeholder="Leave your email if you'd like us to follow up (optional)"
+            />
+            <div className="button-group">
+              <button className="submit-button" onClick={handleDetailedFeedbackSubmit}>Submit</button>
+              <button className="cancel-button" onClick={handleDetailedFeedbackSubmit}>Skip</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

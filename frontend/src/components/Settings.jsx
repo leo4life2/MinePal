@@ -1,5 +1,6 @@
 import Profiles from './Profiles';
 import './Settings.css';
+import PropTypes from 'prop-types';
 
 function Settings({ settings, setSettings, handleSettingChange, settingNotes, selectedProfiles, handleProfileSelect, api }) {
   return (
@@ -69,6 +70,7 @@ function Settings({ settings, setSettings, handleSettingChange, settingNotes, se
       </div>
       <label htmlFor="profiles">
           your pals:
+          {settingNotes.profiles && <span className="setting-note"> ({settingNotes.profiles})</span>}
       </label>
       <Profiles
         profiles={settings.profiles}
@@ -80,5 +82,27 @@ function Settings({ settings, setSettings, handleSettingChange, settingNotes, se
     </div>
   );
 }
+
+Settings.propTypes = {
+  settings: PropTypes.shape({
+    player_username: PropTypes.string.isRequired,
+    host: PropTypes.string.isRequired,
+    port: PropTypes.string.isRequired,
+    minecraft_version: PropTypes.string.isRequired,
+    whisper_to_player: PropTypes.bool.isRequired,
+    profiles: PropTypes.array.isRequired
+  }).isRequired,
+  setSettings: PropTypes.func.isRequired,
+  handleSettingChange: PropTypes.func.isRequired,
+  settingNotes: PropTypes.shape({
+    player_username: PropTypes.string,
+    host: PropTypes.string,
+    minecraft_version: PropTypes.string,
+    profiles: PropTypes.string
+  }).isRequired,
+  selectedProfiles: PropTypes.array.isRequired,
+  handleProfileSelect: PropTypes.func.isRequired,
+  api: PropTypes.object.isRequired
+};
 
 export default Settings;
