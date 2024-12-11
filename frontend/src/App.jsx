@@ -37,7 +37,7 @@ function App() {
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
   const [inputDevices, setInputDevices] = useState([]);
   const [selectedInputDevice, setSelectedInputDevice] = useState('');
-  const [showFeedbackModal, setShowFeedbackModal] = useState(true);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showDetailedFeedbackModal, setShowDetailedFeedbackModal] = useState(false);
   const [feedbackType, setFeedbackType] = useState(null);
   const [feedbackText, setFeedbackText] = useState('');
@@ -207,7 +207,7 @@ function App() {
         }
       } catch (error) {
         console.error("Failed to start agent:", error);
-        setError(error.response?.data || error.message || "An unknown error occurred while starting the agent.");
+        setError(String(error.response?.data) || String(error.message) || "An unknown error occurred while starting the agent.");
       }
     }
   };

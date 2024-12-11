@@ -107,7 +107,7 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
         checked={selectedProfiles.includes(profile)}
         onChange={(e) => handleCheckboxClick(e, profile)}
       />
-      <span>{profile.name}</span>
+      <span>{String(profile.name)}</span>
     </div>
   );
 
@@ -152,7 +152,7 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
                 <button className="delete-button" onClick={deleteProfile}>Delete Pal</button>
               )}
             </div>
-            {error && <div className="error-message">{error}</div>}
+            {error && <div className="error-message">{String(error)}</div>}
           </div>
         </div>
       )}
