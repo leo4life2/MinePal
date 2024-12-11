@@ -37,7 +37,7 @@ function App() {
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
   const [inputDevices, setInputDevices] = useState([]);
   const [selectedInputDevice, setSelectedInputDevice] = useState('');
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(true);
   const [showDetailedFeedbackModal, setShowDetailedFeedbackModal] = useState(false);
   const [feedbackType, setFeedbackType] = useState(null);
   const [feedbackText, setFeedbackText] = useState('');

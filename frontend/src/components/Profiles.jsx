@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './Profiles.css';
+import PropTypes from 'prop-types';
 
 function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles, api }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -104,7 +105,7 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
       <input
         type="checkbox"
         checked={selectedProfiles.includes(profile)}
-        onClick={(e) => handleCheckboxClick(e, profile)}
+        onChange={(e) => handleCheckboxClick(e, profile)}
       />
       <span>{profile.name}</span>
     </div>
@@ -158,5 +159,18 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
     </div>
   );
 }
+
+Profiles.propTypes = {
+  profiles: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string.isRequired,
+      personality: PropTypes.string.isRequired
+    })
+  ).isRequired,
+  setSettings: PropTypes.func.isRequired,
+  handleProfileSelect: PropTypes.func.isRequired,
+  selectedProfiles: PropTypes.array.isRequired,
+  api: PropTypes.oneOfType([PropTypes.func, PropTypes.object]).isRequired
+};
 
 export default Profiles;

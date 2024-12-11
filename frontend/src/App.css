@@ -336,17 +336,24 @@ h1 {
   border: none;
 }
 
+.submit-button:hover {
+  background-color: var(--primary-color);
+  opacity: 0.9;
+}
+
 .cancel-button {
   background: none;
   border: 1px solid var(--primary-color);
   color: var(--text-color);
 }
 
-.submit-button:hover {
-  background-color: var(--secondary-color);
+.cancel-button:focus {
+  outline: none;
+  border-color: var(--primary-color);
 }
 
 .cancel-button:hover {
   background-color: var(--primary-color);
   color: var(--bg-color);
+  border-color: var(--primary-color);
 }

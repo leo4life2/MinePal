@@ -102,7 +102,7 @@ Settings.propTypes = {
   }).isRequired,
   selectedProfiles: PropTypes.array.isRequired,
   handleProfileSelect: PropTypes.func.isRequired,
-  api: PropTypes.object.isRequired
+  api: PropTypes.oneOfType([PropTypes.func, PropTypes.object]).isRequired
 };
 
 export default Settings;
