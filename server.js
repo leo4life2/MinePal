@@ -88,6 +88,8 @@ function startServer() {
             "whisper_to_player": false,
             "voice_mode": "always_on",
             "key_binding": "",
+            "openai_api_key": "",
+            "model": "",
             "language": "en"
         };
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
@@ -317,6 +319,10 @@ function startServer() {
         // Check for empty fields in newSettings, except for key_binding if voice_mode is always_on or off
         const emptyFields = Object.entries(newSettings)
             .filter(([key, value]) => {
+                // Skip API key and model checks if not using own API key
+                if (!newSettings.useOwnApiKey && (key === 'openai_api_key' || key === 'model')) {
+                    return false;
+                }
                 if (key === 'profiles') return !Array.isArray(value) || value.length === 0;
                 if (key === 'key_binding' && (newSettings.voice_mode === 'always_on' || newSettings.voice_mode === 'off')) return false;
                 return value === "" || value === null || value === undefined;
@@ -344,7 +350,7 @@ function startServer() {
         for (let profile of profiles) {
             const profileBotName = profile.name;
             const agentProcess = new AgentProcess(notifyBotKicked);
-            agentProcess.start(profileBotName, userDataDir, load_memory);
+            agentProcess.start(profileBotName, userDataDir, newSettings.useOwnApiKey, newSettings.openai_api_key, load_memory);
             agentProcesses.push(agentProcess);
         }
         agentProcessStarted = true;

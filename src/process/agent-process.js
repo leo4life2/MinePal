@@ -31,7 +31,7 @@ export class AgentProcess {
      * @param {string} userDataDir - The directory to store log files.
      * @param {boolean} [load_memory=false] - Whether to load memory from a previous session.
      */
-    start(profile, userDataDir, load_memory=false) {
+    start(profile, userDataDir, useOwnApiKey, openai_api_key, load_memory=false) {
         this.botName = profile;
         // Prepare arguments for the agent process
         let args = [path.join(app.getAppPath(), 'src/process/init-agent.js')]; // Adjust path
@@ -62,10 +62,11 @@ export class AgentProcess {
         } else {
             fs.appendFileSync(logFilePath, `\n\nArguments: ${args.join(' ')}\n\n`);
         }
-
         // Spawn the agent process using Node.js's child_process.fork
+        const env = useOwnApiKey ? { OPENAI_API_KEY: openai_api_key } : {};
         this.agentProcess = fork(path.join(app.getAppPath(), 'src/process/init-agent.js'), args, {
             stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+            env: env
         });
 
         // Pipe process output to log file
@@ -110,7 +111,7 @@ export class AgentProcess {
                     agentLogStream.write('Restarting agent...\n');
                     agentLogStream.end();
                 }
-                this.start(profile, userDataDir, true, 'Agent process restarted.');
+                this.start(profile, userDataDir, useOwnApiKey, openai_api_key, true, 'Agent process restarted.');
             }
         });
     

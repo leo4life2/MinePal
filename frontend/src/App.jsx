@@ -22,7 +22,10 @@ function App() {
     whisper_to_player: false,
     voice_mode: 'always_on',
     key_binding: '',
-    language: 'en'
+    language: 'en',
+    openai_api_key: '',
+    model: '',
+    useOwnApiKey: false
   });
 
   const [error, setError] = useState(null);
@@ -70,6 +73,8 @@ function App() {
           personality: profile.personality
         }));
       }
+
+      console.log("filtered settings", filteredSettings);
 
       setSettings(prevSettings => ({ ...prevSettings, ...filteredSettings }));
     } catch (err) {
@@ -138,8 +143,12 @@ function App() {
     } else {
       const emptyFields = Object.entries(settings)
         .filter(([key, value]) => {
+          if (!settings.useOwnApiKey && (key === 'openai_api_key' || key === 'model')) {
+            return false;
+          }
+          
           if (key === 'profiles') return value.length === 0;
-          if (key === 'key_binding' && (settings.voice_mode === 'always_on' || settings.voice_mode === 'off')) return false; // Skip key_binding check
+          if (key === 'key_binding' && (settings.voice_mode === 'always_on' || settings.voice_mode === 'off')) return false;
           if (typeof value === 'string') return value.trim() === '';
           if (Array.isArray(value)) return value.length === 0;
           return value === null || value === undefined;
@@ -175,7 +184,8 @@ function App() {
       try {
         const filteredSettings = {
           ...settings,
-          profiles: selectedProfiles // Only send selected profiles
+          profiles: selectedProfiles, // Only send selected profiles
+          useOwnApiKey: settings.useOwnApiKey 
         };
         const response = await api.post('/start', filteredSettings);
         console.log("Agent started successfully:", response.data);
@@ -195,12 +205,14 @@ function App() {
         setStartTime(Date.now());
 
         // Automatically handle microphone based on voice mode
-        if (settings.voice_mode !== 'off') {
-          startMicrophone();
-        }
+        // temporarily disabling voice mode due to influx
+        // if (settings.voice_mode !== 'off') {
+        //   startMicrophone();
+        // }
+
       } catch (error) {
         console.error("Failed to start agent:", error);
-        setError(error.response?.data || error.message || "An unknown error occurred while starting the agent.");
+        setError(error.message || "An unknown error occurred while starting the agent.");
       }
     }
   };
@@ -383,12 +395,12 @@ function App() {
         agentStarted={agentStarted}
         toggleAgent={toggleAgent}
         stopMicrophone={stopMicrophone}
-        isMicrophoneActive={isMicrophoneActive} // Pass the new state
+        isMicrophoneActive={isMicrophoneActive}
         settings={settings}
         setSettings={setSettings}
-        inputDevices={inputDevices} // Pass input devices
-        selectedInputDevice={selectedInputDevice} // Pass selected input device
-        setSelectedInputDevice={setSelectedInputDevice} // Pass setter for selected input device
+        inputDevices={inputDevices}
+        selectedInputDevice={selectedInputDevice}
+        setSelectedInputDevice={setSelectedInputDevice}
       />
       {error && <div className="error-message">{error}</div>}
       <Transcription transcription={transcription} />

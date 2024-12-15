@@ -5,6 +5,7 @@ import { getSkillDocs } from './library/index.js';
 import { stringifyTurns } from '../utils/text.js';
 import { getCommand } from './commands/index.js';
 
+import { Proxy } from '../models/proxy.js';
 import { GPT } from '../models/gpt.js';
 
 export class Prompter {
@@ -26,10 +27,18 @@ export class Prompter {
 
         console.log('Using chat settings:', chat);
 
-        if (chat.api == 'openai')
-            this.chat_model = new GPT(chat.model, chat.url);
-        else
+        if (chat.api == 'openai') {
+            const openaiApiKey = process.env.OPENAI_API_KEY;
+            if (openaiApiKey && openaiApiKey.trim() !== '') {
+                console.log("!!!!!!! using openai");
+                this.chat_model = new GPT(chat.model, openaiApiKey);
+            } else {
+                console.log("!!!!!!! using proxy");
+                this.chat_model = new Proxy(chat.model, chat.url);
+            }
+        } else {
             throw new Error('Unknown API:', chat.api);
+        }
 
         let embedding = this.profile.embedding;
         if (embedding === undefined) {
@@ -40,9 +49,16 @@ export class Prompter {
 
         console.log('Using embedding settings:', embedding);
 
-        if (embedding.api == 'openai')
-            this.embedding_model = new GPT(embedding.model, embedding.url);
-        else {
+        if (embedding.api == 'openai') {
+            const openaiApiKey = process.env.OPENAI_API_KEY;
+            if (openaiApiKey && openaiApiKey.trim() !== '') {
+                console.log("!!!!!!! using openai for embeddings");
+                this.embedding_model = new GPT(embedding.model, openaiApiKey);
+            } else {
+                console.log("!!!!!!! using proxy for embeddings");
+                this.embedding_model = new Proxy(embedding.model, embedding.url);
+            }
+        } else {
             this.embedding_model = null;
             console.log('Unknown embedding: ', embedding ? embedding.api : '[NOT SPECIFIED]', '. Using word overlap.');
         }
@@ -132,7 +148,11 @@ export class Prompter {
         let prompt = this.profile.conversing;
         prompt = await this.replaceStrings(prompt, messages, this.convo_examples);
         let chat_response, execute_command;
-        ({ chat_response, execute_command } = await this.chat_model.sendRequest(messages, prompt));
+        let response = await this.chat_model.sendRequest(messages, prompt);
+        if (typeof response === 'string') {
+            response = JSON.parse(response);
+        }
+        ({ chat_response, execute_command } = response);
         console.log('Chat Response:', chat_response);
         console.log('Execute Command:', execute_command);
         

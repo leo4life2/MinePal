@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { HTTPS_BACKEND_URL } from '../constants.js';
 const minepal_response_schema = {
     type: "object",
     properties: {
@@ -10,28 +9,25 @@ const minepal_response_schema = {
     additionalProperties: false
 };
 export class GPT {
-    constructor(model_name) {
+    constructor(model_name, openai_api_key) {
         this.model_name = model_name;
+        this.openai_api_key = openai_api_key;
         console.log(`Using model: ${model_name}`);
     }
 
     async sendRequest(turns, systemMessage, stop_seq='***', memSaving=false) {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(turns);
         let res = null;
-        // console.log("=== BEGIN MESSAGES ===");
-        // messages.forEach((msg, index) => {
-        //     console.log(`Message ${index + 1}:`);
-        //     console.log(`Role: ${msg.role}`);
-        //     console.log(`Content: ${msg.content}`);
-        //     console.log("---");
-        // });
-        // console.log("=== END MESSAGES ===");
+
+        const maxRetries = 5;
+        let attempt = 0;
+        let response;
 
         try {
             const requestBody = {
-                model_name: this.model_name,
+                model: this.model_name || "gpt-4o-mini",
                 messages: messages,
-                stop_seq: stop_seq,
+                stop: stop_seq,
             };
 
             if (!memSaving) {
@@ -45,27 +41,54 @@ export class GPT {
                 };
             }
 
-            const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody);
-            res = response.data;
+            while (attempt < maxRetries) {
+                try {
+                    response = await axios.post('https://api.openai.com/v1/chat/completions', 
+                        requestBody,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${this.openai_api_key}`,
+                                'Content-Type': 'application/json'
+                            },
+                            timeout: 2000
+                        }
+                    );
+                    res = response.data.choices[0].message.content;
+                    break; // Exit loop if request is successful
+                } catch (err) {
+                    attempt++;
+                    if (err.response) {
+                        // Log the server's error message
+                        console.error("Error response from server:", err.response.data);
+                    } else {
+                        console.error("Error:", err.message);
+                    }
+                    if (attempt >= maxRetries) {
+                        console.error("All retries failed:", err);
+                        res = "Connection to OpenAI service timed out.";
+                        break;
+                    }
+                }
+            }
         } catch (err) {
             console.error("Request failed:", err);
             res = "My brain disconnected.";
-            // if ((err.message.includes('Context length exceeded') || err.response?.status === 500) && turns.length > 1) {
-            //     return await this.sendRequest(turns.slice(1), systemMessage, stop_seq, memSaving);
-            // } else {
-            //     res = 'My brain disconnected, try again.';
-            // }
         }
         return res;
     }
 
     async embed(text) {
         try {
-            const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/embed`, {
-                model_name: this.model_name,
-                text: text,
+            const response = await axios.post('https://api.openai.com/v1/embeddings', {
+                model: 'text-embedding-ada-002',
+                input: text,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${this.openai_api_key}`,
+                    'Content-Type': 'application/json'
+                }
             });
-            return response.data;
+            return response.data.data[0].embedding;
         } catch (err) {
             if (err.response && err.response.status === 500) {
                 console.log('Error 500:', err.response.data);

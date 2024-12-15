@@ -149,3 +149,61 @@
   justify-content: center; /* Center the button horizontally */
   margin-top: 20px; /* Optional: Add some space above the button */
 }
+
+.api-key-settings {
+  display: flex;
+  flex-direction: column;  /* Stack items vertically */
+  gap: 10px;
+  margin-bottom: 10px;
+  width: 100%;  /* Take full width */
+}
+
+.api-key-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.api-key-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* New container for API key input and model select */
+.api-key-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.api-key-input-group, .model-select-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.api-key-input {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  box-sizing: border-box;
+  flex: 1;  /* Take remaining space */
+  min-width: 250px;  /* Minimum width */
+}
+
+.model-select {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  box-sizing: border-box;
+  background-color: var(--bg-color);
+  min-width: 150px;  /* Minimum width */
+}

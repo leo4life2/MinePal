@@ -5,11 +5,12 @@ import {
   faMicrophoneSlash,
 } from "@fortawesome/free-solid-svg-icons";
 import "./Actions.css";
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = 'https://wwcgmpbfypiagjfeixmn.supabase.co';
+const supabaseUrl = "https://wwcgmpbfypiagjfeixmn.supabase.co";
 // Hardcoded API key (not recommended for production)
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3Y2dtcGJmeXBpYWdqZmVpeG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMwNTMwNjAsImV4cCI6MjA0ODYyOTA2MH0.7L7IeDKmuSmI7qKLXgylmwihpM6sLsljv32FsK-sbf4';
+const supabaseKey =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3Y2dtcGJmeXBpYWdqZmVpeG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMwNTMwNjAsImV4cCI6MjA0ODYyOTA2MH0.7L7IeDKmuSmI7qKLXgylmwihpM6sLsljv32FsK-sbf4";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 function Actions({
@@ -21,32 +22,58 @@ function Actions({
   isMicrophoneActive,
   inputDevices, // Add inputDevices prop
   selectedInputDevice, // Add selectedInputDevice prop
-  setSelectedInputDevice // Add setSelectedInputDevice prop
+  setSelectedInputDevice, // Add setSelectedInputDevice prop
 }) {
   const handleVoiceModeChange = (event) => {
-    setSettings(prevSettings => ({ ...prevSettings, voice_mode: event.target.value }));
+    setSettings((prevSettings) => ({
+      ...prevSettings,
+      voice_mode: event.target.value,
+    }));
   };
 
   const handleKeyBindingChange = (event) => {
-    setSettings(prevSettings => ({ ...prevSettings, key_binding: event.target.value }));
+    setSettings((prevSettings) => ({
+      ...prevSettings,
+      key_binding: event.target.value,
+    }));
   };
 
   const handleKeyPress = (event) => {
-    setSettings(prevSettings => ({ ...prevSettings, key_binding: event.key }));
+    setSettings((prevSettings) => ({
+      ...prevSettings,
+      key_binding: event.key,
+    }));
   };
 
   const handleLanguageChange = (event) => {
-    setSettings(prevSettings => ({ ...prevSettings, language: event.target.value }));
+    setSettings((prevSettings) => ({
+      ...prevSettings,
+      language: event.target.value,
+    }));
   };
 
   const handleInputDeviceChange = (event) => {
     setSelectedInputDevice(event.target.value);
   };
 
+  const handleApiKeyChange = (event) => {
+    setSettings((prevSettings) => ({
+      ...prevSettings,
+      openai_api_key: event.target.value,
+    }));
+  };
+
+  const handleModelChange = (event) => {
+    setSettings((prevSettings) => ({
+      ...prevSettings,
+      model: event.target.value,
+    }));
+  };
+
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-  const [feedbackContent, setFeedbackContent] = useState('');
+  const [feedbackContent, setFeedbackContent] = useState("");
   const [discordModalOpen, setDiscordModalOpen] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState("");
 
   const handleFeedbackClick = () => {
     setFeedbackModalOpen(true);
@@ -54,28 +81,28 @@ function Actions({
 
   const closeFeedbackModal = () => {
     setFeedbackModalOpen(false);
-    setFeedbackContent(''); // Clear feedback content on close
+    setFeedbackContent(""); // Clear feedback content on close
   };
 
   const submitFeedback = async () => {
     try {
       const { data, error } = await supabase
-        .from('Feedback')
+        .from("Feedback")
         .insert([{ feedback: { message: feedbackContent } }]);
 
       if (error) {
-        console.error('Error inserting feedback:', error);
+        console.error("Error inserting feedback:", error);
         setFeedbackMessage(`Error: ${error.message}`);
       } else {
-        console.log('Feedback submitted:', data);
+        console.log("Feedback submitted:", data);
         setFeedbackMessage(
-          'Feedback submitted successfully! Consider joining our Discord: ' +
-          '<a href="https://discord.gg/zTn25X24w2" target="_blank" rel="noopener noreferrer">Join Discord</a>'
+          "Feedback submitted successfully! Consider joining our Discord: " +
+            '<a href="https://discord.gg/zTn25X24w2" target="_blank" rel="noopener noreferrer">Join Discord</a>'
         );
         setDiscordModalOpen(true); // Open the Discord modal
       }
     } catch (error) {
-      console.error('Unexpected error:', error);
+      console.error("Unexpected error:", error);
       setFeedbackMessage(`Unexpected error: ${error.message}`);
     }
     closeFeedbackModal();
@@ -83,6 +110,13 @@ function Actions({
 
   const closeDiscordModal = () => {
     setDiscordModalOpen(false);
+  };
+
+  const handleUseOwnApiKeyChange = (event) => {
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      useOwnApiKey: event.target.checked
+    }));
   };
 
   useEffect(() => {
@@ -93,6 +127,7 @@ function Actions({
 
   return (
     <div className="actions">
+      {/*
       <div className="voice-settings">
         <FontAwesomeIcon
           icon={isMicrophoneActive ? faMicrophone : faMicrophoneSlash}
@@ -200,6 +235,48 @@ function Actions({
           <option value="vi">Vietnamese</option>
         </select>
       </div>
+*/}
+      <div className="api-key-settings">
+        <label className="api-key-checkbox">
+          <input
+            type="checkbox"
+            checked={settings.useOwnApiKey || false}
+            onChange={handleUseOwnApiKeyChange}
+            disabled={agentStarted}
+          />
+          Use your own API Key
+        </label>
+        
+        {settings.useOwnApiKey && (
+          <div className="api-key-controls">
+            <div className="api-key-input-group">
+              <span htmlFor="api-key">OpenAI API Key:</span>
+              <input
+                type="password"
+                id="api-key"
+                value={settings.openai_api_key || ''}
+                onChange={handleApiKeyChange}
+                placeholder="Enter your OpenAI API key"
+                disabled={agentStarted}
+                className="api-key-input"
+              />
+            </div>
+            <div className="model-select-group">
+              <span htmlFor="model">Model:</span>
+              <select
+                id="model"
+                value={settings.model || 'gpt-4o-mini'}
+                onChange={handleModelChange}
+                disabled={agentStarted}
+                className="model-select"
+              >
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
+                <option value="gpt-4o">gpt-4o</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
       <button className="action-button" onClick={toggleAgent}>
         {agentStarted ? "Stop Bot" : "Start Bot"}
       </button>
@@ -215,11 +292,15 @@ function Actions({
               onChange={(e) => setFeedbackContent(e.target.value)}
               placeholder="Enter your feedback here"
               rows="10"
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
             />
             <div className="button-group">
-              <button className="submit-button" onClick={submitFeedback}>Submit</button>
-              <button className="cancel-button" onClick={closeFeedbackModal}>Cancel</button>
+              <button className="submit-button" onClick={submitFeedback}>
+                Submit
+              </button>
+              <button className="cancel-button" onClick={closeFeedbackModal}>
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -233,7 +314,9 @@ function Actions({
               dangerouslySetInnerHTML={{ __html: feedbackMessage }}
             />
             <div className="button-group">
-              <button className="ok-button" onClick={closeDiscordModal}>OK</button>
+              <button className="ok-button" onClick={closeDiscordModal}>
+                OK
+              </button>
             </div>
           </div>
         </div>
