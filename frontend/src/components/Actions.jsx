@@ -175,6 +175,7 @@ function Actions({
           ))}
         </select>
       </div>
+      */}
       <div className="language-settings">
         <span htmlFor="language">Language/Accent:</span>
         <select
@@ -235,7 +236,9 @@ function Actions({
           <option value="vi">Vietnamese</option>
         </select>
       </div>
-*/}
+      <div className="notice" style={{ color: '#666666', fontSize: '0.9em', marginTop: '5px' }}>
+        Voice chat temporarily disabled due to high server loads
+      </div>
       <div className="api-key-settings">
         <label className="api-key-checkbox">
           <input
