@@ -103,7 +103,7 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
     <div key={index} className="profile-box" onClick={() => openModal(profile, index)}>
       <input
         type="checkbox"
-        checked={selectedProfiles.includes(profile)}
+        checked={selectedProfiles.some(p => p.name === profile.name)}
         onClick={(e) => handleCheckboxClick(e, profile)}
       />
       <span>{profile.name}</span>
