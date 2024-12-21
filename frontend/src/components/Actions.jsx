@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from 'prop-types';
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faMicrophone,
-  faMicrophoneSlash,
-} from "@fortawesome/free-solid-svg-icons";
+import { Mic, MicOff } from "react-feather";
 import "./Actions.css";
 
 function Actions({
@@ -124,11 +120,11 @@ function Actions({
     <div className="actions">
       {/*
       <div className="voice-settings">
-        <FontAwesomeIcon
-          icon={isMicrophoneActive ? faMicrophone : faMicrophoneSlash}
+        <Mic
           className={`microphone-icon ${
             isMicrophoneActive ? "active" : "inactive"
           }`}
+          size={20}
         />
         <span htmlFor="voice-mode">Voice Mode:</span>
         <select

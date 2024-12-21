@@ -44,15 +44,17 @@
 }
 
 .microphone-icon {
-  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  transition: color 0.3s ease;
 }
 
 .microphone-icon.active {
-  color: green;
+  stroke: #4caf50;
 }
 
 .microphone-icon.inactive {
-  color: red;
+  stroke: #f44336;
 }
 
 .key-input {

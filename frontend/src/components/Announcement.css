@@ -15,8 +15,10 @@
 }
 
 .announcement-icon {
-  color: var(--primary-color);
-  font-size: 1.2rem;
+  stroke: var(--primary-color);
+  width: 20px;
+  height: 20px;
+  transition: stroke 0.3s ease;
 }
 
 .announcement-text {

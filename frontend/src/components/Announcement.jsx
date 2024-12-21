@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBullhorn } from "@fortawesome/free-solid-svg-icons";
+import { Radio } from "react-feather";
 import axios from 'axios';
 import './Announcement.css';
 
@@ -24,7 +23,7 @@ function Announcement() {
 
   return (
     <div className="announcement-bar">
-      <FontAwesomeIcon icon={faBullhorn} className="announcement-icon" />
+      <Radio className="announcement-icon" size={20} />
       <span className="announcement-text">{announcement}</span>
     </div>
   );
