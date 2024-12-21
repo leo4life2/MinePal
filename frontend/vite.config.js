@@ -22,6 +22,10 @@ export default defineConfig({
   base: './', // Ensure assets are loaded relative to the index.html location
   build: {
     minify: false,
+    terserOptions: {
+      compress: false,
+      mangle: false,
+    },
     rollupOptions: {
       output: {
         manualChunks: undefined,
