@@ -69,6 +69,7 @@ function Settings({ settings, setSettings, handleSettingChange, settingNotes, se
       </div>
       <label htmlFor="profiles">
           your pals:
+          {settingNotes.pal_message && <span className="setting-note"> ({settingNotes.pal_message})</span>}
       </label>
       <Profiles
         profiles={settings.profiles}

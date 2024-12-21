@@ -1,17 +1,11 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMicrophone,
   faMicrophoneSlash,
 } from "@fortawesome/free-solid-svg-icons";
 import "./Actions.css";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = "https://wwcgmpbfypiagjfeixmn.supabase.co";
-// Hardcoded API key (not recommended for production)
-const supabaseKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3Y2dtcGJmeXBpYWdqZmVpeG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMwNTMwNjAsImV4cCI6MjA0ODYyOTA2MH0.7L7IeDKmuSmI7qKLXgylmwihpM6sLsljv32FsK-sbf4";
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 function Actions({
   agentStarted,
@@ -20,9 +14,10 @@ function Actions({
   settings,
   setSettings,
   isMicrophoneActive,
-  inputDevices, // Add inputDevices prop
-  selectedInputDevice, // Add selectedInputDevice prop
-  setSelectedInputDevice, // Add setSelectedInputDevice prop
+  inputDevices,
+  selectedInputDevice,
+  setSelectedInputDevice,
+  supabase
 }) {
   const handleVoiceModeChange = (event) => {
     setSettings((prevSettings) => ({
@@ -283,9 +278,9 @@ function Actions({
       <button className="action-button" onClick={toggleAgent}>
         {agentStarted ? "Stop Bot" : "Start Bot"}
       </button>
-      <button className="feedback-button" onClick={handleFeedbackClick}>
+      {/*<button className="feedback-button" onClick={handleFeedbackClick}>
         Leave Feedback
-      </button>
+      </button>*/}
 
       {feedbackModalOpen && (
         <div className="modal">
@@ -327,5 +322,18 @@ function Actions({
     </div>
   );
 }
+
+Actions.propTypes = {
+  agentStarted: PropTypes.bool.isRequired,
+  toggleAgent: PropTypes.func.isRequired,
+  stopMicrophone: PropTypes.func.isRequired,
+  settings: PropTypes.object.isRequired,
+  setSettings: PropTypes.func.isRequired,
+  isMicrophoneActive: PropTypes.bool.isRequired,
+  inputDevices: PropTypes.array.isRequired,
+  selectedInputDevice: PropTypes.string.isRequired,
+  setSelectedInputDevice: PropTypes.func.isRequired,
+  supabase: PropTypes.object.isRequired
+};
 
 export default Actions;

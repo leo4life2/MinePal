@@ -129,8 +129,7 @@ function getBannedFood(bot: Bot): number[] {
         bot.registry.foodsByName['rotten_flesh'].id,
         bot.registry.foodsByName['chorus_fruit'].id,
         bot.registry.foodsByName['chicken'].id,
-        bot.registry.foodsByName['suspicious_stew'].id,
-        bot.registry.foodsByName['golden_apple'].id
+        bot.registry.foodsByName['suspicious_stew'].id
     ]
 }
 

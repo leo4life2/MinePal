@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import mixpanel from 'mixpanel-browser';
+import { createClient } from "@supabase/supabase-js";
 import './App.css';
 import Settings from './components/Settings';
 import Actions from './components/Actions';
 import Transcription from './components/Transcription';
+import Announcement from './components/Announcement';
 
 mixpanel.init('a9bdd5c85dab5761be032f1c1650defa');
+
+const supabaseUrl = "https://wwcgmpbfypiagjfeixmn.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3Y2dtcGJmeXBpYWdqZmVpeG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMwNTMwNjAsImV4cCI6MjA0ODYyOTA2MH0.7L7IeDKmuSmI7qKLXgylmwihpM6sLsljv32FsK-sbf4";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const api = axios.create({
   baseURL: LOCAL_BE_HOST
@@ -52,10 +58,11 @@ function App() {
   };
 
   const settingNotes = {
-    minecraft_version: "supports up to 1.20.4",
-    host: "or \"localhost\", \"your.ip.address.here\"",
+    minecraft_version: "1.14 ~ 1.20.4",
+    host: "\"localhost\" for singleplayer. works in some vanilla servers too",
     port: "default is 25565",
     player_username: "your Minecraft username",
+    pal_message: "for multiple bots, /msg each bot."
   }
 
   const fetchSettings = async () => {
@@ -74,7 +81,7 @@ function App() {
         }));
       }
 
-      console.log("filtered settings", filteredSettings);
+      // console.log("filtered settings", filteredSettings);
 
       setSettings(prevSettings => ({ ...prevSettings, ...filteredSettings }));
     } catch (err) {
@@ -382,6 +389,7 @@ function App() {
   return (
     <div className="container">
       <h1>MinePal Control Panel</h1>
+      <Announcement />
       <Settings
         settings={settings}
         setSettings={setSettings}
@@ -401,9 +409,13 @@ function App() {
         inputDevices={inputDevices}
         selectedInputDevice={selectedInputDevice}
         setSelectedInputDevice={setSelectedInputDevice}
+        supabase={supabase}
       />
       {error && <div className="error-message">{error}</div>}
-      <Transcription transcription={transcription} />
+      <div className="guides-text">
+        questions? see guides at <a href="https://minepal.net/guides" target="_blank" rel="noopener noreferrer" className="guides-link">guides / faq</a>
+      </div>
+      {/* <Transcription transcription={transcription} /> */}
     </div>
   );
 }

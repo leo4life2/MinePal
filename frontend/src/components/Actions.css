@@ -3,19 +3,23 @@
   flex-direction: column; /* Stack elements vertically */
   align-items: center; /* Center items horizontally */
   margin-top: 20px;
+  width: 100%; /* Ensure actions container takes full width */
 }
 
 .action-button {
-  padding: 12px 24px;
+  padding: 16px 32px;
   background: var(--primary-color);
   color: var(--bg-color);
   border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: transform 0.3s;
-  height: 50px; /* Fixed height */
-  box-sizing: border-box; /* Ensures padding is included in the height */
-  margin-top: 20px; /* Add space between button and voice settings */
+  height: 60px; /* Increased height */
+  box-sizing: border-box;
+  margin-top: 20px;
+  width: 100%;
+  font-weight: 600; /* Make text bold */
+  font-size: 1.1rem; /* Make text larger */
 }
 
 .action-button:hover {

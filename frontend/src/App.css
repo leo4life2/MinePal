@@ -102,64 +102,6 @@ h1 {
   border-radius: 10px;
 }
 
-.login-container {
-  max-width: 400px;
-  width: 90%;
-  padding: 40px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
-  text-align: center;
-}
-
-.login-container h1 {
-  color: var(--primary-color);
-  font-size: 2.5rem;
-  margin-bottom: 30px;
-}
-
-.login-container form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.login-container input {
-  width: 100%;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--primary-color);
-  border-radius: 8px;
-  color: var(--text-color);
-  font-size: 1rem;
-  transition: all 0.3s ease;
-}
-
-.login-container input:focus {
-  outline: none;
-  box-shadow: 0 0 10px rgba(255, 137, 6, 0.5);
-}
-
-.login-container button {
-  width: 100%;
-  padding: 12px;
-  background: var(--primary-color);
-  border: none;
-  border-radius: 8px;
-  color: var(--bg-color);
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.login-container button:hover {
-  background: var(--secondary-color);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(242, 95, 76, 0.3);
-}
-
 .profiles-list {
   display: flex;
   flex-direction: column;
@@ -219,4 +161,26 @@ h1 {
   box-sizing: border-box;
   resize: vertical;
   min-height: 100px; /* Minimum height for the textarea */
+}
+
+.guides-text {
+  text-align: center;
+  margin-top: 30px;
+  color: var(--text-color);
+  font-size: 0.95rem;
+}
+
+.guides-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  padding: 2px 4px;
+  margin-left: -4px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+
+.guides-link:hover {
+  background: rgba(255, 137, 6, 0.1);
+  box-shadow: 0 0 10px rgba(255, 137, 6, 0.2);
 }
