@@ -81,12 +81,10 @@ function App() {
         }));
       }
 
-      // console.log("filtered settings", filteredSettings);
-
       setSettings(prevSettings => ({ ...prevSettings, ...filteredSettings }));
     } catch (err) {
       console.error("Failed to fetch settings:", err);
-      setError("Failed to load settings.");
+      setError("Failed to load settings. " + (err.message || "Unknown error"));
       throw err;
     }
   };
@@ -97,7 +95,7 @@ function App() {
       setAgentStarted(response.data.agentStarted);
     } catch (err) {
       console.error("Failed to fetch agent status:", err);
-      setError("Failed to load agent status.");
+      setError("Failed to load agent status. " + (err.message || "Unknown error"));
       throw err;
     }
   };
@@ -110,18 +108,18 @@ function App() {
       }
     } catch (err) {
       console.error("Failed to check backend status:", err);
-      setError(`Failed to check backend status: ${err.message}`);
+      setError("Failed to check backend status: " + (err.message || "Unknown error"));
       throw err;
     }
   };
 
   const checkServerAlive = async (host, port) => {
     try {
-        const response = await api.get('/check-server', { params: { host, port } });
-        return response.data.alive;
+      const response = await api.get('/check-server', { params: { host, port } });
+      return response.data.alive;
     } catch (error) {
-        console.error("Server ping failed:", error);
-        return false;
+      console.error("Server ping failed:", error);
+      return false;
     }
   };
 
@@ -131,12 +129,11 @@ function App() {
         const response = await api.post('/stop', {});
         console.log("Agent stopped successfully:", response.data);
         setAgentStarted(false);
-        setError(null); // Clear errors on success
-        await stopMicrophone(); // Ensure microphone and WebSocket are shut down
+        setError(null);
+        await stopMicrophone();
 
-        // Track the "Bot play time" event
         if (startTime) {
-          const playTime = (Date.now() - startTime) / 1000; // in seconds
+          const playTime = (Date.now() - startTime) / 1000;
           mixpanel.track('Bot play time', {
             distinct_id: settings.player_username,
             play_time: playTime
@@ -145,7 +142,7 @@ function App() {
         }
       } catch (error) {
         console.error("Failed to stop agent:", error);
-        setError(error.response?.data || error.message || "An unknown error occurred while stopping the agent.");
+        setError("Failed to stop agent: " + (error.response?.data || error.message || "Unknown error"));
       }
     } else {
       const emptyFields = Object.entries(settings)

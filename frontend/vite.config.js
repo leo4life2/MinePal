@@ -17,7 +17,8 @@ export default defineConfig({
   server: {
   },
   define: {
-    LOCAL_BE_HOST: JSON.stringify('http://localhost:10101')
+    LOCAL_BE_HOST: JSON.stringify('http://localhost:10101'),
+    'process.env.NODE_ENV': '"development"'
   },
   base: './', // Ensure assets are loaded relative to the index.html location
   build: {
@@ -36,5 +37,6 @@ export default defineConfig({
   },
   esbuild: {
     keepNames: true,
-  }
+  },
+  mode: 'development'
 });

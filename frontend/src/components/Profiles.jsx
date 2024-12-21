@@ -15,10 +15,11 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
         botName: editableName,
         message: message
       });
-      setEditableChatMessage(''); // Clear the message input after sending
+      setEditableChatMessage('');
     } catch (error) {
       console.error("Failed to send message:", error);
-      setError(`Failed to send message. ${error.response?.data?.error || ''}`);
+      const errorMsg = error.response?.data?.error;
+      setError("Failed to send message. " + (typeof errorMsg === 'string' ? errorMsg : "Unknown error"));
     }
   };
 
@@ -50,12 +51,12 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
 
   const saveChanges = async () => {
     if (editableName.trim() === '' || editablePersonality.trim() === '') {
-      alert('Name and personality must not be empty');
+      setError('Name and personality must not be empty');
       return;
     }
 
     if (profiles.some((p, idx) => p.name === editableName && idx !== currentProfileIndex)) {
-      alert('A profile with this name already exists');
+      setError('A profile with this name already exists');
       return;
     }
 
@@ -66,15 +67,13 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
       updatedProfiles.push({ name: editableName, personality: editablePersonality });
     }
 
-    console.log(updatedProfiles);
-
     try {
       await api.post('/save-profiles', { profiles: updatedProfiles });
       setSettings(prev => ({ ...prev, profiles: updatedProfiles }));
       closeModal();
     } catch (error) {
       console.error("Failed to save profiles:", error);
-      alert("Failed to save profiles. Please try again.");
+      setError("Failed to save profiles. " + (error.message || "Unknown error"));
     }
   };
 
@@ -82,7 +81,6 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
     if (currentProfileIndex === null) return;
 
     const updatedProfiles = profiles.filter((_, idx) => idx !== currentProfileIndex);
-    console.log(updatedProfiles);
 
     try {
       await api.post('/save-profiles', { profiles: updatedProfiles });
@@ -90,7 +88,7 @@ function Profiles({ profiles, setSettings, handleProfileSelect, selectedProfiles
       closeModal();
     } catch (error) {
       console.error("Failed to delete profile:", error);
-      alert("Failed to delete profile. Please try again.");
+      setError("Failed to delete profile. " + (error.message || "Unknown error"));
     }
   };
 
