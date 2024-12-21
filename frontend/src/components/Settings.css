@@ -1,6 +1,7 @@
 .setting-item {
   margin-bottom: 20px;
-  width: 100%; /* Ensure the setting-item takes up full width */
+  width: 100%;
+  /* Ensure the setting-item takes up full width */
 }
 
 label {
@@ -15,21 +16,25 @@ label {
   border-radius: 8px;
   color: var(--text-color);
   box-sizing: border-box;
-  width: 100%; /* Make input fields take up full width */
+  width: 100%;
+  /* Make input fields take up full width */
 }
 
-.setting-item > div {
+.setting-item>div {
   display: flex;
   align-items: center;
-  width: 100%; /* Ensure the flex container takes up full width */
+  width: 100%;
+  /* Ensure the flex container takes up full width */
 }
 
-.setting-item > div > input[type="text"].setting-input {
-  flex: 1; /* Make the text input take up remaining space */
+.setting-item>div>input[type="text"].setting-input {
+  flex: 1;
+  /* Make the text input take up remaining space */
 }
 
-.setting-item > div > input[type="number"].setting-input {
-  flex: 0 0 20%; /* Adjust the width of the number input */
+.setting-item>div>input[type="number"].setting-input {
+  flex: 0 0 20%;
+  /* Adjust the width of the number input */
 }
 
 /* Switch styles */
@@ -70,16 +75,10 @@ label {
   border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background-color: var(--primary-color);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(26px);
-}
-
-.setting-note {
-  font-size: 0.8em;
-  color: #888;
-  font-style: italic;
 }

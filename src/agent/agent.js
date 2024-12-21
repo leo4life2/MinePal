@@ -66,7 +66,7 @@ export class Agent {
         this.npc = new NPCContoller(this);
         this.memory_bank = new MemoryBank();
 
-        await this.prompter.initExamples();
+        //await this.prompter.initExamples();
 
         console.log('Logging in...');
         this.mcdata = MCData.getInstance(this.settings); // Use singleton with settings

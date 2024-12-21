@@ -20,7 +20,6 @@ body {
 
 .container {
   max-width: 800px;
-  width: 90%;
   padding: 40px;
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(10px);
@@ -41,7 +40,7 @@ h1 {
     flex-direction: column;
     gap: 15px;
   }
-  
+
   .action-button {
     width: 100%;
   }
@@ -160,7 +159,8 @@ h1 {
   color: var(--text-color);
   box-sizing: border-box;
   resize: vertical;
-  min-height: 100px; /* Minimum height for the textarea */
+  min-height: 100px;
+  /* Minimum height for the textarea */
 }
 
 .guides-text {
@@ -183,4 +183,10 @@ h1 {
 .guides-link:hover {
   background: rgba(255, 137, 6, 0.1);
   box-shadow: 0 0 10px rgba(255, 137, 6, 0.2);
+}
+
+.setting-note {
+  font-size: 0.8em;
+  color: #888;
+  font-style: italic;
 }
