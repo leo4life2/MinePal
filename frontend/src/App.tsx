@@ -6,7 +6,9 @@ import AgentProvider from './contexts/AgentContext/AgentProvider';
 import ErrorReportProvider from './contexts/ErrorReportContext/ErrorReportProvider';
 import ErrorDisplay from './components/ErrorDisplay';
 import Profiles from './components/Profiles';
+import GuidesLink from './components/GuidesLink';
 import settingNotes from './utils/settingsNotes';
+import Announcement from './components/Announcement';
 
 export default function App() {
   return (
@@ -15,6 +17,7 @@ export default function App() {
         <AgentProvider>
           <div className="container">
             <h1>MinePal Control Panel</h1>
+            <Announcement />
             <Settings />
             <label htmlFor="profiles">
               Your pals:
@@ -23,6 +26,7 @@ export default function App() {
             <Profiles />
             <Actions />
             <ErrorDisplay />
+            <GuidesLink />
           </div>
         </AgentProvider>
       </UserSettingsProvider>

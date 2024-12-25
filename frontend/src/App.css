@@ -30,9 +30,10 @@ body {
 h1 {
   color: var(--primary-color);
   text-align: center;
-  font-size: 2.5rem;
+  font-size: clamp(1.5rem, 5vw, 2.5rem);
   margin-bottom: 30px;
   margin-top: 0;
+  white-space: nowrap;
 }
 
 @media (max-width: 600px) {
@@ -161,28 +162,6 @@ h1 {
   resize: vertical;
   min-height: 100px;
   /* Minimum height for the textarea */
-}
-
-.guides-text {
-  text-align: center;
-  margin-top: 30px;
-  color: var(--text-color);
-  font-size: 0.95rem;
-}
-
-.guides-link {
-  color: var(--primary-color);
-  text-decoration: none;
-  padding: 2px 4px;
-  margin-left: -4px;
-  border-radius: 4px;
-  transition: all 0.3s ease;
-  display: inline-block;
-}
-
-.guides-link:hover {
-  background: rgba(255, 137, 6, 0.1);
-  box-shadow: 0 0 10px rgba(255, 137, 6, 0.2);
 }
 
 .setting-note {
