@@ -1,5 +1,4 @@
 import { mkdirSync, writeFileSync } from 'fs';
-import { Examples } from '../utils/examples.js';
 import { getCommandDocs } from './commands/index.js';
 import { getSkillDocs } from './library/index.js';
 import { stringifyTurns } from '../utils/text.js';
@@ -12,8 +11,6 @@ export class Prompter {
     constructor(agent) {
         this.agent = agent;
         this.profile = agent.profile
-        this.convo_examples = null;
-        this.coding_examples = null;
 
         let name = this.profile.name;
         let chat = this.profile.model;
@@ -80,18 +77,7 @@ export class Prompter {
         return this.profile.modes;
     }
 
-    async initExamples() {
-        console.log('Loading examples...')
-        const startTime = performance.now();
-        this.convo_examples = new Examples(this.embedding_model);
-        await this.convo_examples.load(this.profile.conversation_examples);
-        // this.coding_examples = new Examples(this.embedding_model);
-        // await this.coding_examples.load(this.profile.coding_examples);
-        const endTime = performance.now();
-        console.log(`Examples loaded. Time taken: ${(endTime - startTime).toFixed(2)} ms`);
-    }
-
-    async replaceStrings(prompt, messages, examples=null, prev_memory=null, to_summarize=[], last_goals=null) {
+    async replaceStrings(prompt, messages, prev_memory=null, to_summarize=[], last_goals=null) {
         prompt = prompt.replaceAll('$NAME', this.agent.name);
         prompt = prompt.replaceAll('$OWNER', this.agent.owner);
         prompt = prompt.replaceAll('$LANGUAGE', this.agent.settings.language);
@@ -107,8 +93,6 @@ export class Prompter {
             prompt = prompt.replaceAll('$COMMAND_DOCS', getCommandDocs());
         if (prompt.includes('$CODE_DOCS'))
             prompt = prompt.replaceAll('$CODE_DOCS', getSkillDocs());
-        if (prompt.includes('$EXAMPLES') && examples !== null)
-            prompt = prompt.replaceAll('$EXAMPLES', await examples.createExampleMessage(messages));
         if (prompt.includes('$MEMORY'))
             prompt = prompt.replaceAll('$MEMORY', prev_memory ? prev_memory : 'None.');
         if (prompt.includes('$TO_SUMMARIZE'))
