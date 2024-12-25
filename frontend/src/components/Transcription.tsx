@@ -1,6 +1,4 @@
-import React from 'react';
-
-function Transcription({ transcription }) {
+function Transcription({ transcription }: { transcription: string }) {
   return (
     <div className="transcription-box">
       <label htmlFor="transcription">Transcription:</label>

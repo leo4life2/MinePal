@@ -1,23 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Radio } from "react-feather";
-import axios from 'axios';
 import './Announcement.css';
+import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContext';
+import { getAnnouncements } from '../utils/api';
 
 function Announcement() {
   const [announcement, setAnnouncement] = useState('');
+  const { declareError } = useErrorReport();
 
   useEffect(() => {
     const fetchAnnouncement = async () => {
       try {
-        const response = await axios.get('https://minepal.net/announcement.txt');
-        setAnnouncement(response.data);
+        setAnnouncement(await getAnnouncements());
       } catch (error) {
-        console.error('Failed to fetch announcement:', error);
+        declareError("Announcement", error);
       }
     };
 
     fetchAnnouncement();
-  }, []);
+  }, [declareError]);
 
   if (!announcement) return null;
 
