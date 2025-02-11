@@ -115,6 +115,121 @@
   }
   
   .profile-box input[type="checkbox"] {
-    width: 20px; /* Adjust the size as needed */
-    height: 20px; /* Adjust the size as needed */
+    width: 20px;
+    height: 20px;
   }
+
+.view-memories-button {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+  border: none;
+  padding: 10px 20px;
+  margin-right: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.view-memories-button:hover {
+  background-color: var(--secondary-color);
+}
+
+.memories-modal {
+  width: 100%;
+}
+
+.memories-modal h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+
+.memories-table {
+  max-height: 500px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid var(--primary-color);
+}
+
+.memories-table::-webkit-scrollbar {
+  width: 8px;
+}
+
+.memories-table::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.memories-table::-webkit-scrollbar-thumb {
+  background-color: var(--primary-color);
+  border-radius: 10px;
+}
+
+.memory-row {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background-color 0.3s ease;
+}
+
+.memory-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.memory-text {
+  flex: 1;
+  margin-right: 16px;
+  word-break: break-word;
+  color: var(--text-color);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.delete-memory-button {
+  background: none;
+  border: none;
+  color: var(--secondary-color);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.delete-memory-button:hover {
+  background-color: rgba(242, 95, 76, 0.1);
+  transform: scale(1.1);
+}
+
+.back-button {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Update modal-content size when showing memories */
+.modal-content.showing-memories {
+  max-width: 800px;
+  width: 90%;
+}
+
+.no-memories {
+  padding: 30px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  font-size: 0.9rem;
+}

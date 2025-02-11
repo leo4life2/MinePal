@@ -129,12 +129,37 @@ export class Prompter {
     }
 
     async promptConvo(messages) {
-        let prompt = this.profile.conversing;
-        prompt = await this.replaceStrings(prompt, messages, this.convo_examples);
+        // Get the latest user message
+        const latestUserMessage = messages.findLast(msg => msg.role === 'user')?.content;
+        
+        // Get relevant memories if there's a user message
+        let relevantMemories = '';
+        if (latestUserMessage) {
+            const memories = await this.agent.history.searchRelevant(latestUserMessage, 5);
+            if (memories.length > 0) {
+                relevantMemories = 'Relevant memories:\n' + memories
+                    .map(m => `- ${m.text}`)
+                    .join('\n');
+            }
+        }
+
+        let systemPrompt = this.profile.conversing;
+        systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
+        console.log('Relevant memories:\n', relevantMemories);
+        
         let chat_response, execute_command;
-        let response = await this.chat_model.sendRequest(messages, prompt);
+        let response = await this.chat_model.sendRequest(messages, systemPrompt);
         if (typeof response === 'string') {
-            response = JSON.parse(response);
+            // If it's an error message, return it directly
+            if (response.includes('disconnected')) {
+                return response;
+            }
+            // Otherwise try to parse as JSON
+            try {
+                response = JSON.parse(response);
+            } catch (e) {
+                return "Oops! OpenAI's server took an arrow to the knee. Mind trying that prompt again?";
+            }
         }
         ({ chat_response, execute_command } = response);
         console.log('Chat Response:', chat_response);

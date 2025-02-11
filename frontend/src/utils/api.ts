@@ -108,3 +108,25 @@ export async function getAnnouncements(): Promise<string> {
   const data = await response.text();
   return data;
 }
+
+export interface Memory {
+    id: string;
+    text: string;
+}
+
+export async function fetchBotMemories(botName: string): Promise<Memory[]> {
+    const response = await fetch(`http://localhost:10101/bot-memories?name=${encodeURIComponent(botName)}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch memories: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function deleteMemory(botName: string, memoryId: string): Promise<void> {
+    const response = await fetch(`http://localhost:10101/bot-memories/${encodeURIComponent(botName)}/${encodeURIComponent(memoryId)}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to delete memory: ${response.statusText}`);
+    }
+}

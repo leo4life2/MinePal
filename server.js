@@ -9,6 +9,7 @@ import cors from 'cors';
 import path from 'path';
 import net from 'net';
 import { GlobalKeyboardListener } from 'node-global-key-listener';
+import { LocalIndex } from 'vectra';
 
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -241,6 +242,58 @@ function startServer() {
     
         fs.writeFileSync(settingsPath, JSON.stringify(updatedSettings, null, 4));
         res.json(updatedSettings);
+    });
+
+    app.get('/bot-memories', async (req, res) => {
+        const { name } = req.query;
+        
+        if (!name) {
+            return res.status(400).json({ error: "Bot name parameter is required" });
+        }
+    
+        const botMemoryPath = path.join(userDataDir, 'bots', name, 'index');
+        
+        try {
+            const index = new LocalIndex(botMemoryPath);
+            if (!(await index.isIndexCreated())) {
+                return res.status(404).json({ error: "Bot memories not found" });
+            }
+
+            // Get all items from the index
+            const items = await index.listItems();
+            const memories = items.map(item => ({
+                id: item.id,
+                text: item.metadata.text
+            }));
+    
+            res.json(memories);
+        } catch (error) {
+            logToFile(`Error reading bot memories: ${error.message}`);
+            res.status(500).json({ error: "Failed to read bot memories" });
+        }
+    });
+
+    app.delete('/bot-memories/:botName/:memoryId', async (req, res) => {
+        const { botName, memoryId } = req.params;
+        
+        if (!botName || !memoryId) {
+            return res.status(400).json({ error: "Bot name and memory ID are required" });
+        }
+    
+        const botMemoryPath = path.join(userDataDir, 'bots', botName, 'index');
+        
+        try {
+            const index = new LocalIndex(botMemoryPath);
+            if (!(await index.isIndexCreated())) {
+                return res.status(404).json({ error: "Bot memories not found" });
+            }
+
+            await index.deleteItem(memoryId);
+            res.json({ message: `Memory ${memoryId} deleted successfully` });
+        } catch (error) {
+            logToFile(`Error deleting memory: ${error.message}`);
+            res.status(500).json({ error: "Failed to delete memory" });
+        }
     });
 
     app.get('/check-server', (req, res) => {

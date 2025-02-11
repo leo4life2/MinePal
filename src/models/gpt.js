@@ -80,7 +80,7 @@ export class GPT {
     async embed(text) {
         try {
             const response = await axios.post('https://api.openai.com/v1/embeddings', {
-                model: 'text-embedding-ada-002',
+                model: 'text-embedding-3-small',
                 input: text,
             }, {
                 headers: {

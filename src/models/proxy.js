@@ -59,20 +59,32 @@ export class Proxy {
         return res;
     }
 
-    async embed(text) {
-        try {
-            const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/embed`, {
-                model_name: this.model_name,
-                text: text,
-            });
-            return response.data;
-        } catch (err) {
-            if (err.response && err.response.status === 500) {
-                console.log('Error 500:', err.response.data);
-            } else {
-                console.log('Error:', err.message);
+    async embed(text, maxRetries = 3, initialDelay = 10) {
+        let retryCount = 0;
+        
+        while (true) {
+            try {
+                const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/embed`, {
+                    model_name: 'text-embedding-3-small',
+                    text: text,
+                });
+                return response.data;
+            } catch (err) {
+                retryCount++;
+                
+                if (retryCount > maxRetries) {
+                    if (err.response && err.response.status === 500) {
+                        console.log('Error 500:', err.response.data);
+                    } else {
+                        console.log('Error:', err.message);
+                    }
+                    throw new Error(`Failed to get embedding after ${maxRetries} retries`);
+                }
+
+                const delay = initialDelay * Math.pow(2, retryCount - 1);
+                console.log(`Retry attempt ${retryCount}/${maxRetries} after ${delay}ms delay...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
             }
-            throw new Error('Failed to get embedding');
         }
     }
 }

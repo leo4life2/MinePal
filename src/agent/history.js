@@ -2,6 +2,7 @@ import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
 import { join } from 'path';
 import { readFileSync, existsSync, unlinkSync } from 'fs';
+import { LocalIndex } from 'vectra';
 
 export class History {
     constructor(agent) {
@@ -10,21 +11,30 @@ export class History {
         this.memory_fp = `${this.agent.userDataDir}/bots/${this.name}/memory.json`;
         this.turns = [];
 
-        // These define an agent's long term memory
+        // These define an agent's long term memory (deprecate soon)
         this.memory = '';
+
+        // New LTM
+        this.index = new LocalIndex(join(this.agent.userDataDir, 'bots', this.name, 'index'));
 
         // Variables for controlling the agent's memory and knowledge
         this.max_messages = 30;
     }
 
     async initDB() {
+        // LowDB storage
         const file = join(this.agent.userDataDir, 'bots', this.name, 'lowdb.json');
         const defaultData = { memory: '', turns: [], modes: {}, memory_bank: {} };
         const adapter = new JSONFile(file);
         this.db = new Low(adapter, defaultData);
-
         await this.db.read();
 
+        // VectorDB
+        if (!(await this.index.isIndexCreated())) {
+            await this.index.createIndex();
+        }
+
+        // This can probably get removed in a few versions, i don't think anyone will still be running the old memory.json anymore.
         // Check if memory.json exists and LowDB is empty
         if (existsSync(this.memory_fp) && this.db.data.memory === '' && this.db.data.turns.length === 0) {
             try {
@@ -68,13 +78,28 @@ export class History {
         }
         this.turns.push({role, content});
 
-        // Summarize older turns into memory
+        // When we hit max messages, summarize all turns and store in vector DB
+        console.log(`Turns length: ${this.turns.length}`);
         if (this.turns.length >= this.max_messages) {
-            let to_summarize = [this.turns.shift()];
-            while (this.turns[0].role != 'user' && this.turns.length > 1)
-                to_summarize.push(this.turns.shift());
-            await this.storeMemories(to_summarize);
+            console.log("Triggering summarization and vector LTM");
+            // Copy all turns for summarization
+            const turnsToSummarize = [...this.turns];
+            await this.summarizeTurns(turnsToSummarize);
+            
+            // Remove oldest 2/3 of messages
+            const keepCount = Math.floor(this.turns.length / 3);
+            this.turns = this.turns.slice(-keepCount);
         }
+    }
+
+    async summarizeTurns(turns) {
+        console.log(`Process ${process.pid}: Summarizing conversation chunk...`);
+        const summary = await this.agent.prompter.promptMemSaving(this.getHistory(), turns);
+        console.log(`Process ${process.pid}: Chunk summarized as: `, summary);
+        
+        // Store the summary in vector DB
+        await this.insertMemory(summary);
+        return summary;
     }
 
     async save() {
@@ -96,5 +121,48 @@ export class History {
         this.turns = [];
         this.memory = '';
         this.save();
+    }
+
+    async insertMemory(text) {
+        try {
+            const vector = await this.agent.prompter.chat_model.embed(text);
+            await this.index.insertItem({
+                vector: vector,
+                metadata: { text: text }
+            });
+            return true;
+        } catch (err) {
+            console.error('Failed to insert memory:', err);
+            return false;
+        }
+    }
+
+    async searchRelevant(text, k = 4) {
+        try {
+            const vector = await this.agent.prompter.chat_model.embed(text);
+            const results = await this.index.queryItems(vector, k);
+            return results.map(result => ({
+                text: result.item.metadata.text,
+                score: result.score
+            }));
+        } catch (err) {
+            console.error('Failed to search memories:', err);
+            return [];
+        }
+    }
+
+    async deleteMemory(text) {
+        try {
+            const vector = await this.agent.prompter.chat_model.embed(text);
+            const results = await this.index.queryItems(vector, 1);
+            if (results.length > 0 && results[0].score > 0.95) {  // Only delete if very similar
+                await this.index.deleteItems([results[0].item.id]);
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.error('Failed to delete memory:', err);
+            return false;
+        }
     }
 }
