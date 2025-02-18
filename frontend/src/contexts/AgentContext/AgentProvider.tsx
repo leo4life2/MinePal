@@ -79,9 +79,12 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
   }, [declareError, clearError, userSettings])
 
   const toggleProfile = useCallback((profile: Profile) => {
-    setSelectedProfiles((currentProfiles) => currentProfiles.includes(profile)
-      ? currentProfiles.filter((currentProfile) => currentProfile !== profile)
-      : [...currentProfiles, profile]);
+    setSelectedProfiles((currentProfiles) => {
+      const isSelected = currentProfiles.some(p => p.name === profile.name);
+      return isSelected
+        ? currentProfiles.filter((p) => p.name !== profile.name)
+        : [...currentProfiles, profile];
+    });
   }, []);
 
   useEffect(() => {

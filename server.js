@@ -228,9 +228,9 @@ function startServer() {
                 updatedProfiles.push({
                     name: profileData.name,
                     personality: profileData.personality,
-                    conversing: profileData.conversing,
-                    coding: profileData.coding,
-                    saving_memory: profileData.saving_memory
+                    autoMessage: profileData.autoMessage || '',
+                    triggerOnJoin: !!profileData.triggerOnJoin,
+                    triggerOnRespawn: !!profileData.triggerOnRespawn
                 });
             }
         });
@@ -411,6 +411,7 @@ function startServer() {
         res.send('Settings updated and AgentProcess started for all profiles');
     });
 
+    // Only batch save supported rn.
     app.post('/save-profiles', express.json(), (req, res) => {
         const profilesDir = path.join(userDataDir, 'profiles');
         const ethanTemplatePath = path.join(electronApp.getAppPath(), 'ethan.json');
@@ -433,6 +434,9 @@ function startServer() {
             const profileData = JSON.parse(fs.readFileSync(ethanTemplatePath, 'utf8'));
             profileData.name = profile.name;
             profileData.personality = profile.personality;
+            profileData.autoMessage = profile.autoMessage || '';
+            profileData.triggerOnJoin = !!profile.triggerOnJoin;
+            profileData.triggerOnRespawn = !!profile.triggerOnRespawn;
             fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
         });
 

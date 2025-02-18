@@ -1,6 +1,9 @@
-export type Profile = {
+export interface Profile {
   name: string;
   personality: string;
+  autoMessage?: string;
+  triggerOnJoin?: boolean;
+  triggerOnRespawn?: boolean;
 }
 
 export enum VoiceMode {

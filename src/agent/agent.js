@@ -104,8 +104,13 @@ export class Agent {
             });
 
             await this.sendMessage('Hello world! I am ' + this.name);
-            this.bot.emit('finished_executing');
+            
+            // Handle auto-message on join
+            if ((this.profile.triggerOnJoin || this.profile.triggerOnRespawn) && this.profile.autoMessage) {
+                await this.sendMessage(this.profile.autoMessage);
+            }
 
+            this.bot.emit('finished_executing');
             this.startEvents();
         });
     }
@@ -330,6 +335,12 @@ export class Agent {
      * Initializes and starts various event listeners for the agent.
      */
     startEvents() {
+        // Set up respawn message handler if enabled
+        if (this.profile.triggerOnRespawn && this.profile.autoMessage) {
+            this.bot.on('spawn', async () => {
+                await this.sendMessage(this.profile.autoMessage);
+            });
+        }
         // Custom time-based events
         this.bot.on('time', () => {
             if (this.bot.time.timeOfDay == 0)
