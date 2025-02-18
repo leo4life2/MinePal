@@ -145,7 +145,6 @@ export class Prompter {
 
         let systemPrompt = this.profile.conversing;
         systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
-        console.log('Relevant memories:\n', relevantMemories);
         
         let chat_response, execute_command;
         let response = await this.chat_model.sendRequest(messages, systemPrompt);

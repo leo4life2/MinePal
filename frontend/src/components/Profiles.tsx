@@ -167,7 +167,9 @@ function Profiles() {
                 </div>
                 <div className="button-group">
                   <button className="save-button" onClick={saveChanges}>Save</button>
-                  <button className="view-memories-button" onClick={viewMemories}>View Memories</button>
+                  {editingProfileIndex !== null && (
+                    <button className="view-memories-button" onClick={viewMemories}>View Memories</button>
+                  )}
                   <button className="cancel-button" onClick={closeModal}>Cancel</button>
                   {editingProfileIndex !== null && (
                     <button className="delete-button" onClick={deleteProfile}>Delete Pal</button>

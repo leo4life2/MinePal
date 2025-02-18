@@ -81,7 +81,6 @@ export class History {
         // When we hit max messages, summarize all turns and store in vector DB
         console.log(`Turns length: ${this.turns.length}`);
         if (this.turns.length >= this.max_messages) {
-            console.log("Triggering summarization and vector LTM");
             // Copy all turns for summarization
             const turnsToSummarize = [...this.turns];
             await this.summarizeTurns(turnsToSummarize);

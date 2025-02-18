@@ -74,9 +74,9 @@ export class Proxy {
                 
                 if (retryCount > maxRetries) {
                     if (err.response && err.response.status === 500) {
-                        console.log('Error 500:', err.response.data);
+                        console.log('proxy embed Error 500:', err.response.data);
                     } else {
-                        console.log('Error:', err.message);
+                        console.log('proxy embed Error:', err.message);
                     }
                     throw new Error(`Failed to get embedding after ${maxRetries} retries`);
                 }
