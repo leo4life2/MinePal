@@ -85,7 +85,37 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
+  // Register the protocol
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient('minepal', process.execPath, [path.resolve(process.argv[1])])
+    }
+  } else {
+    app.setAsDefaultProtocolClient('minepal')
+  }
+
+  // Handle the protocol. In this case, we choose to show an existing window
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      // Send the URL to the renderer process
+      mainWindow.webContents.send('auth-callback', url);
+    }
+  });
+
   app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    // Protocol handler for win32
+    // commandLine includes the protocol url
+    if (process.platform === 'win32') {
+      const url = commandLine.find(arg => arg.startsWith('minepal://'));
+      if (url) {
+        mainWindow.webContents.send('auth-callback', url);
+      }
+    }
+
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();

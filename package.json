@@ -7,7 +7,7 @@
   "author": "NemosAI",
   "license": "MIT",
   "dependencies": {
-    "@supabase/supabase-js": "^2.46.2",
+    "@supabase/supabase-js": "^2.48.1",
     "axios": "^1.7.3",
     "cors": "^2.8.5",
     "electron-updater": "^6.3.9",

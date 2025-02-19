@@ -213,3 +213,197 @@
   background-color: var(--bg-color);
   min-width: 150px;  /* Minimum width */
 }
+
+.auth-modal {
+  background: var(--bg-color);
+  padding: 32px;
+  border-radius: 20px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  max-width: 400px;
+  width: 90%;
+}
+
+.auth-title {
+  color: var(--primary-color);
+  text-align: center;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  margin-bottom: 0;
+  margin-top: 0;
+}
+
+.auth-intro {
+  text-align: center;
+  color: var(--text-color);
+  margin-bottom: 22px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
+.auth-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.auth-discord-button {
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: #5865F2;
+  color: white;
+  width: 100%;
+}
+
+.auth-discord-button:hover:not(:disabled) {
+  background-color: #4752C4;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(88, 101, 242, 0.2);
+}
+
+.auth-discord-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.discord-icon {
+  color: currentColor;
+  fill: currentColor;
+  transition: transform 0.3s ease;
+}
+
+.auth-discord-button:hover:not(:disabled) .discord-icon {
+  transform: scale(1.1);
+}
+
+.auth-cancel-button {
+  width: 100%;
+  padding: 14px;
+  background-color: transparent;
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.auth-cancel-button:hover {
+  background-color: rgba(255, 137, 6, 0.1);
+  transform: translateY(-2px);
+}
+
+.error-message {
+  color: #ff4444;
+  text-align: center;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+
+.auth-toggle {
+  display: flex;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px;
+  border-radius: 10px;
+  margin-bottom: 0;
+}
+
+.auth-toggle-button {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.auth-toggle-button.active {
+  background: var(--primary-color);
+  color: var(--bg-color);
+  opacity: 1;
+}
+
+.auth-toggle-button:not(.active):hover {
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.password-input-container {
+  position: relative;
+  width: 100%;
+}
+
+.password-requirements {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--bg-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.85rem;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.password-requirements p {
+  margin: 0 0 8px 0;
+  color: var(--text-color);
+  opacity: 0.8;
+}
+
+.password-requirements ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.password-requirements li {
+  color: rgba(255, 255, 255, 0.5);
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.password-requirements li::before {
+  content: "○";
+  font-size: 0.8em;
+}
+
+.password-requirements li.valid {
+  color: var(--primary-color);
+}
+
+.password-requirements li.valid::before {
+  content: "●";
+}
+
+.auth-alternative {
+  text-align: center;
+  color: var(--text-color);
+  font-size: 0.85rem;
+  opacity: 0.6;
+  font-style: italic;
+}

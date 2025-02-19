@@ -1,37 +1,48 @@
-import React from "react";
+import React, { useState } from "react";
 import supportedLocales from '../../utils/supportedLocales';
 import { useUserSettings } from "../../contexts/UserSettingsContext/UserSettingsContext";
 import "./Actions.css";
-import openAIModels from "../../utils/openAIModels";
 import { useAgent } from "../../contexts/AgentContext/AgentContext";
+import { useSupabase } from "../../contexts/SupabaseContext/useSupabase";
+import DiscordIcon from '../../assets/discord.svg';
 
 function Actions() {
   const { userSettings, updateField } = useUserSettings();
-  const { agentActive, start, stop } = useAgent();
+  const { agentActive } = useAgent();
+  const { signInWithDiscord, user } = useSupabase();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [error, setError] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLanguageChange = ({ target: { value } }: React.ChangeEvent<HTMLSelectElement>) => {
     updateField("language", value);
   };
 
-  const handleApiKeyChange = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
-    updateField("openai_api_key", value);
-  };
-
-  const handleModelChange = ({ target: { value } }: React.ChangeEvent<HTMLSelectElement>) => {
-    updateField("model", value);
-  };
-
-  const handleUseOwnApiKeyChange = ({ target: { checked } }: React.ChangeEvent<HTMLInputElement>) => {
-    updateField("useOwnApiKey", checked);
+  const handleDiscordSignIn = async () => {
+    setError(undefined);
+    setIsLoading(true);
+    try {
+      await signInWithDiscord();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to initiate Discord sign in');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleAgent = () => {
-    if (!agentActive) {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    // Original agent toggle logic (commented out as requested)
+    /*if (!agentActive) {
       start();
     } else {
       stop();
-    }
-  }
+    }*/
+  };
 
   return (
     <div className="actions">
@@ -49,54 +60,38 @@ function Actions() {
         </select>
       </div>
       <div className="notice" style={{ color: '#666666', fontSize: '0.9em', marginTop: '5px' }}>
-        Voice chat temporarily disabled due to high server loads
-      </div>
-      <div className="api-key-settings">
-        <label className="api-key-checkbox">
-          <input
-            type="checkbox"
-            checked={userSettings.useOwnApiKey || false}
-            onChange={handleUseOwnApiKeyChange}
-            disabled={agentActive}
-          />
-          Use your own API Key
-        </label>
-
-        {userSettings.useOwnApiKey && (
-          <div className="api-key-controls">
-            <div className="api-key-input-group">
-              <label htmlFor="api-key">OpenAI API Key:</label>
-              <input
-                type="password"
-                id="api-key"
-                value={userSettings.openai_api_key || ''}
-                onChange={handleApiKeyChange}
-                placeholder="Enter your OpenAI API key"
-                disabled={agentActive}
-                className="api-key-input"
-              />
-            </div>
-            <div className="model-select-group">
-              <label htmlFor="model">Model:</label>
-              <select
-                id="model"
-                value={userSettings.model || 'gpt-4o-mini'}
-                onChange={handleModelChange}
-                disabled={agentActive}
-                className="model-select"
-              >
-                {openAIModels.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
+        Voice chat temporarily disabled due to high server loads (will be back soon!)
       </div>
       <button className="action-button" onClick={toggleAgent}>
-        {agentActive ? "Stop Bot" : "Start Bot"}
+        {user ? (agentActive ? "Stop Bot" : "Start Bot") : "Sign In"}
       </button>
-    </div >
+
+      {showAuthModal && (
+        <div className="modal">
+          <div className="modal-content auth-modal">
+            <h2 className="auth-title">Welcome to MinePal</h2>
+            <p className="auth-intro">Sign in with Discord to get free play time everyday!</p>
+            
+            <div className="auth-methods">
+              <button 
+                onClick={handleDiscordSignIn}
+                className="auth-discord-button"
+                disabled={isLoading}
+              >
+                <img src={DiscordIcon} alt="" width={20} height={20} className="discord-icon" />
+                {isLoading ? "Connecting..." : "Continue with Discord"}
+              </button>
+            </div>
+
+            {error && <div className="error-message">{error}</div>}
+            
+            <button className="auth-cancel-button" onClick={() => setShowAuthModal(false)}>
+              Go back
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
