@@ -40,19 +40,36 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
       
       try {
         const urlObj = new URL(url);
-        const code = urlObj.searchParams.get('code');
         
-        if (!code) {
-          console.error('No code found in callback URL');
+        // First check for authorization code in search params
+        const code = urlObj.searchParams.get('code');
+        if (code) {
+          console.log('Authorization code flow detected');
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('Error exchanging code for session:', error);
+            throw error;
+          }
           return;
         }
 
-        // Exchange the code for a session
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          console.error('Error exchanging code for session:', error);
-          throw error;
+        // If no code, check for access token in hash fragment
+        const hashParams = new URLSearchParams(urlObj.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        if (accessToken) {
+          console.log('Implicit flow detected');
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: hashParams.get('refresh_token') || '',
+          });
+          if (error) {
+            console.error('Error setting session:', error);
+            throw error;
+          }
+          return;
         }
+
+        console.error('No authentication credentials found in callback URL');
       } catch (err) {
         console.error('Error handling auth redirect:', err);
         throw err;
@@ -89,7 +106,8 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?` + 
       new URLSearchParams({
         provider: 'discord',
-        redirect_to: 'minepal://auth/callback'
+        redirect_to: 'minepal://auth/callback',
+        close_tab: 'true'
       }).toString();
 
     await shell.openExternal(oauthUrl);

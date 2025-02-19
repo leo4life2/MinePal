@@ -42,7 +42,7 @@ function Profiles() {
       setMemoryError(undefined);
     } catch (error) {
       declareError("Memories", error);
-      setMemoryError("Failed to fetch memories. Please try again.");
+      setMemoryError(`Failed to fetch memories: ${error}`);
     }
   };
 
@@ -55,7 +55,7 @@ function Profiles() {
       setMemoryError(undefined);
     } catch (error) {
       declareError("Memories", error);
-      setMemoryError("Failed to delete memory. Please try again.");
+      setMemoryError(`Failed to delete memory: ${error}`);
     }
   };
 
@@ -92,7 +92,7 @@ function Profiles() {
       closeModal();
     } catch (error) {
       declareError("Profiles", error);
-      setError("Failed to save profiles. Please try again.");
+      setError(`Failed to save profiles: ${error}`);
     }
   };
 
@@ -108,7 +108,7 @@ function Profiles() {
       closeModal();
     } catch (error) {
       declareError("Profiles", error);
-      setError("Failed to delete profile. Please try again.");
+      setError(`Failed to delete profile: ${error}`);
     }
   };
 

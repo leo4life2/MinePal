@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./Actions.css";
 import { useAgent } from "../../contexts/AgentContext/AgentContext";
 import { useSupabase } from "../../contexts/SupabaseContext/useSupabase";
 import DiscordIcon from '../../assets/discord.svg';
 
 function Actions() {
-  const { agentActive } = useAgent();
-  const { signInWithDiscord, user } = useSupabase();
+  const { agentActive, start, stop } = useAgent();
+  const { signInWithDiscord, user, loading } = useSupabase();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (user && !loading) {
+      setShowAuthModal(false);
+      setIsLoading(false);
+      setError(undefined);
+    }
+  }, [user, loading]);
 
   const handleDiscordSignIn = async () => {
     setError(undefined);
@@ -18,7 +26,6 @@ function Actions() {
       await signInWithDiscord();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initiate Discord sign in');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -27,6 +34,11 @@ function Actions() {
     if (!user) {
       setShowAuthModal(true);
       return;
+    }
+    if (!agentActive) {
+      start();
+    } else {
+      stop();
     }
   };
 
