@@ -1172,8 +1172,11 @@ export async function teleportToPlayer(bot, username) {
   bot.chat("/tp @s " + username);
   await new Promise((resolve) => setTimeout(resolve, 500)); // wait for tp to complete
   let player = bot.players[username]?.entity;
+  if (!player) {
+    log(bot, `username ${username} incorrect, player not found.`);
+    return false;
+  }
   if (
-    player &&
     bot.entity.position.distanceTo(player.position) <= NEAR_DISTANCE
   ) {
     log(bot, `Teleported to ${username}.`);

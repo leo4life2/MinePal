@@ -18,7 +18,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
     const emptyFields = validateUserSettings(userSettings);
 
     if (emptyFields.length > 0) {
-      declareError("AgentProvider", `Please fill in the following fields: ${emptyFields.join(', ')}`, true);
+      declareError("AgentProvider", `Please fill in the following fields in settings: ${emptyFields.join(', ')}`, true);
       return;
     }
 
