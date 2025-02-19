@@ -1,22 +1,15 @@
-import React, { useState } from "react";
-import supportedLocales from '../../utils/supportedLocales';
-import { useUserSettings } from "../../contexts/UserSettingsContext/UserSettingsContext";
+import { useState } from "react";
 import "./Actions.css";
 import { useAgent } from "../../contexts/AgentContext/AgentContext";
 import { useSupabase } from "../../contexts/SupabaseContext/useSupabase";
 import DiscordIcon from '../../assets/discord.svg';
 
 function Actions() {
-  const { userSettings, updateField } = useUserSettings();
   const { agentActive } = useAgent();
   const { signInWithDiscord, user } = useSupabase();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
-
-  const handleLanguageChange = ({ target: { value } }: React.ChangeEvent<HTMLSelectElement>) => {
-    updateField("language", value);
-  };
 
   const handleDiscordSignIn = async () => {
     setError(undefined);
@@ -35,30 +28,10 @@ function Actions() {
       setShowAuthModal(true);
       return;
     }
-
-    // Original agent toggle logic (commented out as requested)
-    /*if (!agentActive) {
-      start();
-    } else {
-      stop();
-    }*/
   };
 
   return (
     <div className="actions">
-      <div className="language-settings">
-        <label htmlFor="language">Language/Accent:</label>
-        <select
-          id="language"
-          value={userSettings.language}
-          onChange={handleLanguageChange}
-          disabled={agentActive}
-        >
-          {supportedLocales.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-      </div>
       <div className="notice" style={{ color: '#666666', fontSize: '0.9em', marginTop: '5px' }}>
         Voice chat temporarily disabled due to high server loads (will be back soon!)
       </div>

@@ -1,10 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
 
 :root {
-  --bg-color: #0f0e17;
-  --text-color: #fffffe;
-  --primary-color: #ff8906;
-  --secondary-color: #f25f4c;
+  /* Warm, parchment-like theme */
+  --bg-color: #f0e6d2;          /* Parchment background */
+  --primary-color: #606c38;      /* Lighter earthy green */
+  --secondary-color: #e67e22;    /* Warm orange */
+  --text-color: #2c1810;        /* Dark brown text */
+  --error-color: #e63946;       /* Alert red */
+  --success-color: #606c38;     /* Same as primary */
+  --accent-color: #d35400;      /* Deeper orange */
+  --hover-color: #6b7841;       /* Slightly lighter green for hover */
+  --border-color: rgba(96, 108, 56, 0.15);  /* Subtle green border */
+  --modal-overlay: rgba(44, 24, 16, 0.2);  /* Warm brown overlay */
 }
 
 body {
@@ -21,10 +28,9 @@ body {
 .container {
   max-width: 800px;
   padding: 40px;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
+  background: #fff;
   border-radius: 20px;
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px rgba(44, 24, 16, 0.1);
 }
 
 h1 {

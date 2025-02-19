@@ -2,10 +2,18 @@
     display: flex;
     align-items: center;
     padding: 10px;
-    border: 1px solid var(--primary-color);
+    border: 1px solid var(--border-color);
+    background: #fff;
     border-radius: 8px;
     margin-bottom: 10px;
     cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .profile-box:hover {
+    transform: translateY(-2px);
+    background: var(--bg-color);
+    box-shadow: 0 4px 12px rgba(44, 24, 16, 0.05);
   }
   
   .profile-box input {
@@ -15,8 +23,12 @@
   
   .profile-box.empty {
     justify-content: center;
+    padding: 5px;
     font-size: 24px;
-    color: var(--primary-color);
+    color: var(--secondary-color);
+    border-style: dashed;
+    border-width: 3px;
+    background: transparent;
   }
   
   .modal {
@@ -25,18 +37,21 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--modal-overlay);
     display: flex;
     justify-content: center;
     align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
   }
   
   .modal-content {
-    background: var(--bg-color);
-    padding: 20px;
-    border-radius: 8px;
+    background: #fff;
+    padding: 24px;
+    border-radius: 12px;
     width: 80%;
     max-width: 500px;
+    box-shadow: 0 8px 24px rgba(44, 24, 16, 0.1);
   }
   
   .modal-content h2 {
@@ -49,17 +64,17 @@
     margin-top: 10px;
     padding: 10px;
     border-radius: 8px;
-    border: 1px solid var(--primary-color);
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
     color: var(--text-color);
-    box-sizing: border-box; /* Add this line */
+    box-sizing: border-box;
   }
   
   .modal-content input[type="text"] {
     width: 100%;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--primary-color);
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-color);
     box-sizing: border-box;
@@ -68,18 +83,38 @@
   .modal-content .button-group {
     display: flex;
     justify-content: space-between;
+    margin-top: 20px;
+  }
+  
+  .modal-content .save-button,
+  .modal-content .delete-button,
+  .send-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
   }
   
   .modal-content .save-button {
     background-color: var(--primary-color);
-    color: var(--bg-color);
-    margin-right: 10px;
+    color: #fff;
+  }
+  
+  .modal-content .save-button:hover {
+    background-color: var(--hover-color);
+    transform: translateY(-2px);
   }
   
   .modal-content .delete-button {
-    background-color: var(--secondary-color);
-    color: var(--bg-color);
-    margin-left: auto; /* Align the cancel button to the right */
+    background-color: var(--error-color);
+    color: #fff;
+  }
+  
+  .modal-content .delete-button:hover {
+    background-color: #f05454;
+    transform: translateY(-2px);
   }
   
   .send-group {
@@ -92,46 +127,77 @@
   .send-group input {
     flex-grow: 1;
     height: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-color);
     box-sizing: border-box;
+    transition: all 0.3s ease;
+    padding: 10px;
+  }
+  
+  .send-group input:focus {
+    border-color: var(--primary-color);
+    outline: none;
   }
   
   .send-button {
-    margin-left: 10px;
-    padding: 10px 20px;
     background-color: var(--primary-color);
-    border: none;
-    border-radius: 8px;
-    color: var(--bg-color);
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+    color: #fff;
+    margin-left: 10px;
   }
   
   .send-button:hover {
-    background-color: var(--secondary-color);
+    background-color: var(--hover-color);
+    transform: translateY(-2px);
   }
   
   .profile-box input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
+    width: 28px;
+    height: 28px;
+    appearance: none;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .profile-box input[type="checkbox"]:checked {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+  }
+  
+  .profile-box input[type="checkbox"]:checked::after {
+    content: '✓';
+    color: #fff;
+    font-size: 18px;
+    line-height: 1;
+  }
+  
+  .profile-box input[type="checkbox"]:hover {
+    border-color: var(--primary-color);
+    transform: scale(1.05);
   }
 
 .view-memories-button {
   background-color: var(--primary-color);
-  color: var(--bg-color);
+  color: #fff;
   border: none;
   padding: 10px 20px;
   margin-right: 10px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .view-memories-button:hover {
-  background-color: var(--secondary-color);
+  background-color: var(--hover-color);
+  transform: translateY(-1px);
 }
 
 .memories-modal {
@@ -149,9 +215,9 @@
   max-height: 500px;
   overflow-y: auto;
   margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-color);
   border-radius: 8px;
-  border: 1px solid var(--primary-color);
+  border: 1px solid var(--border-color);
 }
 
 .memories-table::-webkit-scrollbar {
@@ -172,12 +238,12 @@
   display: flex;
   align-items: center;
   padding: 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-color);
   transition: background-color 0.3s ease;
 }
 
 .memory-row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: #fff;
 }
 
 .memory-text {
@@ -206,9 +272,9 @@
 }
 
 .back-button {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--bg-color);
   color: var(--text-color);
-  border: none;
+  border: 1px solid var(--border-color);
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
@@ -216,7 +282,7 @@
 }
 
 .back-button:hover {
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: #e8dcc5;
   transform: translateY(-2px);
 }
 
@@ -248,8 +314,10 @@
 .message-input input {
   width: 100%;
   padding: 8px;
-  border: 1px solid #ccc;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
+  color: var(--text-color);
 }
 
 .message-triggers {
@@ -267,10 +335,11 @@
   border-radius: 4px;
   transition: background-color 0.2s;
   position: relative;
+  color: var(--text-color);
 }
 
 .message-triggers label:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--bg-color);
 }
 
 /* Custom tooltip styling */
@@ -320,11 +389,12 @@
   border-radius: 50%;
   outline: none;
   transition: all 0.2s ease;
+  background: #fff;
 }
 
 .message-triggers input[type="radio"]:checked {
   background: var(--primary-color);
-  box-shadow: inset 0 0 0 3px var(--bg-color);
+  box-shadow: inset 0 0 0 3px #fff;
 }
 
 .message-triggers input[type="radio"]:hover {

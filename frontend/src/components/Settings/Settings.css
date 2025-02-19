@@ -1,0 +1,203 @@
+.settings-container {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.settings-toggle {
+  width: 100%;
+  padding: 16px;
+  background: var(--bg-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.settings-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
+}
+
+.settings-toggle svg {
+  color: var(--primary-color);
+}
+
+.settings-toggle span {
+  flex: 1;
+  text-align: left;
+  font-weight: 500;
+}
+
+.arrow {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+  opacity: 0.5;
+}
+
+.arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.settings-content {
+  margin-top: 16px;
+  padding: 20px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.setting-item {
+  margin-bottom: 10px;
+}
+
+.setting-item:last-child {
+  margin-bottom: 0;
+}
+
+.setting-item label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-color);
+}
+
+.setting-input {
+  padding: 10px;
+  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.setting-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(255, 137, 6, 0.1);
+}
+
+.setting-note {
+  color: #666666;
+  font-size: 0.9em;
+}
+
+/* Switch styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: lightgray;
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.game-mode-selector {
+  display: flex;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px;
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.mode-button {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  background: #fff;
+  color: var(--text-color);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.mode-button.active {
+  background: var(--primary-color);
+  color: var(--bg-color);
+  opacity: 1;
+}
+
+.mode-button:not(.active):hover {
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.setting-input.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.setting-input optgroup {
+  background-color: var(--bg-color);
+  color: var(--primary-color);
+  font-weight: 600;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.setting-input option {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  padding: 8px;
+  font-weight: normal;
+}
+
+.setting-input option:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+} 
