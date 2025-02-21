@@ -256,7 +256,7 @@ function startServer() {
         try {
             const index = new LocalIndex(botMemoryPath);
             if (!(await index.isIndexCreated())) {
-                return res.status(404).json({ error: "Bot memories not found" });
+                return res.json([]);
             }
 
             // Get all items from the index
@@ -269,7 +269,7 @@ function startServer() {
             res.json(memories);
         } catch (error) {
             logToFile(`Error reading bot memories: ${error.message}`);
-            res.status(500).json({ error: "Failed to read bot memories" });
+            res.json([]);
         }
     });
 
