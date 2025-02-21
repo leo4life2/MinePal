@@ -27,7 +27,7 @@ export function validateUserSettings({
   if (!key_binding && !["always_on", "off"].includes(voice_mode)) invalidFields.push("key_binding");
   if (!host) invalidFields.push("host");
   if (!port) invalidFields.push("port");
-  if (!minecraft_version || minecraft_version.split(".").length !== 3) invalidFields.push("minecraft_version");
+  if (!minecraft_version) invalidFields.push("minecraft_version");
 
   return invalidFields;
 }

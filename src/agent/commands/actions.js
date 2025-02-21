@@ -426,6 +426,16 @@ export const actionsList = [
     perform: wrapExecution(async (agent, house_type) => {
       return await skills.buildHouse(agent.bot, house_type);
     }),
+  },
+  {
+    name: "!tameMob",
+    description: "Tame a nearby cat or wolf using appropriate items (fish for cats, bones for wolves).",
+    params: {
+      mobType: "(string) The type of mob to tame ('cat' or 'wolf').",
+    },
+    perform: wrapExecution(async (agent, mobType) => {
+      return await skills.tameMob(agent.bot, mobType);
+    }),
   }
   // {
   //   name: "!goal",

@@ -55,7 +55,7 @@ function Actions() {
         <div className="modal">
           <div className="modal-content auth-modal">
             <h2 className="auth-title">Welcome to MinePal</h2>
-            <p className="auth-intro">Sign in with Discord to get free play time everyday!</p>
+            <p className="auth-intro">Sign in with Discord to continue</p>
             
             <div className="auth-methods">
               <button 
@@ -67,7 +67,12 @@ function Actions() {
                 {isLoading ? "Connecting..." : "Continue with Discord"}
               </button>
             </div>
-
+            <p className="terms-text">
+                By continuing with Discord, you agree to our{' '}
+                <a href="https://app.getterms.io/view/4ZA3K/tos/en-us" target="_blank" rel="noopener noreferrer">Terms of Service</a>,{' '}
+                <a href="https://app.getterms.io/view/4ZA3K/privacy/en-us" target="_blank" rel="noopener noreferrer">Privacy Policy</a>, and{' '}
+                <a href="https://app.getterms.io/view/4ZA3K/aup/en-us" target="_blank" rel="noopener noreferrer">Acceptable Use Policy</a>
+              </p>
             {error && <div className="error-message">{error}</div>}
             
             <button className="auth-cancel-button" onClick={() => setShowAuthModal(false)}>

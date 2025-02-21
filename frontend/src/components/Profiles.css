@@ -295,7 +295,7 @@
 .no-memories {
   padding: 30px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-color);
   font-style: italic;
   font-size: 0.9rem;
 }

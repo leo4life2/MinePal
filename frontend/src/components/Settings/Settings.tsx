@@ -101,7 +101,10 @@ function Settings() {
             <select
               id="minecraft_version"
               value={userSettings.minecraft_version}
-              onChange={(e) => updateField('minecraft_version', e.target.value)}
+              onChange={(e) => {
+                console.log('Selected Minecraft version:', e.target.value);
+                updateField('minecraft_version', e.target.value);
+              }}
               className="setting-input"
             >
               {minecraftVersions.map((group) => (

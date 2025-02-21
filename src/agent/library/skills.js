@@ -454,7 +454,7 @@ export async function defendSelf(bot, range = 9) {
   let attacked = false;
   let enemy = world.getNearestEntityWhere(
     bot,
-    (entity) => MCData.getInstance().isHostile(entity),
+    (entity) => MCData.getInstance().isHostile(entity) && entity.name !== "item",
     range
   );
   while (enemy) {
@@ -471,6 +471,7 @@ export async function defendSelf(bot, range = 9) {
         /* might error if entity dies, ignore */
       }
     }
+    console.log("self defense attacking", enemy);
     bot.pvp.attack(enemy);
     attacked = true;
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -2163,4 +2164,132 @@ export async function buildHouse(bot, houseType) {
 
     log(bot, `${houseType} built successfully.`);
     return true;
+}
+
+export async function tameMob(bot, mobType) {
+  /**
+   * Tame a nearby untamed cat or wolf.
+   * @param {MinecraftBot} bot, reference to the minecraft bot.
+   * @param {string} mobType, the type of mob to tame ('cat' or 'wolf').
+   * @returns {Promise<boolean>} true if the mob was tamed, false otherwise.
+   * @example
+   * await skills.tameMob(bot, "cat");
+   * await skills.tameMob(bot, "wolf");
+   **/
+  
+  const tamingItems = {
+    cat: ["cod", "salmon"],
+    wolf: ["bone"]
+  };
+
+  if (!tamingItems[mobType]) {
+    log(bot, `Can only tame cats or wolves, not ${mobType}.`);
+    return false;
+  }
+
+  // Find required taming item in inventory
+  const validItems = tamingItems[mobType];
+  let tamingItem = null;
+  for (const itemName of validItems) {
+    const item = bot.inventory.items().find(item => item.name === itemName);
+    if (item) {
+      tamingItem = item;
+      break;
+    }
+  }
+
+  if (!tamingItem) {
+    log(bot, `You need ${validItems.join(" or ")} to tame a ${mobType}.`);
+    return false;
+  }
+
+  // Find nearest untamed mob
+  const nearbyEntities = world.getNearbyEntities(bot, 24);
+  let targetMob = null;
+  
+  for (const entity of nearbyEntities) {
+    if (entity.name !== mobType) continue;
+    
+    // Check if any metadata value is a UUID (contains dashes)
+    const isTamed = entity.metadata.some(meta => 
+      typeof meta === 'string' && meta.includes('-')
+    );
+    
+    if (!isTamed) {
+      targetMob = entity;
+      break;
+    }
+  }
+
+  if (!targetMob) {
+    log(bot, `No untamed ${mobType} found nearby.`);
+    return false;
+  }
+
+  // Equip taming item and use it on the mob
+  await bot.equip(tamingItem, "hand");
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (attempts < maxAttempts) {
+    try {
+      const distance = bot.entity.position.distanceTo(targetMob.position);
+      
+      // For cats, manage crouching based on distance
+      if (mobType === 'cat') {
+        if (distance > 12) { // Too far, need to catch up
+          stopCrouching(bot);
+        } else if (distance <= 10) { // Close enough to be stealthy
+          startCrouching(bot);
+        }
+      }
+
+      // Move closer if needed
+      if (distance > NEAR_DISTANCE) {
+        await goToPosition(
+          bot,
+          targetMob.position.x,
+          targetMob.position.y,
+          targetMob.position.z,
+          2
+        );
+      }
+      
+      await bot.lookAt(targetMob.position.offset(0, 0.5, 0));
+      await bot.useOn(targetMob);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait to see if taming succeeded
+
+      // Check if any metadata value is a UUID (contains dashes)
+      const isTamed = targetMob.metadata.some(meta => 
+        typeof meta === 'string' && meta.includes('-')
+      );
+      
+      if (isTamed) {
+        if (mobType === 'cat') {
+          stopCrouching(bot);
+        }
+        log(bot, `Successfully tamed ${mobType}!`);
+
+        // make pet stand if it's sitting
+        await bot.unequip('hand');  // Unequip food/bone first
+        await bot.lookAt(targetMob.position.offset(0, 0.5, 0));
+        await bot.useOn(targetMob);
+        return true;
+      }
+      
+      attempts++;
+    } catch (err) {
+      if (mobType === 'cat') {
+        stopCrouching(bot);
+      }
+      log(bot, `Failed to use ${tamingItem.name} on ${mobType}: ${err.message}`);
+      return false;
+    }
+  }
+
+  if (mobType === 'cat') {
+    stopCrouching(bot);
+  }
+  log(bot, `Failed to tame ${mobType} after ${maxAttempts} attempts.`);
+  return false;
 }
