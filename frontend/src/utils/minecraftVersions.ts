@@ -5,6 +5,10 @@ interface VersionGroup {
 
 export const minecraftVersions: VersionGroup[] = [
   {
+    label: "Select Version",
+    versions: ["select"]
+  },
+  {
     label: "1.20.x: Trails & Tales",
     versions: ["1.20", "1.20.1", "1.20.2", "1.20.3", "1.20.4"]
   },

@@ -75,7 +75,7 @@ function startServer() {
 
     if (!fs.existsSync(settingsPath)) {
         settings = {
-            "minecraft_version": "1.20.4",
+            "minecraft_version": "select",
             "host": "localhost",
             "port": "25565",
             "auth": "offline",
@@ -378,6 +378,7 @@ function startServer() {
                 }
                 if (key === 'profiles') return !Array.isArray(value) || value.length === 0;
                 if (key === 'key_binding' && (newSettings.voice_mode === 'always_on' || newSettings.voice_mode === 'off')) return false;
+                if (key === 'minecraft_version' && value === 'select') return true;
                 return value === "" || value === null || value === undefined;
             })
             .map(([key]) => key);

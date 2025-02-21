@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { saveProfiles, fetchBotMemories, deleteMemory, Memory } from '../utils/api';
+import { saveProfiles, fetchBotMemories, deleteMemory, Memory, sendMessage } from '../utils/api';
 import { Profile } from '../types/apiTypes';
 import { useUserSettings } from '../contexts/UserSettingsContext/UserSettingsContext';
 import './Profiles.css';
 import { useAgent } from '../contexts/AgentContext/AgentContext';
 import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContext';
+import { Settings as SettingsIcon } from 'react-feather';
 
 function Profiles() {
   const { userSettings: { profiles }, updateField } = useUserSettings();
@@ -17,6 +18,9 @@ function Profiles() {
   const [showMemories, setShowMemories] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [memoryError, setMemoryError] = useState<string>();
+  const [showMoreSettings, setShowMoreSettings] = useState(false);
+  const [customMessage, setCustomMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const openModal = (profile = { name: '', personality: '' }, index: number | null = null) => {
     setEditingProfileIndex(index);
@@ -116,6 +120,20 @@ function Profiles() {
     toggleProfile(profile);
   };
 
+  const handleSendMessage = async () => {
+    if (!editingProfile?.name || !customMessage.trim()) return;
+    
+    setSendingMessage(true);
+    try {
+      await sendMessage(editingProfile.name, customMessage.trim());
+      setCustomMessage('');
+    } catch (error) {
+      declareError("Send Message", error);
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   return (
     <div className="profiles">
       {profiles.map((profile, index) => (
@@ -138,77 +156,124 @@ function Profiles() {
           <div className={`modal-content ${showMemories ? 'showing-memories' : ''}`}>
             {!showMemories ? (
               <>
-                <input
-                  type="text"
-                  value={editingProfile.name}
-                  onChange={({ target: { value } }) => setEditingProfile((currentEditingProfile) => ({
-                    ...currentEditingProfile!,
-                    name: value,
-                  }))}
-                  placeholder="Name"
-                />
-                <textarea
-                  value={editingProfile.personality}
-                  onChange={({ target: { value } }) => setEditingProfile((currentEditingProfile) => ({
-                    ...currentEditingProfile!,
-                    personality: value,
-                  }))}
-                  placeholder="Personality"
-                />
-                <div className="automated-messages-group">
-                  <div className="message-input">
-                    <input
-                      type="text"
-                      value={editingProfile?.autoMessage || ''}
-                      onChange={({ target: { value } }) => setEditingProfile((currentEditingProfile) => ({
-                        ...currentEditingProfile!,
-                        autoMessage: value,
-                      }))}
-                      placeholder="Message or command to send automatically"
-                    />
-                  </div>
-                  <div className="message-triggers">
-                    <label title="Best for login type commands to execute when bot joins a server">
-                      <input
-                        type="radio"
-                        name="trigger"
-                        checked={!!editingProfile?.triggerOnJoin}
-                        onChange={() => setEditingProfile((currentEditingProfile) => ({
-                          ...currentEditingProfile!,
-                          triggerOnJoin: true,
-                          triggerOnRespawn: false,
-                        }))}
-                      />
-                      On Join
-                    </label>
-                    <label title="For skin commands so it automatically applies skin on each respawn">
-                      <input
-                        type="radio"
-                        name="trigger"
-                        checked={!!editingProfile?.triggerOnRespawn}
-                        onChange={() => setEditingProfile((currentEditingProfile) => ({
-                          ...currentEditingProfile!,
-                          triggerOnJoin: false,
-                          triggerOnRespawn: true,
-                        }))}
-                      />
-                      On Each Spawn
-                    </label>
-                    <label title="No automatic messages will be sent">
-                      <input
-                        type="radio"
-                        name="trigger"
-                        checked={!editingProfile?.triggerOnJoin && !editingProfile?.triggerOnRespawn}
-                        onChange={() => setEditingProfile((currentEditingProfile) => ({
-                          ...currentEditingProfile!,
-                          triggerOnJoin: false,
-                          triggerOnRespawn: false,
-                        }))}
-                      />
-                      Disabled
-                    </label>
-                  </div>
+                <div className="input-group">
+                  <label className="input-label">Name</label>
+                  <input
+                    type="text"
+                    value={editingProfile.name}
+                    onChange={({ target: { value } }) => setEditingProfile((currentEditingProfile) => ({
+                      ...currentEditingProfile!,
+                      name: value,
+                    }))}
+                    placeholder="Enter pal name"
+                  />
                 </div>
+                
+                <div className="input-group">
+                  <label className="input-label">Personality Description</label>
+                  <textarea
+                    value={editingProfile.personality}
+                    onChange={({ target: { value } }) => setEditingProfile((currentEditingProfile) => ({
+                      ...currentEditingProfile!,
+                      personality: value,
+                    }))}
+                    placeholder="Describe your pal's personality"
+                  />
+                </div>
+                
+                <button 
+                  className="more-settings-toggle"
+                  onClick={() => setShowMoreSettings(!showMoreSettings)}
+                  aria-expanded={showMoreSettings}
+                >
+                  <SettingsIcon size={18} />
+                  <span>More Settings</span>
+                  <div className={`arrow ${showMoreSettings ? 'expanded' : ''}`}>▼</div>
+                </button>
+
+                {showMoreSettings && (
+                  <div className="more-settings-content">
+                    <div className="automated-messages-group">
+                      <div className="input-group">
+                        <label className="input-label">Automated Messages</label>
+                        <div className="message-input">
+                          <input
+                            type="text"
+                            value={editingProfile?.autoMessage || ''}
+                            onChange={({ target: { value } }) => setEditingProfile((currentEditingProfile) => ({
+                              ...currentEditingProfile!,
+                              autoMessage: value,
+                            }))}
+                            placeholder="Message or command to send automatically"
+                          />
+                        </div>
+                        <div className="message-triggers">
+                          <label title="Best for login type commands to execute when bot joins a server">
+                            <input
+                              type="radio"
+                              name="trigger"
+                              checked={!!editingProfile?.triggerOnJoin}
+                              onChange={() => setEditingProfile((currentEditingProfile) => ({
+                                ...currentEditingProfile!,
+                                triggerOnJoin: true,
+                                triggerOnRespawn: false,
+                              }))}
+                            />
+                            On Join
+                          </label>
+                          <label title="For skin commands so it automatically applies skin on each respawn">
+                            <input
+                              type="radio"
+                              name="trigger"
+                              checked={!!editingProfile?.triggerOnRespawn}
+                              onChange={() => setEditingProfile((currentEditingProfile) => ({
+                                ...currentEditingProfile!,
+                                triggerOnJoin: false,
+                                triggerOnRespawn: true,
+                              }))}
+                            />
+                            On Each Spawn
+                          </label>
+                          <label title="No automatic messages will be sent">
+                            <input
+                              type="radio"
+                              name="trigger"
+                              checked={!editingProfile?.triggerOnJoin && !editingProfile?.triggerOnRespawn}
+                              onChange={() => setEditingProfile((currentEditingProfile) => ({
+                                ...currentEditingProfile!,
+                                triggerOnJoin: false,
+                                triggerOnRespawn: false,
+                              }))}
+                            />
+                            Disabled
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bot-say-group">
+                      <div className="input-group">
+                        <label className="input-label">Bot Say</label>
+                        <div className="message-input">
+                          <input
+                            type="text"
+                            value={customMessage}
+                            onChange={(e) => setCustomMessage(e.target.value)}
+                            placeholder="Send messages in the game's chat as the bot"
+                          />
+                        </div>
+                        <button 
+                          className="send-message-button" 
+                          onClick={handleSendMessage}
+                          disabled={sendingMessage || !customMessage.trim()}
+                        >
+                          {sendingMessage ? 'Sending...' : 'Send'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="button-group">
                   <button className="save-button" onClick={saveChanges}>Save</button>
                   {editingProfileIndex !== null && (

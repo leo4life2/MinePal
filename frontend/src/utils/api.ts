@@ -60,7 +60,6 @@ export async function fetchSettings() {
   return filteredSettings;
 }
 
-// deprecate soon
 export async function sendMessage(botName: string, message: string) {
   await fetch(`${settings.API_BASE_URL}/manual-chat`, {
     method: 'POST',
