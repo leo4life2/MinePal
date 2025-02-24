@@ -25,7 +25,15 @@ function Actions() {
     try {
       await signInWithDiscord();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate Discord sign in');
+      if (err instanceof Error) {
+        if (err.message.includes('0x800401F5')) {
+          setError('No default browser, open this in your browser manually: https://wwcgmpbfypiagjfeixmn.supabase.co/auth/v1/authorize?provider=discord');
+        } else {
+          setError(`Sign in with Discord failed: ${err.message}`);
+        }
+      } else {
+        setError('Failed to initiate Discord sign in');
+      }
       setIsLoading(false);
     }
   };
