@@ -1,0 +1,3 @@
+[submodule "prismarine-world"]
+	path = prismarine-world
+	url = https://github.com/leo4life2/prismarine-world.git

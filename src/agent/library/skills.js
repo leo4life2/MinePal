@@ -511,6 +511,11 @@ export async function collectBlock(
     `Starting collectBlock with blockType: ${blockType}, num: ${num}, exclude: ${exclude}`
   );
 
+  if (typeof num !== 'number') {
+    log(bot, `Invalid type for num: ${typeof num}. Expected a number.`);
+    return false;
+  }
+
   if (num < 1) {
     log(bot, `Invalid number of blocks to collect: ${num}.`);
     return false;

@@ -10,11 +10,6 @@ const minepal_response_schema = {
     additionalProperties: false
 };
 export class Proxy {
-    constructor(model_name) {
-        this.model_name = model_name;
-        console.log(`Using model: ${model_name}`);
-    }
-
     async sendRequest(turns, systemMessage, stop_seq='***', memSaving=false) {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(turns);
         let res = null;

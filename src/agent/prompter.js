@@ -2,63 +2,16 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { getCommandDocs } from './commands/index.js';
 import { getSkillDocs } from './library/index.js';
 import { stringifyTurns } from '../utils/text.js';
-import { getCommand } from './commands/index.js';
-
 import { Proxy } from '../models/proxy.js';
-import { GPT } from '../models/gpt.js';
-
 export class Prompter {
     constructor(agent) {
         this.agent = agent;
         this.profile = agent.profile
 
         let name = this.profile.name;
-        let chat = this.profile.model;
-        if (typeof chat === 'string' || chat instanceof String) {
-            chat = {model: chat};
-            if (chat.model.includes('gpt'))
-                chat.api = 'openai';
-            else
-                throw new Error('Unknown model:', chat.model);
-        }
 
-        console.log('Using chat settings:', chat);
-
-        if (chat.api == 'openai') {
-            const openaiApiKey = process.env.OPENAI_API_KEY;
-            if (openaiApiKey && openaiApiKey.trim() !== '') {
-                console.log("!!!!!!! using openai");
-                this.chat_model = new GPT(chat.model, openaiApiKey);
-            } else {
-                console.log("!!!!!!! using proxy");
-                this.chat_model = new Proxy(chat.model, chat.url);
-            }
-        } else {
-            throw new Error('Unknown API:', chat.api);
-        }
-
-        let embedding = this.profile.embedding;
-        if (embedding === undefined) {
-            embedding = {api: chat.api};
-        }
-        else if (typeof embedding === 'string' || embedding instanceof String)
-            embedding = {api: embedding};
-
-        console.log('Using embedding settings:', embedding);
-
-        if (embedding.api == 'openai') {
-            const openaiApiKey = process.env.OPENAI_API_KEY;
-            if (openaiApiKey && openaiApiKey.trim() !== '') {
-                console.log("!!!!!!! using openai for embeddings");
-                this.embedding_model = new GPT(embedding.model, openaiApiKey);
-            } else {
-                console.log("!!!!!!! using proxy for embeddings");
-                this.embedding_model = new Proxy(embedding.model, embedding.url);
-            }
-        } else {
-            this.embedding_model = null;
-            console.log('Unknown embedding: ', embedding ? embedding.api : '[NOT SPECIFIED]', '. Using word overlap.');
-        }
+        this.chat_model = new Proxy();
+        this.embedding_model = new Proxy();
 
         mkdirSync(`${this.agent.userDataDir}/bots/${name}`, { recursive: true });
         writeFileSync(`${this.agent.userDataDir}/bots/${name}/last_profile.json`, JSON.stringify(this.profile, null, 4), (err) => {
