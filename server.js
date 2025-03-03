@@ -2,8 +2,7 @@ import { AgentProcess } from './src/process/agent-process.js';
 import { app as electronApp } from 'electron';
 import express from 'express';
 import http from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
-import { HTTPS_BACKEND_URL, WSS_BACKEND_URL } from './src/constants.js';
+import { HTTPS_BACKEND_URL } from './src/constants.js';
 import fs from 'fs';
 import cors from 'cors';
 import path from 'path';
@@ -14,7 +13,6 @@ import { LocalIndex } from 'vectra';
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
-let wss; // Declare wss in the outer scope
 let isToggleToTalkActive = false; // Global state for toggle_to_talk
 let isKeyDown = false; // Track key state
 let gkl; // Declare the global keyboard listener
@@ -24,17 +22,8 @@ function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
 }
 
-function broadcastMessage(message) {
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-        }
-    });
-}
-
 function notifyBotKicked() {
     logToFile("Bot was kicked");
-    broadcastMessage("Error: Bot kicked.");
 }
 
 function setupVoice(settings) {
@@ -106,7 +95,6 @@ function startServer() {
     const app = express();
     const port = 10101;
     const server = http.createServer(app);
-    wss = new WebSocketServer({ server }); // Initialize wss within startServer
 
     // Configure CORS to allow credentials
     app.use(cors({
@@ -118,78 +106,6 @@ function startServer() {
     app.use((req, res, next) => {
         // logToFile(`Incoming request: ${req.method} ${req.url}`);
         next();
-    });
-
-    let transcriptBuffer = "";
-
-    function broadcastMessage(message) {
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(message);
-            }
-        });
-    }
-
-    wss.on("connection", (ws) => {
-        logToFile("socket: client connected");
-        const proxyWs = new WebSocket(`${WSS_BACKEND_URL}?language=${settings.language}`);
-        
-        // Update settings
-        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-        voice_mode = settings.voice_mode;
-        setupVoice(settings);
-
-        proxyWs.on('open', () => {
-            logToFile(`proxy: connected to ${WSS_BACKEND_URL}`);
-        });
-
-        proxyWs.on('message', (message) => {
-            // console.log(`Voice Mode: ${settings.voice_mode}, isKeyDown: ${isKeyDown}, isToggleToTalkActive: ${isToggleToTalkActive}`);
-            if (voice_mode === 'always_on' || 
-                (voice_mode === 'push_to_talk' && isKeyDown) || 
-                (voice_mode === 'toggle_to_talk' && isToggleToTalkActive)) {
-
-                const parsedMessage = JSON.parse(message.toString('utf8'));
-                const { is_final, speech_final, transcript } = parsedMessage;
-
-                if (is_final) {
-                    transcriptBuffer += transcript;
-                }
-
-                if (speech_final) {
-                    ws.send(transcriptBuffer); // to frontend
-                    agentProcesses.forEach(agentProcess => {
-                        agentProcess.sendTranscription(transcriptBuffer);
-                    });
-                    transcriptBuffer = "";
-                }
-            } else {
-                ws.send("Voice Disabled");
-            }
-        });
-
-        proxyWs.on('close', () => {
-            logToFile(`proxy: connection to ${WSS_BACKEND_URL} closed`);
-            ws.close();
-        });
-
-        proxyWs.on('error', (error) => {
-            logToFile(`proxy: error ${error}`);
-            ws.close();
-        });
-
-        ws.on("message", (message) => {
-            if (proxyWs.readyState === WebSocket.OPEN) {
-                proxyWs.send(message);
-            } else {
-                logToFile("socket: data couldn't be sent to proxy");
-            }
-        });
-
-        ws.on("close", () => {
-            logToFile("socket: client disconnected");
-            proxyWs.close();
-        });
     });
 
     app.get('/backend-alive', async (req, res) => {
