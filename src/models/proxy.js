@@ -1,5 +1,8 @@
 import axios from 'axios';
 import { HTTPS_BACKEND_URL } from '../constants.js';
+import fs from 'fs';
+import path from 'path';
+
 const minepal_response_schema = {
     type: "object",
     properties: {
@@ -9,7 +12,26 @@ const minepal_response_schema = {
     required: ["chat_response", "execute_command"],
     additionalProperties: false
 };
+
 export class Proxy {
+    constructor(userDataDir) {
+        this.userDataDir = userDataDir;
+    }
+
+    // Get the latest JWT from file
+    async getJWT() {
+        try {
+            const tokenPath = path.join(this.userDataDir, 'supa-jwt.json');
+            if (fs.existsSync(tokenPath)) {
+                const data = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+                return data.token;
+            }
+        } catch (err) {
+            console.error("Error reading JWT:", err);
+        }
+        return null;
+    }
+
     async sendRequest(turns, systemMessage, stop_seq='***', memSaving=false) {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(turns);
         let res = null;
@@ -40,7 +62,14 @@ export class Proxy {
                 };
             }
 
-            const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody);
+            // Get JWT for authorization
+            const token = await this.getJWT();
+            const headers = {};
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+
+            const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, { headers });
             res = response.data;
         } catch (err) {
             console.error("Request failed:", err);
@@ -59,10 +88,17 @@ export class Proxy {
         
         while (true) {
             try {
+                // Get JWT for authorization
+                const token = await this.getJWT();
+                const headers = {};
+                if (token) {
+                    headers.Authorization = `Bearer ${token}`;
+                }
+
                 const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/embed`, {
                     model_name: 'text-embedding-3-small',
                     text: text,
-                });
+                }, { headers });
                 return response.data;
             } catch (err) {
                 retryCount++;

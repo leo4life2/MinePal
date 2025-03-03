@@ -21,17 +21,36 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Function to save token to our backend endpoint
+  const saveTokenToBackend = async (token?: string) => {
+    try {
+      await fetch('http://localhost:10101/save-jwt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token || '' })
+      });
+    } catch (error) {
+      console.error('Failed to save token to backend:', error);
+    }
+  };
+
   useEffect(() => {
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Save token from initial session check
+      saveTokenToBackend(session?.access_token);
     });
 
     // Listen for changes on auth state (sign in, sign out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Save token when auth state changes
+      saveTokenToBackend(session?.access_token);
     });
 
     // Handle OAuth redirect

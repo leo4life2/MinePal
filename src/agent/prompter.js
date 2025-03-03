@@ -10,8 +10,8 @@ export class Prompter {
 
         let name = this.profile.name;
 
-        this.chat_model = new Proxy();
-        this.embedding_model = new Proxy();
+        // Create a single proxy instance with userDataDir
+        this.proxy = new Proxy(this.agent.userDataDir);
 
         mkdirSync(`${this.agent.userDataDir}/bots/${name}`, { recursive: true });
         writeFileSync(`${this.agent.userDataDir}/bots/${name}/last_profile.json`, JSON.stringify(this.profile, null, 4), (err) => {
@@ -100,7 +100,7 @@ export class Prompter {
         systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
         
         let chat_response, execute_command;
-        let response = await this.chat_model.sendRequest(messages, systemPrompt);
+        let response = await this.proxy.sendRequest(messages, systemPrompt);
         if (typeof response === 'string') {
             // If it's an error message, return it directly
             if (response.includes('disconnected')) {
@@ -131,6 +131,6 @@ export class Prompter {
     async promptMemSaving(prev_mem, to_summarize) {
         let prompt = this.profile.saving_memory;
         prompt = await this.replaceStrings(prompt, null, null, prev_mem, to_summarize);
-        return await this.chat_model.sendRequest([], prompt, '***', true);
+        return await this.proxy.sendRequest([], prompt, '***', true);
     }
 }

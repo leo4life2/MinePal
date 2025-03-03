@@ -277,6 +277,24 @@ function startServer() {
         }
     });
 
+    // Add JWT save endpoint
+    app.post('/save-jwt', express.json(), (req, res) => {
+        try {
+            const { token } = req.body;
+            const tokenPath = path.join(userDataDir, 'supa-jwt.json');
+            
+            // Save token to file (empty string if not provided)
+            fs.writeFileSync(tokenPath, JSON.stringify({ 
+                token: token || ''
+            }));
+            
+            res.json({ success: true });
+        } catch (error) {
+            logToFile(`Error saving JWT: ${error.message}`);
+            res.status(500).json({ error: "Failed to save JWT" });
+        }
+    });
+
     app.post('/start', express.json(), (req, res) => {
         logToFile('API: POST /start called');
         if (agentProcessStarted) {
