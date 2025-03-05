@@ -123,7 +123,7 @@ export class History {
 
     async insertMemory(text) {
         try {
-            const vector = await this.agent.prompter.chat_model.embed(text);
+            const vector = await this.agent.prompter.proxy.embed(text);
             await this.index.insertItem({
                 vector: vector,
                 metadata: { text: text }
@@ -137,7 +137,7 @@ export class History {
 
     async searchRelevant(text, k = 4) {
         try {
-            const vector = await this.agent.prompter.chat_model.embed(text);
+            const vector = await this.agent.prompter.proxy.embed(text);
             const results = await this.index.queryItems(vector, k);
             return results.map(result => ({
                 text: result.item.metadata.text,
@@ -151,7 +151,7 @@ export class History {
 
     async deleteMemory(text) {
         try {
-            const vector = await this.agent.prompter.chat_model.embed(text);
+            const vector = await this.agent.prompter.proxy.embed(text);
             const results = await this.index.queryItems(vector, 1);
             if (results.length > 0 && results[0].score > 0.95) {  // Only delete if very similar
                 await this.index.deleteItems([results[0].item.id]);
