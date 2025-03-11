@@ -72,13 +72,12 @@ export class Proxy {
             const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, { headers });
             res = response.data;
         } catch (err) {
-            console.error("Request failed:", err);
-            res = "My brain disconnected.";
-            // if ((err.message.includes('Context length exceeded') || err.response?.status === 500) && turns.length > 1) {
-            //     return await this.sendRequest(turns.slice(1), systemMessage, stop_seq, memSaving);
-            // } else {
-            //     res = 'My brain disconnected, try again.';
-            // }
+            res = "Error: ";
+            if (err.response) {
+                res += `${err.response.data.error}`;
+            } else {
+                res += "Request failed, my brain disconnected.";
+            }
         }
         return res;
     }
@@ -101,6 +100,9 @@ export class Proxy {
                 }, { headers });
                 return response.data;
             } catch (err) {
+                if (err.response && err.response.status === 403) {
+                    throw new Error('Access forbidden: ' + err.response.data.error);
+                }
                 retryCount++;
                 
                 if (retryCount > maxRetries) {

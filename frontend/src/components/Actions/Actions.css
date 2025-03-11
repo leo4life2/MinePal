@@ -150,12 +150,6 @@
   background-color: var(--secondary-color);
 }
 
-.modal-content .button-group {
-  display: flex;
-  justify-content: center; /* Center the button horizontally */
-  margin-top: 20px; /* Optional: Add some space above the button */
-}
-
 .api-key-settings {
   display: flex;
   flex-direction: column;  /* Stack items vertically */
@@ -425,4 +419,87 @@
   font-size: 0.85rem;
   opacity: 0.6;
   font-style: italic;
+}
+
+/* Subscription quota styles */
+.subscription-quota {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 15px;
+  position: relative;
+  z-index: 1;
+}
+
+.progress-container {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px; /* Fully semicircle for 24px height */
+  height: 24px;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--primary-color);
+  border-right: 1px solid rgba(255, 255, 255, 0.2); /* Adding border to progress bar */
+  border-radius: 12px; /* Match container radius */
+  transition: width 0.3s ease;
+}
+
+.quota-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% - 30px); /* Make room for refresh button */
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.refresh-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 12px 12px 0; /* Rounded on right side only */
+  width: 30px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2; /* This is fine since it's in a different stacking context */
+}
+
+.refresh-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  width: 16px;
+  height: 16px;
+  filter: invert(0.7);
+}
+
+.refresh-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

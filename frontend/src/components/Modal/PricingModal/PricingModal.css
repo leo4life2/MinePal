@@ -1,0 +1,252 @@
+.pricing-modal {
+  background: #fff;
+  padding: 28px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(44, 24, 16, 0.1);
+  position: relative;
+}
+
+.modal-close-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 5px;
+  line-height: 0;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.modal-close-icon:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #666;
+}
+
+.pricing-title {
+  color: var(--text-color);
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.pricing-subtitle {
+  color: #666;
+  margin: 0 0 20px 0;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.pricing-plans {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.pricing-plan {
+  background: var(--bg-color);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 12px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-height: 80px;
+}
+
+.pricing-plan:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(44, 24, 16, 0.1);
+}
+
+.pricing-plan.selected {
+  border-color: var(--primary-color);
+  background: rgba(215, 117, 76, 0.05);
+  transform: scale(1.02);
+}
+
+.plan-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  flex: 1;
+}
+
+.plan-name {
+  color: var(--text-color);
+  margin: 0 0 4px 0;
+  font-size: 1.2rem;
+}
+
+.plan-quota {
+  font-weight: bold;
+  color: var(--primary-color);
+  margin: 4px 0;
+  font-size: 1rem;
+}
+
+.plan-value {
+  font-size: 0.75rem;
+  color: #666;
+  margin: 2px 0 0 0;
+  line-height: 1.2;
+}
+
+.price-per-response {
+  font-weight: bold;
+}
+
+.plan-price-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-left: 12px;
+  min-width: 80px;
+}
+
+.plan-price {
+  font-size: 1.4rem;
+  color: var(--text-color);
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.price-currency {
+  font-size: 0.9rem;
+  vertical-align: super;
+}
+
+.price-amount {
+  font-weight: bold;
+  margin: 0 2px;
+}
+
+.price-period {
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.subscription-info {
+  background: rgba(215, 117, 76, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.subscription-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subscription-info li {
+  font-size: 0.85rem;
+  color: #666;
+  position: relative;
+  padding-left: 18px;
+}
+
+.subscription-info li:before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+.pricing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.subscribe-button {
+  padding: 16px;
+  background-color: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.subscribe-button:hover:not(:disabled) {
+  background-color: var(--secondary-color);
+}
+
+.subscribe-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #e53935;
+  background-color: rgba(229, 57, 53, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .pricing-modal {
+    padding: 20px 16px;
+    width: 100%;
+    max-height: 85vh;
+  }
+  
+  .pricing-title {
+    font-size: 1.2rem;
+  }
+  
+  .pricing-subtitle {
+    font-size: 0.8rem;
+  }
+  
+  .pricing-plan {
+    padding: 10px 12px;
+    min-height: 70px;
+  }
+  
+  .plan-name {
+    font-size: 1rem;
+  }
+  
+  .plan-price {
+    font-size: 1.2rem;
+  }
+  
+  .plan-quota {
+    font-size: 0.9rem;
+  }
+  
+  .plan-value {
+    font-size: 0.7rem;
+  }
+  
+  .plan-price-container {
+    min-width: 70px;
+  }
+} 

@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { ReactNode, useEffect, useState } from 'react';
-import { SupabaseContext, SupabaseContextType } from './SupabaseContext';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../config/supabase';
+import { SupabaseContext, SupabaseContextType, StripeData } from './SupabaseContext';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../constants';
 import { IpcRendererEvent } from 'electron';
 
 // Get electron IPC renderer if we're in electron
@@ -20,6 +20,14 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
   );
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPaying, setIsPaying] = useState(false);
+  const [tierQuota, setTierQuota] = useState<number | null>(null);
+  const [requestsRemaining, setRequestsRemaining] = useState<number | null>(null);
+  const [stripeData, setStripeData] = useState<StripeData>({
+    customerId: null,
+    subscriptionId: null,
+    subscriptionItemId: null
+  });
 
   // Function to save token to our backend endpoint
   const saveTokenToBackend = async (token?: string) => {
@@ -34,10 +42,77 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     }
   };
 
+  // Function to fetch subscription data
+  const fetchSubscriptionData = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_subscription')
+        .select('stripe_subscription_id, tier_quota, stripe_customer_id, stripe_subscription_item_id, requests_remaining')
+        .eq('user_id', userId)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching subscription data:', error);
+        setIsPaying(false);
+        setTierQuota(null);
+        setRequestsRemaining(null);
+        setStripeData({
+          customerId: null,
+          subscriptionId: null,
+          subscriptionItemId: null
+        });
+        return;
+      }
+      
+      // Destructure data once
+      const { 
+        stripe_subscription_id,
+        tier_quota, 
+        requests_remaining, 
+        stripe_customer_id, 
+        stripe_subscription_item_id 
+      } = data;
+      
+      // Set all states using the destructured values
+      setIsPaying(stripe_subscription_id !== null && stripe_subscription_id !== "" && stripe_subscription_id !== undefined);
+      setTierQuota(tier_quota ?? null);
+      setRequestsRemaining(requests_remaining ?? null);
+      setStripeData({
+        customerId: stripe_customer_id ?? null,
+        subscriptionId: stripe_subscription_id ?? null,
+        subscriptionItemId: stripe_subscription_item_id ?? null
+      });
+      
+    } catch (err) {
+      console.error('Failed to fetch subscription data:', err);
+      setIsPaying(false);
+      setTierQuota(null);
+      setRequestsRemaining(null);
+      setStripeData({
+        customerId: null,
+        subscriptionId: null,
+        subscriptionItemId: null
+      });
+    }
+  };
+
+  // Function to refresh subscription data for the current user
+  const refreshSubscription = async () => {
+    if (!user) return;
+    await fetchSubscriptionData(user.id);
+  };
+
   useEffect(() => {
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      // Fetch subscription data if user is logged in
+      if (currentUser) {
+        fetchSubscriptionData(currentUser.id);
+      }
+      
       setLoading(false);
       
       // Save token from initial session check
@@ -46,7 +121,16 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
 
     // Listen for changes on auth state (sign in, sign out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      // Fetch subscription data if user is logged in
+      if (currentUser) {
+        fetchSubscriptionData(currentUser.id);
+      } else {
+        setIsPaying(false); // Reset isPaying when user logs out
+      }
+      
       setLoading(false);
       
       // Save token when auth state changes
@@ -136,8 +220,13 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     supabase,
     user,
     loading,
+    isPaying,
+    tierQuota,
+    requestsRemaining,
+    stripeData,
     signOut,
-    signInWithDiscord
+    signInWithDiscord,
+    refreshSubscription,
   };
 
   return (

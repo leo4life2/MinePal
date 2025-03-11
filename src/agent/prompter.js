@@ -103,13 +103,14 @@ export class Prompter {
         let response = await this.proxy.sendRequest(messages, systemPrompt);
         if (typeof response === 'string') {
             // If it's an error message, return it directly
-            if (response.includes('disconnected')) {
+            if (response.includes('Error')) {
                 return response;
             }
             // Otherwise try to parse as JSON
             try {
                 response = JSON.parse(response);
             } catch (e) {
+                // Bad json
                 return "Oops! OpenAI's server took an arrow to the knee. Mind trying that prompt again?";
             }
         }

@@ -1,497 +1,64 @@
 .profile-box {
-    display: flex;
-    align-items: center;
-    padding: 10px;
-    border: 1px solid var(--border-color);
-    background: #fff;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-  }
-  
-  .profile-box:hover {
-    transform: translateY(-2px);
-    background: var(--bg-color);
-    box-shadow: 0 4px 12px rgba(44, 24, 16, 0.05);
-  }
-  
-  .profile-box input {
-    margin-right: 10px;
-    width: auto; /* Ensure the checkbox does not take full width */
-  }
-  
-  .profile-box.empty {
-    justify-content: center;
-    padding: 5px;
-    font-size: 24px;
-    color: var(--secondary-color);
-    border-style: dashed;
-    border-width: 3px;
-    background: transparent;
-  }
-  
-  .modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--modal-overlay);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    backdrop-filter: blur(4px);
-  }
-  
-  .modal-content {
-    background: #fff;
-    padding: 24px;
-    border-radius: 12px;
-    width: 80%;
-    max-width: 500px;
-    box-shadow: 0 8px 24px rgba(44, 24, 16, 0.1);
-  }
-  
-  .modal-content h2 {
-    margin-top: 0;
-  }
-  
-  .modal-content .input-group {
-    margin-bottom: 16px;
-  }
-  
-  .modal-content .input-label {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--text-color);
-    font-weight: 600;
-    font-size: 1rem;
-  }
-  
-  .modal-content textarea {
-    width: 100%;
-    height: 200px;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    background: #f7f7f7;
-    color: var(--text-color);
-    box-sizing: border-box;
-  }
-  
-  .modal-content input[type="text"] {
-    width: 100%;
-    padding: 10px;
-    background: #f7f7f7;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    color: var(--text-color);
-    box-sizing: border-box;
-  }
-  
-  .modal-content .button-group {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 20px;
-  }
-  
-  .modal-content .save-button,
-  .modal-content .delete-button,
-  .send-button {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-weight: 500;
-  }
-  
-  .modal-content .save-button {
-    background-color: var(--primary-color);
-    color: #fff;
-  }
-  
-  .modal-content .save-button:hover {
-    background-color: var(--hover-color);
-    transform: translateY(-2px);
-  }
-  
-  .modal-content .delete-button {
-    background-color: var(--error-color);
-    color: #fff;
-  }
-  
-  .modal-content .delete-button:hover {
-    background-color: #f05454;
-    transform: translateY(-2px);
-  }
-  
-  .send-group {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-    margin-top: 5px;
-  }
-  
-  .send-group input {
-    flex-grow: 1;
-    height: 100%;
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    color: var(--text-color);
-    box-sizing: border-box;
-    transition: all 0.3s ease;
-    padding: 10px;
-  }
-  
-  .send-group input:focus {
-    border-color: var(--primary-color);
-    outline: none;
-  }
-  
-  .send-button {
-    background-color: var(--primary-color);
-    color: #fff;
-    margin-left: 10px;
-  }
-  
-  .send-button:hover {
-    background-color: var(--hover-color);
-    transform: translateY(-2px);
-  }
-  
-  .profile-box input[type="checkbox"] {
-    width: 28px;
-    height: 28px;
-    appearance: none;
-    border: 2px solid var(--border-color);
-    border-radius: 4px;
-    background: #fff;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-right: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .profile-box input[type="checkbox"]:checked {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-  }
-  
-  .profile-box input[type="checkbox"]:checked::after {
-    content: '✓';
-    color: #fff;
-    font-size: 18px;
-    line-height: 1;
-  }
-  
-  .profile-box input[type="checkbox"]:hover {
-    border-color: var(--primary-color);
-    transform: scale(1.05);
-  }
-
-.view-memories-button {
-  background-color: var(--primary-color);
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  margin-right: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.view-memories-button:hover {
-  background-color: var(--hover-color);
-  transform: translateY(-1px);
-}
-
-.memories-modal {
-  width: 100%;
-}
-
-.memories-modal h3 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  color: var(--primary-color);
-  font-size: 1.5rem;
-}
-
-.memories-table {
-  max-height: 500px;
-  overflow-y: auto;
-  margin-bottom: 20px;
-  background: var(--bg-color);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-}
-
-.memories-table::-webkit-scrollbar {
-  width: 8px;
-}
-
-.memories-table::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-.memories-table::-webkit-scrollbar-thumb {
-  background-color: var(--primary-color);
-  border-radius: 10px;
-}
-
-.memory-row {
   display: flex;
   align-items: center;
-  padding: 15px;
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.3s ease;
-}
-
-.memory-row:hover {
-  background: #fff;
-}
-
-.memory-text {
-  flex: 1;
-  margin-right: 16px;
-  word-break: break-word;
-  color: var(--text-color);
-  line-height: 1.5;
-  font-size: 0.9rem;
-}
-
-.delete-memory-button {
-  background: none;
-  border: none;
-  color: var(--secondary-color);
-  font-size: 24px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 0.3s ease;
-}
-
-.delete-memory-button:hover {
-  background-color: rgba(242, 95, 76, 0.1);
-  transform: scale(1.1);
-}
-
-.back-button {
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.back-button:hover {
-  background-color: #e8dcc5;
-  transform: translateY(-2px);
-}
-
-/* Update modal-content size when showing memories */
-.modal-content.showing-memories {
-  max-width: 800px;
-  width: 90%;
-}
-
-.no-memories {
-  padding: 30px;
-  text-align: center;
-  color: var(--text-color);
-  font-style: italic;
-  font-size: 0.9rem;
-}
-
-.automated-messages-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.message-input {
-  width: 100%;
-}
-
-.message-input input {
-  width: 100%;
-  padding: 8px;
-  background: #f7f7f7;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  color: var(--text-color);
-}
-
-.message-triggers {
-  display: flex;
-  gap: 16px;
-  margin-top: 8px;
-}
-
-.message-triggers label {
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 4px 4px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-  position: relative;
-  color: var(--text-color);
-}
-
-.message-triggers label:hover {
-  background-color: var(--bg-color);
-}
-
-/* Custom tooltip styling */
-.message-triggers label:hover::after {
-  content: attr(title);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 8px 12px;
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  border: 1px solid var(--primary-color);
-  border-radius: 4px;
-  font-size: 0.8rem;
-  white-space: normal;
-  width: max-content;
-  max-width: 200px;
-  text-align: center;
-  z-index: 1000;
-  pointer-events: none;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  word-wrap: break-word;
-}
-
-/* Tooltip arrow */
-.message-triggers label:hover::before {
-  content: '';
-  position: absolute;
-  bottom: calc(100% + 3px);
-  left: 50%;
-  transform: translateX(-50%);
-  border-width: 5px;
-  border-style: solid;
-  border-color: var(--primary-color) transparent transparent transparent;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.message-triggers input[type="radio"] {
-  margin: 0;
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  appearance: none;
-  border: 2px solid var(--primary-color);
-  border-radius: 50%;
-  outline: none;
-  transition: all 0.2s ease;
-  background: #fff;
-}
-
-.message-triggers input[type="radio"]:checked {
-  background: var(--primary-color);
-  box-shadow: inset 0 0 0 3px #fff;
-}
-
-.message-triggers input[type="radio"]:hover {
-  transform: scale(1.1);
-}
-
-.more-settings-toggle {
-  width: 100%;
-  padding: 12px;
-  background: var(--bg-color);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  color: var(--text-color);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: all 0.3s ease;
-  margin: 8px 0;
-}
-
-.more-settings-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-1px);
-}
-
-.more-settings-toggle span {
-  flex: 1;
-  text-align: left;
-  font-weight: 500;
-}
-
-.more-settings-toggle .arrow {
-  font-size: 12px;
-  transition: transform 0.3s ease;
-  opacity: 0.5;
-}
-
-.more-settings-toggle .arrow.expanded {
-  transform: rotate(180deg);
-}
-
-.more-settings-content {
-  margin-top: 16px;
-  padding: 16px 16px 0 16px;
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.bot-say-group {
-  border-top: 1px solid var(--border-color);
-  padding-top: 16px;
-}
-
-.send-message-button {
-  width: 100%;
-  margin-top: 8px;
   padding: 10px;
-  background-color: var(--primary-color);
-  color: #fff;
-  border: none;
+  border: 1px solid var(--border-color);
+  background: #fff;
   border-radius: 8px;
+  margin-bottom: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-weight: 500;
 }
 
-.send-message-button:hover:not(:disabled) {
-  background-color: var(--hover-color);
-  transform: translateY(-1px);
+.profile-box:hover {
+  transform: translateY(-2px);
+  background: var(--bg-color);
+  box-shadow: 0 4px 12px rgba(44, 24, 16, 0.05);
 }
 
-.send-message-button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+.profile-box input {
+  margin-right: 10px;
+  width: auto; /* Ensure the checkbox does not take full width */
+}
+
+.profile-box.empty {
+  justify-content: center;
+  padding: 5px;
+  font-size: 24px;
+  color: var(--secondary-color);
+  border-style: dashed;
+  border-width: 3px;
+  background: transparent;
+}
+
+.profile-box input[type="checkbox"] {
+  width: 28px;
+  height: 28px;
+  appearance: none;
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-box input[type="checkbox"]:checked {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.profile-box input[type="checkbox"]:checked::after {
+  content: '✓';
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.profile-box input[type="checkbox"]:hover {
+  border-color: var(--primary-color);
+  transform: scale(1.05);
 }
