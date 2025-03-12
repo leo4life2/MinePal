@@ -186,7 +186,7 @@ function Actions() {
             </button>
           </div>
           <div className="quota-refresh-notice">
-            Responses refresh at the beginning of each month
+            responses refresh at the beginning of each month
           </div>
         </div>
       )}
