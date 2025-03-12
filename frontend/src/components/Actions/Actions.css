@@ -16,7 +16,6 @@
   transition: transform 0.3s;
   height: 60px; /* Increased height */
   box-sizing: border-box;
-  margin-top: 20px;
   width: 100%;
   font-weight: 600; /* Make text bold */
   font-size: 1.1rem; /* Make text larger */
@@ -424,21 +423,24 @@
 /* Subscription quota styles */
 .subscription-quota {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   width: 100%;
-  margin-top: 15px;
+  margin-top: 5px;
   position: relative;
   z-index: 1;
 }
 
 .progress-container {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px; /* Fully semicircle for 24px height */
-  height: 24px;
+  background: var(--bg-color);
+  border-radius: 20px;
+  height: 20px;
   position: relative;
   overflow: hidden;
   width: 100%;
+  margin-top: 5px;
+  border: 1.3px solid var(--primary-color);
+  display: flex; /* Make this a flex container */
+  align-items: center; /* Center items vertically */
 }
 
 .progress-bar {
@@ -447,37 +449,38 @@
   border-right: 1px solid rgba(255, 255, 255, 0.2); /* Adding border to progress bar */
   border-radius: 12px; /* Match container radius */
   transition: width 0.3s ease;
+  position: absolute; /* Keep this absolute since it's a background element */
+  left: 0;
+  top: 0;
+  z-index: 1;
 }
 
 .quota-text {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: calc(100% - 30px); /* Make room for refresh button */
-  height: 100%;
+  position: relative; /* Change from absolute to relative */
+  flex: 1; /* Take up remaining space */
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-color);
   font-size: 0.85rem;
   white-space: nowrap;
+  z-index: 2; /* Place above progress bar */
+  padding-left: 5px; /* Add some padding */
 }
 
 .refresh-button {
-  position: absolute;
-  top: 0;
-  right: 0;
+  position: relative; /* Change from absolute to relative */
   background: transparent;
   border: none;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0 12px 12px 0; /* Rounded on right side only */
   width: 30px;
-  height: 24px;
+  height: 100%; /* Make it full height of container */
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 2; /* This is fine since it's in a different stacking context */
+  z-index: 2; /* Place above progress bar */
 }
 
 .refresh-button:hover {
@@ -502,4 +505,11 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.quota-refresh-notice {
+  color: #666666;
+  font-size: 0.75em;
+  text-align: center;
+  margin-top: 3px;
 }

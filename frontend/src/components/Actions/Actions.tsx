@@ -144,9 +144,6 @@ function Actions() {
 
   return (
     <div className="actions">
-      <div className="notice" style={{ color: '#666666', fontSize: '0.9em', marginTop: '5px' }}>
-        Voice chat temporarily disabled due to high server loads (will be back soon!)
-      </div>
       <button 
         className="action-button" 
         onClick={actionButtonPressed}
@@ -164,16 +161,16 @@ function Actions() {
               className="progress-bar" 
               style={{ 
                 width: requestsRemaining !== null && tierQuota !== null ? 
-                  `${(requestsRemaining / tierQuota) * 100}%` : 
-                  '0%' 
+                  `${((tierQuota - requestsRemaining) / tierQuota) * 100}%` : 
+                  '0%'
               }}
             ></div>
             <div className="quota-text">
               {loadingSubscription ? 
                 'Loading...' : 
                 (requestsRemaining !== null && tierQuota !== null) ? 
-                  `${requestsRemaining}/${tierQuota} responses remaining this month` : 
-                  'Play with a Pal to claim your free tier'
+                  `${tierQuota - requestsRemaining}/${tierQuota} responses used this month` : 
+                  '0/200 responses used this month'
               }
             </div>
             <button 
@@ -187,6 +184,9 @@ function Actions() {
                 className={loadingSubscription ? "refresh-icon spinning" : "refresh-icon"} 
               />
             </button>
+          </div>
+          <div className="quota-refresh-notice">
+            Responses refresh at the beginning of each month
           </div>
         </div>
       )}

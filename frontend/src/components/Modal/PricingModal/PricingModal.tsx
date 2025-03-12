@@ -3,6 +3,7 @@ import { PRICING_PLANS, PricingPlan, HTTPS_BACKEND_URL } from '../../../constant
 import { X as CloseIcon } from 'react-feather';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
 import './PricingModal.css';
+import { ModalWrapper } from '..';
 
 // Get electron shell
 const isElectron = window && window.process && window.process.type;
@@ -103,7 +104,7 @@ function PricingModal({ onClose }: PricingModalProps) {
   };
 
   return (
-    <div className="modal">
+    <ModalWrapper onClose={onClose}>
       <div className="modal-content pricing-modal">
         <button className="modal-close-icon" onClick={onClose}>
           <CloseIcon size={18} />
@@ -159,7 +160,7 @@ function PricingModal({ onClose }: PricingModalProps) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalWrapper>
   );
 }
 

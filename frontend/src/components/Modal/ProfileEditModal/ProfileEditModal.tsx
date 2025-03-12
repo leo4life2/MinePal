@@ -3,6 +3,7 @@ import { Memory, deleteMemory, fetchBotMemories, sendMessage } from '../../../ut
 import { Profile } from '../../../types/apiTypes';
 import { Settings as SettingsIcon, X as CloseIcon } from 'react-feather';
 import './ProfileEditModal.css';
+import { ModalWrapper } from '..';
 
 interface ProfileEditModalProps {
   profile: Profile;
@@ -94,7 +95,7 @@ function ProfileEditModal({
   };
 
   return (
-    <div className="modal">
+    <ModalWrapper onClose={onClose}>
       <div className={`modal-content profile-modal ${showMemories ? 'showing-memories' : ''}`}>
         <button className="modal-close-icon" onClick={onClose}>
           <CloseIcon size={18} />
@@ -258,7 +259,7 @@ function ProfileEditModal({
           </div>
         )}
       </div>
-    </div>
+    </ModalWrapper>
   );
 }
 

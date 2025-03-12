@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
 import { User as UserIcon, X as CloseIcon, Award } from 'react-feather';
-import { PricingModal } from '..';
+import { PricingModal, ModalWrapper } from '..';
 import './AccountModal.css';
 import { HTTPS_BACKEND_URL } from '../../../constants';
 
@@ -41,7 +41,7 @@ function AccountModal() {
 
   const handlePlanButtonClick = async () => {
     if (isPaying) {
-      await getCustomerPortal();
+      await getCustomerPortal('update');
     } else {
       // If user is not paying, show pricing modal
       setShowPricingModal(true);
@@ -50,16 +50,16 @@ function AccountModal() {
   };
 
   const handleCancelPlan = async () => {
-    await getCustomerPortal(true);
+    await getCustomerPortal('cancel');
   };
 
-  const getCustomerPortal = async (isCancel = false) => {
+  const getCustomerPortal = async (action?: 'cancel' | 'update') => {
     if (!stripeData.customerId) {
       setError('No customer ID found. Please contact support.');
       return;
     }
 
-    if (isCancel && !stripeData.subscriptionId) {
+    if (action && !stripeData.subscriptionId) {
       setError('No subscription ID found. Please contact support.');
       return;
     }
@@ -89,10 +89,11 @@ function AccountModal() {
 
       const { url } = await response.json();
 
-      // Append the cancel path if this is a cancellation request
-      const finalUrl = isCancel && stripeData.subscriptionId 
-        ? `${url}/subscriptions/${stripeData.subscriptionId}/cancel` 
-        : url;
+      // Append the appropriate path if we're handling a subscription action
+      let finalUrl = url;
+      if (action && stripeData.subscriptionId) {
+        finalUrl = `${url}/subscriptions/${stripeData.subscriptionId}/${action}`;
+      }
 
       // Open the portal URL in external browser
       if (shell) {
@@ -125,7 +126,7 @@ function AccountModal() {
       </button>
 
       { showModal && (
-        <div className="modal account-modal-container">
+        <ModalWrapper onClose={() => setShowModal(false)}>
           <div className="modal-content account-modal">
             <button 
               className="modal-close-icon"
@@ -185,7 +186,7 @@ function AccountModal() {
               Sign Out
             </button>
           </div>
-        </div>
+        </ModalWrapper>
       )}
 
       {showPricingModal && (

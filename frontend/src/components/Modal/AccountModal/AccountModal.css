@@ -72,10 +72,12 @@
   box-shadow: 0 8px 24px rgba(44, 24, 16, 0.1);
   position: relative;
   box-sizing: border-box;
+  width: 450px;
 }
 
 .account-info {
   margin-bottom: 24px;
+  max-width: 100%;
 }
 
 .account-avatar-large {
@@ -92,12 +94,14 @@
   color: var(--text-color);
   margin: 0;
   font-size: 1.2rem;
+  max-width: 100%;
 }
 
 .account-plan {
   color: #666;
   font-size: 0.9rem;
   margin: 5px 0 0;
+  max-width: 100%;
 }
 
 .sign-out-button {
@@ -217,7 +221,6 @@
   padding: 12px;
   background-color: rgba(220, 53, 69, 0.1);
   color: #dc3545;
-  border: 1px solid #dc3545;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
@@ -231,95 +234,6 @@
 }
 
 .cancel-plan-note {
-  color: #777;
-  font-size: 0.8rem;
-  margin: 0;
-  padding: 0;
-  text-align: center;
-  max-width: 100%;
-  overflow-wrap: break-word;
-}
-
-/* Use one specific selector for width control */
-.account-modal-container .modal-content.account-modal {
-  width: 450px;
-  box-sizing: border-box;
-}
-
-.account-modal-container .account-info {
-  margin-bottom: 24px;
-  max-width: 100%;
-}
-
-.account-modal-container .account-avatar-large {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  object-fit: cover;
-  margin-bottom: 12px;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 2px 8px rgba(44, 24, 16, 0.05);
-}
-
-.account-modal-container .account-info h3 {
-  color: var(--text-color);
-  margin: 0;
-  font-size: 1.2rem;
-  max-width: 100%;
-}
-
-.account-modal-container .account-plan {
-  color: #666;
-  font-size: 0.9rem;
-  margin: 5px 0 0;
-  max-width: 100%;
-}
-
-.account-modal-container .choose-plan-button {
-  width: 100%;
-  padding: 12px;
-  background-color: var(--primary-color);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  margin-bottom: 12px;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.account-modal-container .choose-plan-button:hover {
-  background-color: var(--accent-color);
-  transform: translateY(-1px);
-}
-
-.account-modal-container .cancel-plan-container {
-  margin-bottom: 12px;
-}
-
-.account-modal-container .cancel-plan-button {
-  width: 100%;
-  padding: 12px;
-  background-color: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
-  border: 1px solid #dc3545;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  margin-bottom: 6px;
-  transition: all 0.3s ease;
-}
-
-.account-modal-container .cancel-plan-button:hover {
-  background-color: rgba(220, 53, 69, 0.2);
-  transform: translateY(-1px);
-}
-
-.account-modal-container .cancel-plan-note {
   color: #777;
   font-size: 0.8rem;
   margin: 0;
