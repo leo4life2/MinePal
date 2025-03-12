@@ -172,7 +172,23 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
           return;
         }
 
-        console.error('No authentication credentials found in callback URL');
+        // Check for error_description in URL params
+        const errorDescription = urlObj.searchParams.get('error_description');
+        if (errorDescription) {
+          console.error('Authentication error:', errorDescription);
+          
+          // Check for specific error about unverified email
+          if (errorDescription === 'Error getting user email from external provider') {
+            throw new Error('Your Discord account needs a verified email address. Please verify your email in Discord and try again.');
+          }
+          
+          throw new Error(errorDescription);
+        }
+
+        // If we get here, there's no auth credentials and no error description
+        const errorMsg = 'No authentication credentials found in callback URL';
+        console.error(errorMsg);
+        throw new Error(errorMsg);
       } catch (err) {
         console.error('Error handling auth redirect:', err);
         throw err;
