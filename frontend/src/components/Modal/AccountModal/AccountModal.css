@@ -97,6 +97,16 @@
   max-width: 100%;
 }
 
+.account-user-id {
+  color: #888;
+  font-size: 0.8rem;
+  margin: 4px 0 0;
+  font-family: monospace;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .account-plan {
   color: #666;
   font-size: 0.9rem;

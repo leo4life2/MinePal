@@ -142,6 +142,7 @@ function AccountModal() {
                 className="account-avatar-large"
               />
               <h3>{full_name}</h3>
+              <p className="account-user-id">Minepal User ID: {user.id}</p>
               {tierQuota !== null && (
                 <p className="account-plan">
                   Your Plan: {tierQuota} responses/month
