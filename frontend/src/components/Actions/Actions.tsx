@@ -22,7 +22,9 @@ function Actions() {
     tierQuota,
     requestsRemaining,
     stripeData,
-    refreshSubscription 
+    refreshSubscription,
+    authError,
+    clearAuthError
   } = useSupabase();
   
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -31,6 +33,9 @@ function Actions() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingSubscription, setLoadingSubscription] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
+
+  // Combined error display - from local error state or context auth error
+  const displayError = error || authError;
 
   const handleRefreshSubscription = async () => {
     setLoadingSubscription(true);
@@ -98,20 +103,39 @@ function Actions() {
       setShowAuthModal(false);
       setIsLoading(false);
       setError(undefined);
+      clearAuthError();
     }
-  }, [user, loading]);
+  }, [user, loading, clearAuthError]);
 
   const handleDiscordSignIn = async () => {
     if (!isLoading) {
       setIsLoading(true);
       try {
         await signInWithDiscord();
-      } catch (error) {
-        console.error('Error signing in with Discord:', error);
-        setError('Failed to initiate Discord sign in');
+      } catch (err) {
+        if (err instanceof Error) {
+          if (err.message.includes('0x800401F5')) {
+            setError('No default browser, open this in your browser manually: https://wwcgmpbfypiagjfeixmn.supabase.co/auth/v1/authorize?provider=discord');
+          } else {
+            setError(`Sign in with Discord failed: ${err.message}`);
+          }
+        } else {
+          setError('Failed to initiate Discord sign in');
+        }
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
+  };
+
+  const closeAuthModal = () => {
+    setShowAuthModal(false);
+    setError(undefined);
+    clearAuthError();
+  };
+
+  const closePricingModal = () => {
+    setShowPricingModal(false);
+    clearAuthError();
   };
 
   const actionButtonPressed = () => {
@@ -157,7 +181,7 @@ function Actions() {
         {getButtonText()}
       </button>
 
-      {error && <div className="error-message">{error}</div>}
+      {displayError && <div className="error-message">{displayError}</div>}
 
       {user && (
         <div className="subscription-quota">
@@ -218,9 +242,9 @@ function Actions() {
                 <a href="https://app.getterms.io/view/4ZA3K/privacy/en-us" target="_blank" rel="noopener noreferrer">Privacy Policy</a>, and{' '}
                 <a href="https://app.getterms.io/view/4ZA3K/aup/en-us" target="_blank" rel="noopener noreferrer">Acceptable Use Policy</a>
               </p>
-            {error && <div className="error-message">{error}</div>}
+            {displayError && <div className="error-message">{displayError}</div>}
             
-            <button className="auth-cancel-button" onClick={() => setShowAuthModal(false)}>
+            <button className="auth-cancel-button" onClick={closeAuthModal}>
               Go back
             </button>
           </div>
@@ -228,7 +252,7 @@ function Actions() {
       )}
 
       {showPricingModal && (
-        <PricingModal onClose={() => setShowPricingModal(false)} />
+        <PricingModal onClose={closePricingModal} />
       )}
     </div>
   );

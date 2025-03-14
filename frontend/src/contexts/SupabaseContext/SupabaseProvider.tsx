@@ -23,11 +23,17 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
   const [isPaying, setIsPaying] = useState(false);
   const [tierQuota, setTierQuota] = useState<number | null>(null);
   const [requestsRemaining, setRequestsRemaining] = useState<number | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [stripeData, setStripeData] = useState<StripeData>({
     customerId: null,
     subscriptionId: null,
     subscriptionItemId: null
   });
+
+  // Function to clear auth error
+  const clearAuthError = () => {
+    setAuthError(null);
+  };
 
   // Function to save token to our backend endpoint
   const saveTokenToBackend = async (token?: string) => {
@@ -151,6 +157,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
             console.error('Error exchanging code for session:', error);
+            setAuthError(error.message);
             throw error;
           }
           return;
@@ -167,6 +174,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
           });
           if (error) {
             console.error('Error setting session:', error);
+            setAuthError(error.message);
             throw error;
           }
           return;
@@ -178,19 +186,26 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
           console.error('Authentication error:', errorDescription);
           
           // Check for specific error about unverified email
-          if (errorDescription === 'Error getting user email from external provider') {
-            throw new Error('Your Discord account needs a verified email address. Please verify your email in Discord and try again.');
+          if (errorDescription.replace(/\+/g, ' ') === 'Error getting user email from external provider') {
+            const errorMsg = 'Your Discord account needs a verified email address. Please verify your email in Discord and try again.';
+            setAuthError(errorMsg);
+            throw new Error(errorMsg);
           }
           
+          setAuthError(errorDescription.replace(/\+/g, ' '));
           throw new Error(errorDescription);
         }
 
         // If we get here, there's no auth credentials and no error description
         const errorMsg = 'No authentication credentials found in callback URL';
         console.error(errorMsg);
+        setAuthError(errorMsg);
         throw new Error(errorMsg);
       } catch (err) {
         console.error('Error handling auth redirect:', err);
+        if (err instanceof Error && !authError) {
+          setAuthError(err.message);
+        }
         throw err;
       }
     };
@@ -243,6 +258,8 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     signOut,
     signInWithDiscord,
     refreshSubscription,
+    authError,
+    clearAuthError,
   };
 
   return (

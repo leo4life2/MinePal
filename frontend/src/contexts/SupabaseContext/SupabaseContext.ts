@@ -15,9 +15,11 @@ export interface SupabaseContextType {
   tierQuota: number | null;
   requestsRemaining: number | null;
   stripeData: StripeData;
+  authError: string | null;
   signInWithDiscord: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
+  clearAuthError: () => void;
 }
 
 export const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined); 
