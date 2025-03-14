@@ -19,24 +19,24 @@ export const PRICING_PLANS: PricingPlan[] = [
     name: 'Basic',
     price: 2.99,
     quota: 1200,
-    priceId: 'price_1R0YEFAbdM8AcunxnUxj07sw' // Test mode
-    // priceId: 'price_live_basic_placeholder' // Live mode
+    // priceId: 'price_1R0YEFAbdM8AcunxnUxj07sw' // Test mode
+    priceId: 'price_1R2MrRAbdM8AcunxfX4snQNi' // Live mode
   },
   {
     id: 2,
     name: 'Standard',
     price: 7.99,
     quota: 3600,
-    priceId: 'price_1R0YFHAbdM8AcunxY1rm8fkw' // Test mode
-    // priceId: 'price_live_standard_placeholder' // Live mode
+    // priceId: 'price_1R0YFHAbdM8AcunxY1rm8fkw' // Test mode
+    priceId: 'price_1R2MrTAbdM8AcunxqGPVw0ZR' // Live mode
   },
   {
     id: 3,
     name: 'Pro',
     price: 13.99,
     quota: 7000,
-    priceId: 'price_1R0YFYAbdM8AcunxKH04jHck' // Test mode
-    // priceId: 'price_live_pro_placeholder' // Live mode
+    // priceId: 'price_1R0YFYAbdM8AcunxKH04jHck' // Test mode
+    priceId: 'price_1R2MrVAbdM8AcunxMUql3BtU' // Live mode
   }
 ]; 
 

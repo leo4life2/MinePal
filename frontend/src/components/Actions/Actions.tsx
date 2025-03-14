@@ -74,9 +74,14 @@ function Actions() {
 
       const { url } = await response.json();
 
+      let finalUrl = url;
+      if (stripeData.subscriptionId) {
+        finalUrl = `${url}/subscriptions/${stripeData.subscriptionId}/update`;
+      }
+
       // Open the portal URL in external browser
       if (shell) {
-        shell.openExternal(url);
+        shell.openExternal(finalUrl);
       } else {
         console.log('Not in Electron environment, would open:', url);
       }
