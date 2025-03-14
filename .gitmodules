@@ -1,3 +1,6 @@
 [submodule "prismarine-world"]
 	path = prismarine-world
 	url = https://github.com/leo4life2/prismarine-world.git
+[submodule "minecraft-protocol"]
+	path = minecraft-protocol
+	url = git@github.com:leo4life2/node-minecraft-protocol.git
