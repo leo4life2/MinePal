@@ -321,7 +321,11 @@ export class Agent {
                     break;
             }
             else {
-                await this.sendMessage(res, true);
+                const [beforeSlash, afterSlash] = res.split(/\/(.*)/s);
+                await this.sendMessage(beforeSlash, true);
+                if (afterSlash) {
+                    await this.sendMessage('/' + afterSlash, true);
+                }
                 console.log('Purely conversational response:', res);
                 break;
             }

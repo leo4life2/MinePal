@@ -122,7 +122,7 @@ export class Prompter {
             return "Oops! OpenAI's server took an arrow to the knee. Mind trying that prompt again?";
         }
         
-        if (execute_command && !execute_command.startsWith('!')) {
+        if (execute_command && !execute_command.startsWith('!') && !execute_command.startsWith('/')) {
             execute_command = '!' + execute_command;
         }
         
