@@ -10,10 +10,18 @@
   transition: all 0.3s ease;
 }
 
+[data-theme='dark'] .profile-box {
+  background: #2a2a2a;
+}
+
 .profile-box:hover {
   transform: translateY(-2px);
   background: var(--bg-color);
   box-shadow: 0 4px 12px rgba(44, 24, 16, 0.05);
+}
+
+[data-theme='dark'] .profile-box:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .profile-box input {
@@ -44,6 +52,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+[data-theme='dark'] .profile-box input[type="checkbox"] {
+  background: #2a2a2a;
 }
 
 .profile-box input[type="checkbox"]:checked {

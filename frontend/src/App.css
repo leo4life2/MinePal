@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
 
 :root {
-  /* Warm, parchment-like theme */
+  /* Warm, parchment-like theme - Light Mode */
   --bg-color: #f0e6d2;          /* Parchment background */
   --primary-color: #606c38;      /* Lighter earthy green */
   --secondary-color: #e67e22;    /* Warm orange */
@@ -14,6 +14,20 @@
   --modal-overlay: rgba(44, 24, 16, 0.2);  /* Warm brown overlay */
 }
 
+/* Dark Mode variables */
+[data-theme='dark'] {
+  --bg-color: #000000;          /* Space black background */
+  --primary-color: #8a9a5b;     /* Lighter green for dark mode */
+  --secondary-color: #ff8c00;   /* Brighter orange for contrast */
+  --text-color: #e0e0e0;        /* Light gray text */
+  --error-color: #ff6b6b;       /* Brighter red for dark mode */
+  --success-color: #8a9a5b;     /* Same as primary */
+  --accent-color: #ff8c00;      /* Same as secondary */
+  --hover-color: #9baa6c;       /* Lighter green for hover in dark mode */
+  --border-color: rgba(138, 154, 91, 0.2);   /* Subtle green border for dark mode */
+  --modal-overlay: rgba(0, 0, 0, 0.5);       /* Dark overlay */
+}
+
 body {
   font-family: 'Poppins', sans-serif;
   background: var(--bg-color);
@@ -23,6 +37,7 @@ body {
   align-items: center;
   min-height: 100vh;
   margin: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .container {
@@ -31,6 +46,13 @@ body {
   background: #fff;
   border-radius: 20px;
   box-shadow: 0 8px 24px rgba(44, 24, 16, 0.1);
+  position: relative;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+[data-theme='dark'] .container {
+  background: #1a1a1a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 h1 {

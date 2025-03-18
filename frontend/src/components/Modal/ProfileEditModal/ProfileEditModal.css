@@ -9,6 +9,10 @@
   position: relative;
 }
 
+[data-theme='dark'] .profile-modal {
+  background: #1a1a1a;
+}
+
 .profile-modal.showing-memories {
   width: 600px;
 }
@@ -32,6 +36,11 @@
   color: #666;
 }
 
+[data-theme='dark'] .modal-close-icon:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #aaa;
+}
+
 .input-group {
   margin-bottom: 16px;
 }
@@ -52,6 +61,12 @@
   background-color: #fff;
   color: var(--text-color);
   font-size: 14px;
+}
+
+[data-theme='dark'] .input-group input,
+[data-theme='dark'] .input-group textarea {
+  background-color: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .input-group textarea {
@@ -109,8 +124,16 @@
   color: #fff;
 }
 
+[data-theme='dark'] .save-button {
+  background-color: #4c5838; /* Darker, less saturated green */
+}
+
 .save-button:hover {
   background-color: var(--accent-color);
+}
+
+[data-theme='dark'] .save-button:hover {
+  background-color: #576341; /* Slightly lighter than the base dark green */
 }
 
 .view-memories-button {
@@ -118,8 +141,16 @@
   color: #fff;
 }
 
+[data-theme='dark'] .view-memories-button {
+  background-color: #4a6295; /* Darker, less saturated blue */
+}
+
 .view-memories-button:hover {
   background-color: #5376b7;
+}
+
+[data-theme='dark'] .view-memories-button:hover {
+  background-color: #526da0; /* Slightly lighter than the base dark blue */
 }
 
 .delete-button {
@@ -127,8 +158,16 @@
   color: #fff;
 }
 
+[data-theme='dark'] .delete-button {
+  background-color: #a13939; /* Darker, less saturated red */
+}
+
 .delete-button:hover {
   background-color: #c04545;
+}
+
+[data-theme='dark'] .delete-button:hover {
+  background-color: #b14141; /* Slightly lighter than the base dark red */
 }
 
 .back-button {
@@ -136,8 +175,17 @@
   color: #333;
 }
 
+[data-theme='dark'] .back-button {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+}
+
 .back-button:hover {
   background-color: #e0e0e0;
+}
+
+[data-theme='dark'] .back-button:hover {
+  background-color: #3a3a3a;
 }
 
 .send-message-button {
@@ -258,6 +306,10 @@
   box-shadow: 0 8px 24px rgba(44, 24, 16, 0.1);
 }
 
+[data-theme='dark'] .modal-content {
+  background: #1a1a1a;
+}
+
 .profile-modal.showing-memories {
   max-width: 800px;
   width: 90%;
@@ -274,6 +326,10 @@
   box-sizing: border-box;
 }
 
+[data-theme='dark'] .modal-content textarea {
+  background: #2a2a2a;
+}
+
 .modal-content input[type="text"] {
   width: 100%;
   padding: 10px;
@@ -284,9 +340,17 @@
   box-sizing: border-box;
 }
 
+[data-theme='dark'] .modal-content input[type="text"] {
+  background: #2a2a2a;
+}
+
 .modal-content .save-button {
   background-color: var(--primary-color);
   color: #fff;
+}
+
+[data-theme='dark'] .modal-content .save-button {
+  background-color: #4c5838; /* Same as the main save button dark version */
 }
 
 .modal-content .save-button:hover {
@@ -294,14 +358,26 @@
   transform: translateY(-2px);
 }
 
+[data-theme='dark'] .modal-content .save-button:hover {
+  background-color: #576341; /* Same as the main save button hover dark version */
+}
+
 .modal-content .delete-button {
   background-color: var(--error-color);
   color: #fff;
 }
 
+[data-theme='dark'] .modal-content .delete-button {
+  background-color: #a13939; /* Same as the main delete button dark version */
+}
+
 .modal-content .delete-button:hover {
   background-color: #f05454;
   transform: translateY(-2px);
+}
+
+[data-theme='dark'] .modal-content .delete-button:hover {
+  background-color: #b14141; /* Same as the main delete button hover dark version */
 }
 
 .memories-modal {
@@ -350,6 +426,10 @@
   background: #fff;
 }
 
+[data-theme='dark'] .memory-row:hover {
+  background: #2a2a2a;
+}
+
 .memory-text {
   flex: 1;
   margin-right: 16px;
@@ -392,6 +472,10 @@
   border: 1px solid var(--border-color);
   border-radius: 4px;
   color: var(--text-color);
+}
+
+[data-theme='dark'] .message-input input {
+  background: #2a2a2a;
 }
 
 .message-triggers {
@@ -440,6 +524,10 @@
   word-wrap: break-word;
 }
 
+[data-theme='dark'] .message-triggers label:hover::after {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
 /* Tooltip arrow */
 .message-triggers label:hover::before {
   content: "";
@@ -467,9 +555,17 @@
   background: #fff;
 }
 
+[data-theme='dark'] .message-triggers input[type="radio"] {
+  background: #2a2a2a;
+}
+
 .message-triggers input[type="radio"]:checked {
   background: var(--primary-color);
   box-shadow: inset 0 0 0 3px #fff;
+}
+
+[data-theme='dark'] .message-triggers input[type="radio"]:checked {
+  box-shadow: inset 0 0 0 3px #2a2a2a;
 }
 
 .message-triggers input[type="radio"]:hover {

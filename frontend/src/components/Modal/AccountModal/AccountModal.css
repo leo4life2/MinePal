@@ -16,6 +16,10 @@
   color: var(--text-color);
 }
 
+[data-theme='dark'] .account-button {
+  background: #2a2a2a;
+}
+
 .account-button:hover {
   background: var(--bg-color);
   transform: translateY(-1px);
@@ -28,9 +32,17 @@
   border: 1px solid var(--border-color);
 }
 
+[data-theme='dark'] .account-button-placeholder {
+  background: #2a2a2a;
+}
+
 .account-button-placeholder:hover {
   background: #fff;
   transform: none;
+}
+
+[data-theme='dark'] .account-button-placeholder:hover {
+  background: #2a2a2a;
 }
 
 .account-icon {
@@ -73,6 +85,11 @@
   position: relative;
   box-sizing: border-box;
   width: 450px;
+}
+
+[data-theme='dark'] .account-modal {
+  background: #1a1a1a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .account-info {
@@ -251,4 +268,8 @@
   text-align: center;
   max-width: 100%;
   overflow-wrap: break-word;
+}
+
+[data-theme='dark'] .cancel-plan-note {
+  color: #aaa;
 } 

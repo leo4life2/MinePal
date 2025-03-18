@@ -86,6 +86,11 @@
   box-sizing: border-box;
 }
 
+[data-theme='dark'] .setting-input {
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .setting-input:focus {
   outline: none;
   border-color: var(--primary-color);
@@ -164,6 +169,10 @@ input:checked + .slider:before {
   border-radius: 8px;
   transition: all 0.2s ease;
   opacity: 0.7;
+}
+
+[data-theme='dark'] .mode-button {
+  background: #2a2a2a;
 }
 
 .mode-button.active {

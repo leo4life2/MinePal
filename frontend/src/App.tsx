@@ -10,28 +10,33 @@ import Profiles from './components/Profiles';
 import Footer from './components/Footer/Footer';
 import settingNotes from './utils/settingsNotes';
 import Announcement from './components/Announcement';
+import ThemeProvider from './contexts/ThemeContext/ThemeProvider';
+import ThemeToggle from './components/ThemeToggle/ThemeToggle';
 
 export default function App() {
   return (
     <SupabaseProvider>
       <ErrorReportProvider>
-        <UserSettingsProvider>
-          <AgentProvider>
-            <div className="container">
-              <h1>MinePal Control Panel</h1>
-              <Announcement />
-              <label htmlFor="profiles">
-                your pals:
-                {settingNotes.pal_message && <span className="setting-note"> ({settingNotes.pal_message})</span>}
-              </label>
-              <Profiles />
-              <Settings />
-              <Actions />
-              <ErrorDisplay />
-              <Footer />
-            </div>
-          </AgentProvider>
-        </UserSettingsProvider>
+        <ThemeProvider>
+          <UserSettingsProvider>
+            <AgentProvider>
+              <div className="container">
+                <ThemeToggle />
+                <h1>MinePal Control Panel</h1>
+                <Announcement />
+                <label htmlFor="profiles">
+                  your pals:
+                  {settingNotes.pal_message && <span className="setting-note"> ({settingNotes.pal_message})</span>}
+                </label>
+                <Profiles />
+                <Settings />
+                <Actions />
+                <ErrorDisplay />
+                <Footer />
+              </div>
+            </AgentProvider>
+          </UserSettingsProvider>
+        </ThemeProvider>
       </ErrorReportProvider>
     </SupabaseProvider>
   );
