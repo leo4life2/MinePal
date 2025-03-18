@@ -225,7 +225,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
         ipcRenderer.removeAllListeners('auth-callback');
       }
     };
-  }, [supabase]);
+  }, []);
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
