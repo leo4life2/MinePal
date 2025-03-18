@@ -54,22 +54,17 @@ class MCData {
     isHostile(mob) {
         if (!mob || !mob.name) return false;
         
-        const conditionallyHostile = [
-            'wolf', 'bee', 'polar_bear', 'llama', 'trader_llama', 
-            'panda', 'iron_golem', 'enderman', 'zombified_piglin'
+        const dontAttack = [
+            'wolf', 'bee', 'polar_bear', 'llama', 'trader_llama', 'allay',
+            'panda', 'iron_golem', 'enderman', 'zombified_piglin', 'cat'
         ];
         
-        if (conditionallyHostile.includes(mob.name.toLowerCase())) {
+        if (dontAttack.includes(mob.name.toLowerCase())) {
             // These mobs are only hostile under certain conditions
             // For simplicity, we're considering them non-hostile by default
             return false;
         }
-        
-        // Cats are not hostile
-        if (mob.name.toLowerCase() === 'cat') {
-            return false;
-        }
-        
+
         return (mob.type === 'mob' || mob.type === 'hostile');
     }
 
