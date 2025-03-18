@@ -6,7 +6,7 @@ import DiscordIcon from '../../assets/discord.svg';
 import RefreshIcon from '../../assets/refresh.svg';
 import { PricingModal } from "../Modal";
 import { HTTPS_BACKEND_URL } from "../../constants";
-import AudioActions from "./AudioActions";
+// import AudioActions from "./AudioActions";
 
 // Get electron shell
 const isElectron = window && window.process && window.process.type;
@@ -221,7 +221,7 @@ function Actions() {
         </div>
       )}
 
-      <AudioActions/>
+      {/* <AudioActions/> */}
 
       {showAuthModal && (
         <div className="modal">
