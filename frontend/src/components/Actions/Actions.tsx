@@ -243,7 +243,7 @@ function Actions() {
                 By continuing with Discord, you agree to our{' '}
                 <a href="https://app.getterms.io/view/4ZA3K/tos/en-us" target="_blank" rel="noopener noreferrer">Terms of Service</a>,{' '}
                 <a href="https://app.getterms.io/view/4ZA3K/privacy/en-us" target="_blank" rel="noopener noreferrer">Privacy Policy</a>, and{' '}
-                <a href="https://app.getterms.io/view/4ZA3K/aup/en-us" target="_blank" rel="noopener noreferrer">Acceptable Use Policy</a>
+                <a href="https://app.getterms.io/view/4ZA3K/acceptable-use/en-us" target="_blank" rel="noopener noreferrer">Acceptable Use Policy</a>
               </p>
             {displayError && <div className="error-message">{displayError}</div>}
             
