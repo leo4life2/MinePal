@@ -22,7 +22,7 @@ export default function App() {
             <AgentProvider>
               <div className="container">
                 <ThemeToggle />
-                <h1>MinePal Control Panel</h1>
+                <h1>MinePal Controls</h1>
                 <Announcement />
                 <label htmlFor="profiles">
                   your pals:
