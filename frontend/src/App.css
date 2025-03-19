@@ -3,6 +3,7 @@
 :root {
   /* Warm, parchment-like theme - Light Mode */
   --bg-color: #f0e6d2;          /* Parchment background */
+  --bg-light-color: #fff;       /* Light background */
   --primary-color: #606c38;      /* Lighter earthy green */
   --secondary-color: #e67e22;    /* Warm orange */
   --text-color: #2c1810;        /* Dark brown text */
@@ -17,6 +18,7 @@
 /* Dark Mode variables */
 [data-theme='dark'] {
   --bg-color: #000000;          /* Space black background */
+  --bg-light-color: #1a1a1a;    /* Dark background */
   --primary-color: #8a9a5b;     /* Lighter green for dark mode */
   --secondary-color: #ff8c00;   /* Brighter orange for contrast */
   --text-color: #e0e0e0;        /* Light gray text */
@@ -30,7 +32,7 @@
 
 body {
   font-family: 'Poppins', sans-serif;
-  background: var(--bg-color);
+  background: var(--bg-light-color);
   color: var(--text-color);
   display: flex;
   justify-content: center;
@@ -43,16 +45,13 @@ body {
 .container {
   max-width: 800px;
   padding: 40px;
-  background: #fff;
   border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(44, 24, 16, 0.1);
   position: relative;
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  transition: none;
 }
 
 [data-theme='dark'] .container {
-  background: #1a1a1a;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  /* No specific styles needed */
 }
 
 h1 {
