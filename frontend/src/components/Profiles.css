@@ -1,7 +1,7 @@
 .profile-box {
   display: flex;
   align-items: center;
-  padding: 10px;
+  padding: 10px 18px 10px 10px;
   border: 1px solid var(--border-color);
   background: #fff;
   border-radius: 8px;
@@ -27,6 +27,21 @@
 .profile-box input {
   margin-right: 10px;
   width: auto; /* Ensure the checkbox does not take full width */
+}
+
+.profile-name {
+  flex: 1;
+}
+
+.edit-icon {
+  color: #666666;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.profile-box:hover .edit-icon {
+  color: var(--primary-color);
+  opacity: 1;
 }
 
 .profile-box.empty {

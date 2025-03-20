@@ -25,7 +25,7 @@
 }
 
 .settings-toggle svg {
-  color: var(--primary-color);
+  color: #666666;
 }
 
 .settings-toggle span {
@@ -35,9 +35,10 @@
 }
 
 .arrow {
-  font-size: 12px;
   transition: transform 0.3s ease;
-  opacity: 0.5;
+  opacity: 0.6;
+  min-width: 20px;
+  color: #666666;
 }
 
 .arrow.expanded {
@@ -46,7 +47,7 @@
 
 .settings-content {
   margin-top: 16px;
-  padding: 20px;
+  padding: 8px 20px 4px 20px;
   background: var(--bg-color);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -65,7 +66,8 @@
 }
 
 .setting-item {
-  padding: 8px 0;
+  padding: 12px 0;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -74,8 +76,6 @@
 }
 
 .setting-item:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
   border-bottom: none;
 }
 
@@ -108,6 +108,44 @@
   box-sizing: border-box;
 }
 
+/* Custom select styling */
+select.setting-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 30px; /* Make room for the custom arrow */
+  background-image: none;
+  cursor: pointer;
+}
+
+/* Remove default IE arrow */
+select.setting-input::-ms-expand {
+  display: none;
+}
+
+.select-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 290px;
+  max-width: 290px;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; /* So clicks pass through to the select element */
+  color: #666666;
+  opacity: 0.7;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.select-wrapper:hover .select-arrow {
+  opacity: 1;
+  color: var(--primary-color);
+}
+
 [data-theme='dark'] .setting-input {
   background: #2a2a2a;
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -128,7 +166,7 @@
 .switch {
   position: relative;
   display: inline-block;
-  width: 42px; /* Reduced width to match slider movement (26px) + slider width (16px) */
+  width: 48px;
   height: 24px;
 }
 
@@ -167,7 +205,7 @@ input:checked + .slider {
 }
 
 input:checked + .slider:before {
-  transform: translateX(18px);
+  transform: translateX(22px);
 }
 
 .game-mode-selector {

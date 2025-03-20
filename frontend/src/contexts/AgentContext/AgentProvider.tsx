@@ -40,7 +40,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
 
     const serverAlive = await checkServerAlive(userSettings.host, userSettings.port);
     if (!serverAlive) {
-      declareError("AgentProvider", "The Minecraft server is not reachable. Please check the host and port.", true);
+      declareError("AgentProvider", "The Minecraft server is not reachable. Please check the game mode and port.", true);
       return;
     }
     try {

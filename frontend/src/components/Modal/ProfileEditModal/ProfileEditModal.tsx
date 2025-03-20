@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Memory, deleteMemory, fetchBotMemories, sendMessage } from '../../../utils/api';
 import { Profile } from '../../../types/apiTypes';
-import { Settings as SettingsIcon, X as CloseIcon } from 'react-feather';
+import { Settings as SettingsIcon, X as CloseIcon, ChevronDown } from 'react-feather';
 import './ProfileEditModal.css';
 import { ModalWrapper } from '..';
 
@@ -135,7 +135,7 @@ function ProfileEditModal({
             >
               <SettingsIcon size={18} />
               <span>More Settings</span>
-              <div className={`arrow ${showMoreSettings ? 'expanded' : ''}`}>▼</div>
+              <ChevronDown className={`arrow ${showMoreSettings ? 'expanded' : ''}`} size={20} strokeWidth={2.5} />
             </button>
 
             {showMoreSettings && (

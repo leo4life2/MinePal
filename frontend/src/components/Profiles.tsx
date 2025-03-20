@@ -6,6 +6,7 @@ import './Profiles.css';
 import { useAgent } from '../contexts/AgentContext/AgentContext';
 import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContext';
 import { ProfileEditModal } from './Modal';
+import { Edit3 as EditIcon } from 'react-feather';
 
 function Profiles() {
   const { userSettings: { profiles }, updateField } = useUserSettings();
@@ -66,7 +67,8 @@ function Profiles() {
             onChange={(e) => handleCheckboxClick(e, profile)}
             onClick={(e) => e.stopPropagation()}
           />
-          <span>{profile.name}</span>
+          <span className="profile-name">{profile.name}</span>
+          <EditIcon size={16} className="edit-icon" />
         </div>
       ))}
       <div className="profile-box empty" onClick={() => openModal()}>

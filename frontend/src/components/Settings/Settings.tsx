@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon } from 'react-feather';
+import { Settings as SettingsIcon, ChevronDown } from 'react-feather';
 import { useUserSettings } from '../../contexts/UserSettingsContext/UserSettingsContext';
 import supportedLocales from '../../utils/supportedLocales';
 import { minecraftVersions } from '../../utils/minecraftVersions';
@@ -34,7 +34,7 @@ function Settings() {
       >
         <SettingsIcon size={18} />
         <span>Settings</span>
-        <div className={`arrow ${isExpanded ? 'expanded' : ''}`}>▼</div>
+        <ChevronDown className={`arrow ${isExpanded ? 'expanded' : ''}`} size={20} strokeWidth={2.5} />
       </button>
 
       {isExpanded && (
@@ -101,39 +101,45 @@ function Settings() {
             <label htmlFor="minecraft_version" className="input-label">
               Minecraft Version
             </label>
-            <select
-              id="minecraft_version"
-              value={userSettings.minecraft_version}
-              onChange={(e) => {
-                updateField('minecraft_version', e.target.value);
-              }}
-              className="setting-input"
-            >
-              {minecraftVersions.map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.versions.map((version) => (
-                    <option key={version} value={version}>
-                      {version}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <div className="select-wrapper">
+              <select
+                id="minecraft_version"
+                value={userSettings.minecraft_version}
+                onChange={(e) => {
+                  updateField('minecraft_version', e.target.value);
+                }}
+                className="setting-input"
+              >
+                {minecraftVersions.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.versions.map((version) => (
+                      <option key={version} value={version}>
+                        {version}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <ChevronDown className="select-arrow" size={16} strokeWidth={2} />
+            </div>
           </div>
 
           <div className="setting-item">
             <label htmlFor="language" className="input-label">Language/Accent</label>
-            <select
-              id="language"
-              value={userSettings.language}
-              onChange={(e) => updateField('language', e.target.value)}
-              disabled={agentActive}
-              className="setting-input"
-            >
-              {supportedLocales.map(({ value, label }) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+            <div className="select-wrapper">
+              <select
+                id="language"
+                value={userSettings.language}
+                onChange={(e) => updateField('language', e.target.value)}
+                disabled={agentActive}
+                className="setting-input"
+              >
+                {supportedLocales.map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              <ChevronDown className="select-arrow" size={16} strokeWidth={2} />
+            </div>
           </div>
 
           <div className="setting-item">

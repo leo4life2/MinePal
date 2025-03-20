@@ -54,8 +54,8 @@ async function checkAndCopyProfile() {
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 610,
-        height: 720,
+        width: 615,
+        height: 800,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,

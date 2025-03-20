@@ -82,8 +82,6 @@
   resize: vertical;
 }
 
-
-
 .more-settings-toggle {
   display: flex;
   align-items: center;
@@ -98,12 +96,14 @@
 }
 
 .more-settings-toggle svg {
-  color: var(--primary-color);
+  color: #666666;
 }
 
-.more-settings-toggle .arrow {
-  font-size: 10px;
+.more-settings-toggle svg.arrow {
   transition: transform 0.2s ease;
+  opacity: 0.6;
+  min-width: 20px;
+  color: #666666;
 }
 
 .more-settings-toggle .arrow.expanded {
@@ -604,9 +604,10 @@
 }
 
 .more-settings-toggle .arrow {
-  font-size: 12px;
-  transition: transform 0.3s ease;
-  opacity: 0.5;
+  transition: transform 0.2s ease;
+  opacity: 0.6;
+  min-width: 20px;
+  color: #666666;
 }
 
 .more-settings-toggle .arrow.expanded {
