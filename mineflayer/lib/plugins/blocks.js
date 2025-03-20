@@ -222,15 +222,15 @@ function inject (bot, { version, storageBuilder, hideErrors }) {
   // also works on anything with a position value
   function canSeeBlock (block) {
     const headPos = bot.entity.position.offset(0, bot.entity.eyeHeight, 0)
-    const blockCenter = block.position.offset(0.5, 0.5, 0.5)
-  
+    const range = headPos.distanceTo(block.position)
+    const dir = block.position.offset(0.5, 0.5, 0.5).minus(headPos)
     const match = (inputBlock, iter) => {
       const intersect = iter.intersect(inputBlock.shapes, inputBlock.position)
-      return intersect && !inputBlock.position.equals(block.position)
+      if (intersect) { return true }
+      return block.position.equals(inputBlock.position)
     }
-  
-    const blockAtCursor = bot.world.raycast(blockCenter, headPos.minus(blockCenter).normalize(), blockCenter.distanceTo(headPos), match)
-    return !blockAtCursor
+    const blockAtCursor = bot.world.raycast(headPos, dir.normalize(), range, match)
+    return blockAtCursor && blockAtCursor.position.equals(block.position)
   }
 
   bot._client.on('unload_chunk', (packet) => {
@@ -261,7 +261,7 @@ function inject (bot, { version, storageBuilder, hideErrors }) {
       bot.world.setColumn(packet.chunkX, packet.chunkZ, column)
     }
 
-    if (bot.supportFeature('dimensionDataIsAvailable')) {
+    if (bot.supportFeature('newLightingDataFormat')) {
       column.loadParsedLight(packet.skyLight, packet.blockLight, packet.skyLightMask, packet.blockLightMask, packet.emptySkyLightMask, packet.emptyBlockLightMask)
     } else {
       column.loadLight(packet.data, packet.skyLightMask, packet.blockLightMask, packet.emptySkyLightMask, packet.emptyBlockLightMask)
@@ -395,10 +395,13 @@ function inject (bot, { version, storageBuilder, hideErrors }) {
   bot._client.on('explosion', (packet) => {
     // explosion
     const p = new Vec3(packet.x, packet.y, packet.z)
-    packet.affectedBlockOffsets.forEach((offset) => {
-      const pt = p.offset(offset.x, offset.y, offset.z)
-      updateBlockState(pt, 0)
-    })
+    if (packet.affectedBlockOffsets) {
+      // TODO: server no longer sends in 1.21.3. Is client supposed to compute this or is it sent via normal block updates?
+      packet.affectedBlockOffsets.forEach((offset) => {
+        const pt = p.offset(offset.x, offset.y, offset.z)
+        updateBlockState(pt, 0)
+      })
+    }
   })
 
   bot._client.on('spawn_entity_painting', (packet) => {
@@ -508,13 +511,9 @@ function inject (bot, { version, storageBuilder, hideErrors }) {
       }
 
       for (const [name, listener] of Object.entries(bot._events)) {
-        if (name.startsWith('blockUpdate:')) {
+        if (name.startsWith('blockUpdate:') && typeof listener === 'function') {
           bot.emit(name, null, null)
-          if (Array.isArray(listener)) {
-            listener.forEach(l => bot.off(name, l))
-          } else {
-            bot.off(name, listener)
-          }
+          bot.off(name, listener)
         }
       }
 
@@ -535,6 +534,9 @@ function inject (bot, { version, storageBuilder, hideErrors }) {
     if (bot.supportFeature('dimensionIsAnInt')) {
       dimension = packet.dimension
       worldName = dimensionToFolderName(dimension)
+    } else if (bot.supportFeature('spawnRespawnWorldDataField')) { // 1.20.5+
+      dimension = packet.worldState.dimension
+      worldName = packet.worldState.name
     } else {
       dimension = packet.dimension
       worldName = /^minecraft:.+/.test(packet.worldName) ? packet.worldName : `minecraft:${packet.worldName}`
@@ -546,6 +548,11 @@ function inject (bot, { version, storageBuilder, hideErrors }) {
     if (bot.supportFeature('dimensionIsAnInt')) { // <=1.15.2
       if (dimension === packet.dimension) return
       dimension = packet.dimension
+    } else if (bot.supportFeature('spawnRespawnWorldDataField')) { // 1.20.5+
+      if (dimension === packet.worldState.dimension) return
+      if (worldName === packet.worldState.name && packet.copyMetadata === true) return // don't unload chunks if in same world and metaData is true
+      dimension = packet.worldState.dimension
+      worldName = packet.worldState.name
     } else { // >= 1.15.2
       if (dimension === packet.dimension) return
       if (worldName === packet.worldName && packet.copyMetadata === true) return // don't unload chunks if in same world and metaData is true

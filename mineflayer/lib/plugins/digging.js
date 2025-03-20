@@ -29,6 +29,11 @@ function inject (bot) {
       digFace = 'auto'
     }
 
+    const waitTime = bot.digTime(block)
+    if (waitTime === Infinity) {
+      throw new Error(`dig time for ${block?.name ?? block} is Infinity`)
+    }
+
     bot.targetDigFace = 1 // Default (top)
 
     if (forceLook !== 'ignore') {
@@ -132,7 +137,6 @@ function inject (bot) {
       location: block.position,
       face: bot.targetDigFace // default face is 1 (top)
     })
-    const waitTime = bot.digTime(block)
     waitTimeout = setTimeout(finishDigging, waitTime)
     bot.targetDigBlock = block
     bot.swingArm()
@@ -208,8 +212,6 @@ function inject (bot) {
     }
 
     await diggingTask.promise
-
-    return true // Ensure the function always returns a boolean
   }
 
   bot.on('death', () => {
