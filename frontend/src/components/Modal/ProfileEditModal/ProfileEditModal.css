@@ -45,6 +45,13 @@
   margin-bottom: 16px;
 }
 
+.sub-input-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text-color);
+}
+
 .input-label {
   display: block;
   margin-bottom: 6px;
@@ -75,6 +82,8 @@
   resize: vertical;
 }
 
+
+
 .more-settings-toggle {
   display: flex;
   align-items: center;
@@ -86,6 +95,10 @@
   padding: 8px 0;
   margin-bottom: 16px;
   font-weight: 500;
+}
+
+.more-settings-toggle svg {
+  color: var(--primary-color);
 }
 
 .more-settings-toggle .arrow {
@@ -104,7 +117,7 @@
 .modal-content .button-group {
   display: flex;
   justify-content: space-between; /* Center the button horizontally */
-  margin-top: 20px; /* Optional: Add some space above the button */
+  margin-top: 24px;
 }
 
 .save-button,
@@ -261,15 +274,6 @@
   flex: 1;
   font-size: 14px;
   color: var(--text-color);
-}
-
-.delete-memory-button {
-  background: transparent;
-  border: none;
-  color: #e05757;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0 8px;
 }
 
 .delete-memory-button:hover {
@@ -443,9 +447,9 @@
 .delete-memory-button {
   background: none;
   border: none;
-  color: var(--secondary-color);
   font-size: 24px;
   cursor: pointer;
+  color: #c04545;
   padding: 4px 8px;
   border-radius: 4px;
   transition: all 0.3s ease;
@@ -575,7 +579,7 @@
 
 .more-settings-toggle {
   width: 100%;
-  padding: 12px;
+  padding: 16px;
   background: var(--bg-color);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
@@ -585,18 +589,18 @@
   align-items: center;
   gap: 12px;
   transition: all 0.3s ease;
-  margin: 8px 0;
 }
 
-.more-settings-toggle:hover {
+.more-settings-toggle:hover,
+.more-settings-toggle:focus {
   background: rgba(255, 255, 255, 0.05);
   transform: translateY(-1px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
-
 .more-settings-toggle span {
   flex: 1;
   text-align: left;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .more-settings-toggle .arrow {

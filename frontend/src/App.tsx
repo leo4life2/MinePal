@@ -24,8 +24,8 @@ export default function App() {
                 <ThemeToggle />
                 <h1>MinePal Controls</h1>
                 <Announcement />
-                <label htmlFor="profiles">
-                  your pals:
+                <label htmlFor="profiles" className="input-label">
+                  Choose Your Pals
                   {settingNotes.pal_message && <span className="setting-note"> ({settingNotes.pal_message})</span>}
                 </label>
                 <Profiles />

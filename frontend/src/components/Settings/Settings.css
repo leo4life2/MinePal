@@ -7,7 +7,6 @@
   width: 100%;
   padding: 16px;
   background: var(--bg-color);
-  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   color: var(--text-color);
   cursor: pointer;
@@ -15,11 +14,14 @@
   align-items: center;
   gap: 12px;
   transition: all 0.3s ease;
+  outline: none;
 }
 
-.settings-toggle:hover {
+.settings-toggle:hover,
+.settings-toggle:focus {
   background: rgba(255, 255, 255, 0.05);
   transform: translateY(-1px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .settings-toggle svg {
@@ -29,7 +31,7 @@
 .settings-toggle span {
   flex: 1;
   text-align: left;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .arrow {
@@ -63,17 +65,37 @@
 }
 
 .setting-item {
-  margin-bottom: 10px;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
 }
 
 .setting-item:last-child {
   margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .setting-item label {
   display: block;
-  margin-bottom: 8px;
   color: var(--text-color);
+  margin-bottom: 0;
+  font-weight: normal;
+}
+
+.setting-input,
+.game-mode-selector {
+  flex-grow: 0;
+  max-width: 290px;
+  width: 290px;
+  box-sizing: border-box;
+}
+
+.setting-item .switch {
+  display: inline-block;
 }
 
 .setting-input {
@@ -106,7 +128,7 @@
 .switch {
   position: relative;
   display: inline-block;
-  width: 50px;
+  width: 42px; /* Reduced width to match slider movement (26px) + slider width (16px) */
   height: 24px;
 }
 
@@ -145,7 +167,7 @@ input:checked + .slider {
 }
 
 input:checked + .slider:before {
-  transform: translateX(26px);
+  transform: translateX(18px);
 }
 
 .game-mode-selector {
@@ -154,7 +176,6 @@ input:checked + .slider:before {
   background: rgba(255, 255, 255, 0.1);
   padding: 2px;
   border-radius: 10px;
-  margin-top: 8px;
 }
 
 .mode-button {
@@ -209,4 +230,11 @@ input:checked + .slider:before {
 
 .setting-input option:hover {
   background-color: rgba(255, 255, 255, 0.05);
+}
+
+.setting-item .switch-container {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 280px;
+  width: 280px;
 } 

@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon } from 'react-feather';
 import { useUserSettings } from '../../contexts/UserSettingsContext/UserSettingsContext';
-import settingNotes from '../../utils/settingsNotes';
 import supportedLocales from '../../utils/supportedLocales';
 import { minecraftVersions } from '../../utils/minecraftVersions';
 import { useAgent } from '../../contexts/AgentContext/AgentContext';
@@ -11,7 +10,13 @@ function Settings() {
   const { userSettings, updateField } = useUserSettings();
   const { agentActive } = useAgent();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [gameMode, setGameMode] = useState(userSettings.host === 'localhost' ? 'singleplayer' : 'multiplayer');
+  const [gameMode, setGameMode] = useState('singleplayer');
+  
+  // Safely access host using a defensive approach
+  useEffect(() => {
+    const currentHost = userSettings.host || '';
+    setGameMode(currentHost === 'localhost' ? 'singleplayer' : 'multiplayer');
+  }, [userSettings]);
 
   const handleGameModeChange = (mode: 'singleplayer' | 'multiplayer') => {
     setGameMode(mode);
@@ -35,9 +40,8 @@ function Settings() {
       {isExpanded && (
         <div className="settings-content">
           <div className="setting-item">
-            <label htmlFor="player_username">
-              player username:
-              {settingNotes.player_username && <span className="setting-note"> ({settingNotes.player_username})</span>}
+            <label htmlFor="player_username" className="input-label">
+              Minecraft Username
             </label>
             <input
               id="player_username"
@@ -49,60 +53,58 @@ function Settings() {
           </div>
 
           <div className="setting-item">
+            <label className="input-label">Game Mode</label>
             <div className="game-mode-selector">
               <button
                 className={`mode-button ${gameMode === 'singleplayer' ? 'active' : ''}`}
                 onClick={() => handleGameModeChange('singleplayer')}
               >
-                singleplayer
+                Singleplayer
               </button>
               <button
                 className={`mode-button ${gameMode === 'multiplayer' ? 'active' : ''}`}
                 onClick={() => handleGameModeChange('multiplayer')}
               >
-                multiplayer
+                Multiplayer
               </button>
             </div>
           </div>
 
-          <div className="setting-item">
-            <label htmlFor="host">
-              host:
-              {settingNotes.host && <span className="setting-note"> ({settingNotes.host})</span>}
-            </label>
-            <input
-              id="host"
-              type="text"
-              className={`setting-input ${gameMode === 'singleplayer' ? 'disabled' : ''}`}
-              value={userSettings.host}
-              onChange={(e) => updateField('host', e.target.value)}
-              disabled={gameMode === 'singleplayer'}
-            />
-          </div>
+          {gameMode === 'multiplayer' && (
+            <div className="setting-item">
+              <label htmlFor="host" className="input-label">
+                Server Address
+              </label>
+              <input
+                id="host"
+                type="text"
+                className="setting-input"
+                value={userSettings.host || ''}
+                onChange={(e) => updateField('host', e.target.value)}
+              />
+            </div>
+          )}
 
           <div className="setting-item">
-            <label htmlFor="port">
-              port:
+            <label htmlFor="port" className="input-label">
+              Port
             </label>
             <input
               id="port"
-              type="number"
               className="setting-input"
               value={userSettings.port}
-              onChange={(e) => updateField('port', e.target.value)}
+              onChange={(e) => updateField('port', parseInt(e.target.value, 10) || "")}
             />
           </div>
 
           <div className="setting-item">
-            <label htmlFor="minecraft_version">
-              minecraft version:
-              {settingNotes.minecraft_version && <span className="setting-note"> ({settingNotes.minecraft_version})</span>}
+            <label htmlFor="minecraft_version" className="input-label">
+              Minecraft Version
             </label>
             <select
               id="minecraft_version"
               value={userSettings.minecraft_version}
               onChange={(e) => {
-                console.log('Selected Minecraft version:', e.target.value);
                 updateField('minecraft_version', e.target.value);
               }}
               className="setting-input"
@@ -120,7 +122,7 @@ function Settings() {
           </div>
 
           <div className="setting-item">
-            <label htmlFor="language">language/accent:</label>
+            <label htmlFor="language" className="input-label">Language/Accent</label>
             <select
               id="language"
               value={userSettings.language}
@@ -135,18 +137,20 @@ function Settings() {
           </div>
 
           <div className="setting-item">
-            <label htmlFor="whisper_to_player">
-              whisper to player:
+            <label htmlFor="whisper_to_player" className="input-label">
+              Whisper To Player
             </label>
-            <label className="switch">
-              <input
-                id="whisper_to_player"
-                type="checkbox"
-                checked={userSettings.whisper_to_player}
-                onChange={(e) => updateField('whisper_to_player', e.target.checked)}
-              />
-              <span className="slider"></span>
-            </label>
+            <div className="switch-container">
+              <label className="switch">
+                <input
+                  id="whisper_to_player"
+                  type="checkbox"
+                  checked={userSettings.whisper_to_player}
+                  onChange={(e) => updateField('whisper_to_player', e.target.checked)}
+                />
+                <span className="slider"></span>
+              </label>
+            </div>
           </div>
         </div>
       )}
