@@ -7,3 +7,6 @@
 [submodule "mineflayer"]
 	path = mineflayer
 	url = git@github.com:leo4life2/mineflayer.git
+[submodule "mineflayer-collectblock"]
+	path = mineflayer-collectblock
+	url = git@github.com:leo4life2/mineflayer-collectblock.git
