@@ -612,14 +612,8 @@ export async function collectBlock(
     }
 
     try {
-      const success = await bot.collectBlock.collect(block);
-      if (success) {
-        collected++;
-        console.log(`Successfully collected block at ${block.position}`);
-      } else {
-        console.log(`Failed to collect block at ${block.position}`);
-        retries++;
-      }
+      await bot.collectBlock.collect(block);
+      collected++;
     } catch (err) {
       console.log(
         `Error collecting block at ${block.position}: ${err.message}`
