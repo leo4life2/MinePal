@@ -4,3 +4,6 @@
 [submodule "minecraft-protocol"]
 	path = minecraft-protocol
 	url = git@github.com:leo4life2/node-minecraft-protocol.git
+[submodule "mineflayer"]
+	path = mineflayer
+	url = git@github.com:leo4life2/mineflayer.git
