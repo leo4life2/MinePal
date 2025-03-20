@@ -129,7 +129,7 @@ function ProfileEditModal({
             </div>
             
             <button 
-              className="more-settings-toggle"
+              className={`settings-toggle ${showMoreSettings ? 'expanded' : ''}`}
               onClick={() => setShowMoreSettings(!showMoreSettings)}
               aria-expanded={showMoreSettings}
             >
