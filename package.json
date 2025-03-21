@@ -27,6 +27,7 @@
     "pidusage": "^3.0.2",
     "prismarine-item": "^1.14.0",
     "rotating-file-stream": "^3.2.3",
+    "uiohook-napi": "^1.5.4",
     "vectra": "^0.9.0",
     "ws": "^8.18.0",
     "yargs": "^17.7.2"
@@ -45,6 +46,10 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**"
+    ],
     "appId": "com.nemosai.minepal",
     "productName": "Minepal",
     "afterSign": "notarize.js",

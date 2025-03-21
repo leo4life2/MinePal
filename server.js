@@ -7,16 +7,14 @@ import fs from 'fs';
 import cors from 'cors';
 import path from 'path';
 import net from 'net';
-import { GlobalKeyboardListener } from 'node-global-key-listener';
+import { uIOhook, UiohookKey } from 'uiohook-napi';
 import { LocalIndex } from 'vectra';
 
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
-let isToggleToTalkActive = false; // Global state for toggle_to_talk
-let isKeyDown = false; // Track key state
-let gkl; // Declare the global keyboard listener
-let voice_mode = 'off'; // Global voice_mode variable with default value
+let isKeyDown = false; // Track push-to-talk key state
+let keyCode = null; // Store the key code for push-to-talk
 
 function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
@@ -27,28 +25,38 @@ function notifyBotKicked() {
 }
 
 function setupVoice(settings) {
-    voice_mode = settings.voice_mode; // Assign voice_mode from settings
     const { key_binding } = settings;
 
-    if ((voice_mode === 'push_to_talk' || voice_mode === 'toggle_to_talk') && key_binding) {
-        gkl = new GlobalKeyboardListener();
-
-        gkl.addListener((e) => {
-            if (e.name.toLowerCase() === key_binding.toLowerCase()) {
-                if (e.state === 'DOWN') {
-                    if (voice_mode === 'push_to_talk') {
-                        isKeyDown = true;
-                        console.log('Push-to-talk key down:', isKeyDown);
-                    } else if (voice_mode === 'toggle_to_talk') {
-                        isToggleToTalkActive = !isToggleToTalkActive;
-                        console.log('Toggle-to-talk active:', isToggleToTalkActive);
-                    }
-                } else if (e.state === 'UP' && voice_mode === 'push_to_talk') {
+    if (key_binding) {
+        // If a hook was previously set up, unregister it first
+        uIOhook.stop();
+        
+        // Try to get the key code from the key binding
+        try {
+            keyCode = key_binding;
+            
+            // Set up the key down and key up listeners
+            uIOhook.on('keydown', (e) => {
+                if (e.keycode === keyCode) {
+                    isKeyDown = true;
+                    console.log('Push-to-talk key down:', isKeyDown);
+                }
+            });
+            
+            uIOhook.on('keyup', (e) => {
+                if (e.keycode === keyCode) {
                     isKeyDown = false;
                     console.log('Push-to-talk key up:', isKeyDown);
                 }
-            }
-        });
+            });
+            
+            // Start the hook
+            uIOhook.start();
+            console.log('Push-to-talk enabled with key code:', keyCode);
+        } catch (error) {
+            logToFile(`Error setting up push-to-talk: ${error.message}`);
+            console.error('Error setting up push-to-talk:', error);
+        }
     }
 }
 
@@ -76,7 +84,6 @@ function startServer() {
             "allow_insecure_coding": false,
             "code_timeout_mins": 10,
             "whisper_to_player": false,
-            "voice_mode": "always_on",
             "key_binding": "",
             "openai_api_key": "",
             "model": "",
@@ -311,7 +318,8 @@ function startServer() {
                     return false;
                 }
                 if (key === 'profiles') return !Array.isArray(value) || value.length === 0;
-                if (key === 'key_binding' && (newSettings.voice_mode === 'always_on' || newSettings.voice_mode === 'off')) return false;
+                // Key binding is optional for push-to-talk
+                if (key === 'key_binding') return false;
                 if (key === 'minecraft_version' && value === 'select') return true;
                 return value === "" || value === null || value === undefined;
             })
@@ -380,6 +388,15 @@ function startServer() {
 
     const shutdown = () => {
         logToFile('Shutting down gracefully...');
+        
+        // Stop uIOhook to clean up keyboard listeners
+        try {
+            uIOhook.stop();
+            logToFile('uIOhook stopped');
+        } catch (error) {
+            logToFile(`Error stopping uIOhook: ${error.message}`);
+        }
+        
         if (agentProcessStarted) {
             agentProcesses.forEach(agentProcess => {
                 agentProcess.agentProcess.kill('SIGTERM');
