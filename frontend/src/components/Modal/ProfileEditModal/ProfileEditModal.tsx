@@ -142,7 +142,7 @@ function ProfileEditModal({
               <div className="more-settings-content">
                 <div className="automated-messages-group">
                   <div className="input-group">
-                    <label className="sub-input-label">Automated Messages</label>
+                    <label className="sub-input-label">Auto Message</label>
                     <div className="message-input">
                       <input
                         type="text"
