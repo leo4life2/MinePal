@@ -10,3 +10,9 @@
 [submodule "mineflayer-collectblock"]
 	path = mineflayer-collectblock
 	url = git@github.com:leo4life2/mineflayer-collectblock.git
+[submodule "mineflayer-auto-eat"]
+	path = mineflayer-auto-eat
+	url = git@github.com:leo4life2/mineflayer-auto-eat.git
+[submodule "mineflayer-pvp"]
+	path = mineflayer-pvp
+	url = git@github.com:leo4life2/mineflayer-pvp.git
