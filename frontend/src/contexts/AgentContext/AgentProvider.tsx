@@ -8,6 +8,18 @@ import { startTrackingSession, stopTrackingSession } from "../../utils/tracking"
 import { useErrorReport } from "../ErrorReportContext/ErrorReportContext";
 import { AgentContext } from "./AgentContext";
 
+// Map of field keys to user-friendly display names
+const fieldDisplayNames: Record<string, string> = {
+  player_username: "Minecraft Username",
+  host: "Server Address",
+  port: "Port",
+  minecraft_version: "Minecraft Version",
+  whisper_to_player: "Whisper To Player",
+  key_binding: "Push-to-Talk Key",
+  language: "Language/Accent",
+  input_device_id: "Input Device"
+};
+
 export default function AgentProvider({ children }: React.PropsWithChildren) {
   const { userSettings } = useUserSettings();
   const { declareError, clearError } = useErrorReport();
@@ -18,7 +30,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
     const emptyFields = validateUserSettings(userSettings);
 
     if (emptyFields.length > 0) {
-      const formattedFields = emptyFields.map(field => field === 'host' ? 'server address' : field).join(', ');
+      const formattedFields = emptyFields.map(field => fieldDisplayNames[field] || field).join(', ');
       declareError("AgentProvider", `Please fill in the following fields in settings: ${formattedFields}`, true);
       return;
     }

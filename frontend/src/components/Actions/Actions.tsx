@@ -6,6 +6,7 @@ import DiscordIcon from '../../assets/discord.svg';
 import RefreshIcon from '../../assets/refresh.svg';
 import { PricingModal } from "../Modal";
 import { HTTPS_BACKEND_URL } from "../../constants";
+import usePushToTalk from "../../hooks/usePushToTalk";
 // import AudioActions from "./AudioActions";
 
 // Get electron shell
@@ -15,6 +16,7 @@ const shell = electron?.shell;
 
 function Actions() {
   const { agentActive, start, stop } = useAgent();
+  const { connect, disconnect } = usePushToTalk();
   const { 
     signInWithDiscord, 
     user, 
@@ -139,7 +141,7 @@ function Actions() {
     clearAuthError();
   };
 
-  const actionButtonPressed = () => {
+  const actionButtonPressed = async () => {
     if (!user) {
       setShowAuthModal(true);
       return;
@@ -157,9 +159,33 @@ function Actions() {
     }
     
     if (!agentActive) {
-      start();
+      try {
+        await start();
+        // Try to connect WebSocket but don't fail if it doesn't work
+        try {
+          connect();
+        } catch (wsError) {
+          console.error('Failed to connect WebSocket:', wsError);
+          // Don't set error state for WebSocket failures
+        }
+      } catch (error) {
+        console.error('Failed to start bot:', error);
+        setError(error instanceof Error ? error.message : 'Unknown error');
+      }
     } else {
-      stop();
+      try {
+        stop();
+        // Try to disconnect WebSocket but don't fail if it doesn't work
+        try {
+          disconnect();
+        } catch (wsError) {
+          console.error('Failed to disconnect WebSocket:', wsError);
+          // Don't set error state for WebSocket failures
+        }
+      } catch (error) {
+        console.error('Failed to stop bot:', error);
+        setError(error instanceof Error ? error.message : 'Unknown error');
+      }
     }
   };
 

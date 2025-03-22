@@ -1,4 +1,4 @@
-import { UserSettings, VoiceMode } from "../types/apiTypes";
+import { UserSettings } from "../types/apiTypes";
 
 const defaultUserSettings: UserSettings = {
   minecraft_version: "",
@@ -7,12 +7,12 @@ const defaultUserSettings: UserSettings = {
   player_username: "",
   profiles: [],
   whisper_to_player: false,
-  voice_mode: VoiceMode.AlwaysOn,
   key_binding: '',
   language: 'en',
   openai_api_key: '',
   model: '',
-  useOwnApiKey: false
+  useOwnApiKey: false,
+  input_device_id: '',
 };
 
 export default defaultUserSettings;

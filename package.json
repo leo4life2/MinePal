@@ -8,7 +8,7 @@
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
-    "axios": "^1.7.3",
+    "axios": "^1.8.4",
     "cors": "^2.8.5",
     "electron-updater": "^6.3.9",
     "express": "^4.19.2",
@@ -42,8 +42,9 @@
   },
   "devDependencies": {
     "@electron/notarize": "^2.3.2",
-    "electron": "^31.3.1",
-    "electron-builder": "^24.13.3"
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "electron-rebuild": "^3.2.9"
   },
   "build": {
     "asar": true,

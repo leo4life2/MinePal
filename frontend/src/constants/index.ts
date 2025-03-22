@@ -13,32 +13,55 @@ export interface PricingPlan {
   priceId: string; // Stripe price ID
 }
 
-export const PRICING_PLANS: PricingPlan[] = [
+const TEST_PRICING_PLANS: PricingPlan[] = [
   {
     id: 1,
     name: 'Basic',
     price: 2.99,
     quota: 1200,
-    // priceId: 'price_1R0YEFAbdM8AcunxnUxj07sw' // Test mode
-    priceId: 'price_1R2MrRAbdM8AcunxfX4snQNi' // Live mode
+    priceId: 'price_1R0YEFAbdM8AcunxnUxj07sw'
   },
   {
     id: 2,
     name: 'Standard',
     price: 7.99,
     quota: 3600,
-    // priceId: 'price_1R0YFHAbdM8AcunxY1rm8fkw' // Test mode
-    priceId: 'price_1R2MrTAbdM8AcunxqGPVw0ZR' // Live mode
+    priceId: 'price_1R0YFHAbdM8AcunxY1rm8fkw'
   },
   {
     id: 3,
     name: 'Pro',
     price: 13.99,
     quota: 7000,
-    // priceId: 'price_1R0YFYAbdM8AcunxKH04jHck' // Test mode
-    priceId: 'price_1R2MrVAbdM8AcunxMUql3BtU' // Live mode
+    priceId: 'price_1R0YFYAbdM8AcunxKH04jHck'
   }
-]; 
+];
+
+const LIVE_PRICING_PLANS: PricingPlan[] = [
+  {
+    id: 1,
+    name: 'Basic',
+    price: 2.99,
+    quota: 1200,
+    priceId: 'price_1R2MrRAbdM8AcunxfX4snQNi'
+  },
+  {
+    id: 2,
+    name: 'Standard',
+    price: 7.99,
+    quota: 3600,
+    priceId: 'price_1R2MrTAbdM8AcunxqGPVw0ZR'
+  },
+  {
+    id: 3,
+    name: 'Pro',
+    price: 13.99,
+    quota: 7000,
+    priceId: 'price_1R2MrVAbdM8AcunxMUql3BtU'
+  }
+];
+
+export const PRICING_PLANS = process.env.NODE_ENV === 'dev' ? TEST_PRICING_PLANS : LIVE_PRICING_PLANS;
 
 const PROD_BACKEND_HOST = 'api.minepal.net';
 const DEV_BACKEND_HOST = 'staging.minepal.net:11111';

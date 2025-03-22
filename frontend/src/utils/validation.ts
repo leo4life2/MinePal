@@ -11,7 +11,6 @@ export function validateUserSettings({
   model,
   profiles,
   key_binding,
-  voice_mode,
   host,
   minecraft_version,
   port,
@@ -24,7 +23,7 @@ export function validateUserSettings({
   }
 
   if (!profiles.length) invalidFields.push("profiles");
-  if (!key_binding && !["always_on", "off"].includes(voice_mode)) invalidFields.push("key_binding");
+  if (!key_binding) invalidFields.push("key_binding");
   if (!host) invalidFields.push("host");
   if (!port) invalidFields.push("port");
   if (!minecraft_version || minecraft_version === "select") invalidFields.push("minecraft_version");

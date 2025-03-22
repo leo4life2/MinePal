@@ -34,12 +34,12 @@ export async function fetchSettings() {
     "player_username",
     "profiles",
     "whisper_to_player",
-    "voice_mode",
     "key_binding",
     "language",
     "openai_api_key",
     "model",
     "useOwnApiKey",
+    "input_device_id"
   ];
 
   const filteredSettings = expectedFields.reduce<UserSettings>((acc, fieldName) => ({
@@ -115,7 +115,7 @@ export interface Memory {
 }
 
 export async function fetchBotMemories(botName: string): Promise<Memory[]> {
-    const response = await fetch(`http://localhost:10101/bot-memories?name=${encodeURIComponent(botName)}`);
+    const response = await fetch(`${settings.API_BASE_URL}/bot-memories?name=${encodeURIComponent(botName)}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch memories: ${response.statusText}`);
     }
@@ -123,7 +123,7 @@ export async function fetchBotMemories(botName: string): Promise<Memory[]> {
 }
 
 export async function deleteMemory(botName: string, memoryId: string): Promise<void> {
-    const response = await fetch(`http://localhost:10101/bot-memories/${encodeURIComponent(botName)}/${encodeURIComponent(memoryId)}`, {
+    const response = await fetch(`${settings.API_BASE_URL}/bot-memories/${encodeURIComponent(botName)}/${encodeURIComponent(memoryId)}`, {
         method: 'DELETE',
     });
     if (!response.ok) {

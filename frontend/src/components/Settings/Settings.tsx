@@ -1,11 +1,26 @@
 import { useState, useEffect, ReactNode } from 'react';
-import { Settings as SettingsIcon, ChevronDown } from 'react-feather';
+import { Settings as SettingsIcon, ChevronDown, X } from 'react-feather';
 import { useUserSettings } from '../../contexts/UserSettingsContext/UserSettingsContext';
 import supportedLocales from '../../utils/supportedLocales';
 import { minecraftVersions } from '../../utils/minecraftVersions';
 import { useAgent } from '../../contexts/AgentContext/AgentContext';
 import useInputDevices from '../../hooks/useInputDevices';
+import { BrowserKeyCodeMap, KeyDisplayMap } from '../../utils/keyCodes';
 import './Settings.css';
+
+// Helper function to clean device labels
+const cleanDeviceLabel = (label: string): string => {
+  if (!label) return '';
+  
+  // First, remove parentheses and content inside them
+  let cleanedLabel = label.replace(/\s*\([^)]*\)\s*/g, '');
+  
+  // Then, remove "Default - " prefix if it exists
+  cleanedLabel = cleanedLabel.replace(/^Default\s*-\s*/i, '');
+  
+  // Finally, trim any whitespace
+  return cleanedLabel.trim();
+};
 
 interface SettingsSectionProps {
   title: string;
@@ -44,6 +59,8 @@ function Settings() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [gameMode, setGameMode] = useState('singleplayer');
   const [selectedDevice, setSelectedDevice] = useState<MediaDeviceInfo>();
+  const [listeningForKey, setListeningForKey] = useState(false);
+  const [keyDisplayName, setKeyDisplayName] = useState('');
   
   // Safely access host using a defensive approach
   useEffect(() => {
@@ -53,12 +70,71 @@ function Settings() {
 
   // Initialize selected device when inputDevices are loaded
   useEffect(() => {
-    if (inputDevices.length && !selectedDevice) {
+    if (inputDevices.length) {
+      // Try to find device matching the stored clean label
+      const storedDeviceLabel = userSettings.input_device_id;
+      
+      // Only try to match if we have a stored label
+      if (storedDeviceLabel) {
+        const matchingDevice = inputDevices.find(device => 
+          cleanDeviceLabel(device.label).includes(storedDeviceLabel) || 
+          storedDeviceLabel.includes(cleanDeviceLabel(device.label))
+        );
+
+        if (matchingDevice) {
+          setSelectedDevice(matchingDevice);
+          return;
+        }
+      }
+      
+      // Fallback to first device if no match found or no stored label
       setSelectedDevice(inputDevices[0]);
-      // Optionally: Store device ID in user settings if needed
-      // updateField('input_device_id', inputDevices[0].deviceId);
+      // Update settings with clean label of first device
+      const cleanedLabel = cleanDeviceLabel(inputDevices[0].label);
+      updateField('input_device_id', cleanedLabel);
     }
-  }, [inputDevices, selectedDevice]);
+  }, [inputDevices, userSettings, updateField]);
+
+  // Initialize key display name
+  useEffect(() => {
+    if (userSettings.key_binding) {
+      setKeyDisplayName(getKeyName(userSettings.key_binding));
+    }
+  }, [userSettings.key_binding]);
+
+  // Get readable key name from key code
+  const getKeyName = (keyCode: string) => {
+    return KeyDisplayMap[keyCode] || `Key ${keyCode}`;
+  };
+
+  // Start listening for key input
+  const startKeyBinding = () => {
+    setListeningForKey(true);
+    
+    // Add one-time event listener for keydown
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      
+      // Get key code from our mapping
+      const keyCode = (BrowserKeyCodeMap[e.code] ?? -1).toString();
+      
+      updateField('key_binding', keyCode);
+      setKeyDisplayName(getKeyName(keyCode));
+      setListeningForKey(false);
+      
+      // Remove the event listener
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+  };
+
+  // Clear key binding
+  const clearKeyBinding = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateField('key_binding', '');
+    setKeyDisplayName('');
+  };
 
   const handleGameModeChange = (mode: 'singleplayer' | 'multiplayer') => {
     setGameMode(mode);
@@ -72,11 +148,13 @@ function Settings() {
 
   const handleInputDeviceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const deviceId = e.target.value;
+    console.log('selected deviceId', deviceId);
     const device = inputDevices.find(d => d.deviceId === deviceId);
     if (device) {
       setSelectedDevice(device);
-      // Optionally: Store device ID in user settings if needed
-      // updateField('input_device_id', deviceId);
+      // Save the cleaned label instead of device ID
+      const cleanedLabel = cleanDeviceLabel(device.label);
+      updateField('input_device_id', cleanedLabel);
     }
   };
 
@@ -225,6 +303,29 @@ function Settings() {
             </div>
 
             <div className="setting-item">
+              <label htmlFor="key_binding" className="input-label">Push-to-Talk Key</label>
+              <div 
+                className={`key-binding-input ${listeningForKey ? 'listening' : ''}`}
+                onClick={() => !agentActive && startKeyBinding()}
+              >
+                {listeningForKey ? (
+                  <span className="key-listening-text">Press any key...</span>
+                ) : keyDisplayName ? (
+                  <div className="key-display">
+                    <span>{keyDisplayName}</span>
+                    <X 
+                      className="key-clear-icon" 
+                      size={16} 
+                      onClick={clearKeyBinding} 
+                    />
+                  </div>
+                ) : (
+                  <span className="key-binding-placeholder">Click to set key</span>
+                )}
+              </div>
+            </div>
+
+            <div className="setting-item">
               <label htmlFor="input-device" className="input-label">Input Device</label>
               <div className="select-wrapper">
                 <select
@@ -236,7 +337,7 @@ function Settings() {
                 >
                   {inputDevices.map(device => (
                     <option key={device.deviceId} value={device.deviceId}>
-                      {device.label || `Device ${device.deviceId}`}
+                      {cleanDeviceLabel(device.label) || `Device ${device.deviceId}`}
                     </option>
                   ))}
                 </select>

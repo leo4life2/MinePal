@@ -7,14 +7,17 @@ import fs from 'fs';
 import cors from 'cors';
 import path from 'path';
 import net from 'net';
-import { uIOhook, UiohookKey } from 'uiohook-napi';
+import { uIOhook } from 'uiohook-napi';
 import { LocalIndex } from 'vectra';
-
+import { WebSocketServer, WebSocket } from 'ws';
+import axios from 'axios';
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
 let isKeyDown = false; // Track push-to-talk key state
 let keyCode = null; // Store the key code for push-to-talk
+let selectedInputDevice = ''; // Store the selected input device ID
+let wss = null; // WebSocket server instance
 
 function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
@@ -24,39 +27,85 @@ function notifyBotKicked() {
     logToFile("Bot was kicked");
 }
 
-function setupVoice(settings) {
-    const { key_binding } = settings;
-
-    if (key_binding) {
-        // If a hook was previously set up, unregister it first
-        uIOhook.stop();
-        
-        // Try to get the key code from the key binding
-        try {
-            keyCode = key_binding;
-            
-            // Set up the key down and key up listeners
-            uIOhook.on('keydown', (e) => {
-                if (e.keycode === keyCode) {
-                    isKeyDown = true;
-                    console.log('Push-to-talk key down:', isKeyDown);
-                }
-            });
-            
-            uIOhook.on('keyup', (e) => {
-                if (e.keycode === keyCode) {
-                    isKeyDown = false;
-                    console.log('Push-to-talk key up:', isKeyDown);
-                }
-            });
-            
-            // Start the hook
-            uIOhook.start();
-            console.log('Push-to-talk enabled with key code:', keyCode);
-        } catch (error) {
-            logToFile(`Error setting up push-to-talk: ${error.message}`);
-            console.error('Error setting up push-to-talk:', error);
+// Get JWT for authentication with backend
+async function getJWT(userDataDir) {
+    try {
+        const tokenPath = path.join(userDataDir, 'supa-jwt.json');
+        if (fs.existsSync(tokenPath)) {
+            const data = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+            return data.token;
         }
+    } catch (err) {
+        logToFile(`Error reading JWT: ${err.message}`);
+    }
+    return null;
+}
+
+function setupVoice(settings, userDataDir, agentProcesses) {
+    const { key_binding, input_device_id } = settings;
+
+    // If a hook was previously set up, unregister it first
+    try {
+        uIOhook.stop();
+    } catch (error) {
+        logToFile(`Error stopping previous uIOhook: ${error.message}`);
+    }
+
+    // Check if both key binding and input device are available
+    if (!key_binding || !input_device_id) {
+        const missingItems = [];
+        if (!key_binding) missingItems.push('key binding');
+        if (!input_device_id) missingItems.push('input device');
+        
+        logToFile(`Push-to-talk setup skipped. Missing: ${missingItems.join(' and ')}`);
+        console.log(`Push-to-talk setup skipped. Missing: ${missingItems.join(' and ')}`);
+        return;
+    }
+
+    // Store the selected input device ID
+    selectedInputDevice = input_device_id;
+
+    // Try to set up push-to-talk with the key code and input device
+    try {
+        keyCode = Number(key_binding);
+        
+        // Set up the key down and key up listeners
+        uIOhook.on('keydown', async (e) => {
+            if (e.keycode === keyCode && !isKeyDown) {
+                isKeyDown = true;
+                
+                // Broadcast keydown event to all connected clients
+                if (wss) {
+                    wss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ type: 'keydown' }));
+                        }
+                    });
+                }
+            }
+        });
+        
+        uIOhook.on('keyup', async (e) => {
+            if (e.keycode === keyCode && isKeyDown) {
+                isKeyDown = false;                
+                // Broadcast keyup event to all connected clients
+                if (wss) {
+                    wss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ type: 'keyup' }));
+                        }
+                    });
+                }
+            }
+        });
+        
+        // Start the hook
+        uIOhook.start();
+        logToFile(`Push-to-talk enabled with key code: ${keyCode} and input device: ${input_device_id}`);
+        console.log(`Push-to-talk enabled with key code: ${keyCode} and input device: ${input_device_id}`);
+    } catch (error) {
+        logToFile(`Error setting up push-to-talk: ${error.message}`);
+        console.error('Error setting up push-to-talk:', error);
     }
 }
 
@@ -87,7 +136,8 @@ function startServer() {
             "key_binding": "",
             "openai_api_key": "",
             "model": "",
-            "language": "en"
+            "language": "en",
+            "input_device_id": ""
         };
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
     } else {
@@ -102,6 +152,91 @@ function startServer() {
     const app = express();
     const port = 10101;
     const server = http.createServer(app);
+
+    // Set up WebSocket server
+    wss = new WebSocketServer({ server });
+    
+    wss.on('connection', (ws) => {
+        logToFile('New WebSocket client connected');
+        
+        ws.on('message', async (message) => {
+            try {
+                const data = JSON.parse(message);
+                
+                if (data.type === 'audio-binary') {
+                    // Handle audio binary data from client
+                    logToFile(`Received audio binary data from client of size ${data.audio.length} bytes`);
+                    
+                    // Get JWT for authorization
+                    const token = await getJWT(userDataDir);
+                    if (!token) {
+                        logToFile('No JWT available for API request');
+                        return;
+                    }
+                    
+                    // Send audio to backend for transcription
+                    try {
+                        const model = settings.language === 'en' || settings.language === 'en-US' ? 'nova-3' : 'nova-2';
+                        logToFile(`Sending audio to backend for transcription with model: ${model} and language: ${settings.language}`);
+                        const response = await axios.post(
+                            `${HTTPS_BACKEND_URL}/deepgram/listen?model=${model}&language=${settings.language}`,
+                            Buffer.from(data.audio, 'base64'),
+                            {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'audio/ogg; codecs=opus'
+                                },
+                                timeout: 4000 // 4 second timeout
+                            }
+                        );
+
+                        // Extract transcript from response
+                        const transcript = response.data?.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim();
+                        
+                        if (transcript) {
+                            logToFile(`Received transcript: ${transcript}`);
+                            
+                            // Send transcript to all bots
+                            agentProcesses.forEach(agentProcess => {
+                                agentProcess.sendTranscription(transcript);
+                            });
+                        } else {
+                            logToFile('No transcript received from Deepgram');
+                            if (agentProcesses.length > 0) {
+                                agentProcesses[0].sendMessage(`/tell ${settings.player_username} I couldn't quite catch that, say again?`);
+                            }
+                        }
+                    } catch (error) {
+                        logToFile(`Error sending audio for transcription: ${error.message}`);
+                        if (agentProcesses.length > 0) {
+                            if (error.response && error.response.status === 400 && 
+                                error.response.data && 
+                                error.response.data.err_msg && 
+                                error.response.data.err_msg.includes('failed to process audio')) {
+                                agentProcesses[0].sendMessage(`/tell ${settings.player_username} I couldn't understand that, come again?`);
+                            } else {
+                                agentProcesses[0].sendMessage(`/tell ${settings.player_username} My voice transcription service took an arrow to the knee, try again later`);
+                            }
+                        }
+                        if (error.response) {
+                            logToFile(`Response status: ${error.response.status}`);
+                            logToFile(`Response data: ${JSON.stringify(error.response.data)}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                logToFile(`Error processing WebSocket message: ${error.message}`);
+            }
+        });
+        
+        ws.on('close', () => {
+            logToFile('WebSocket client disconnected');
+        });
+        
+        ws.on('error', (error) => {
+            logToFile(`WebSocket error: ${error.message}`);
+        });
+    });
 
     // Configure CORS to allow credentials
     app.use(cors({
@@ -250,6 +385,14 @@ function startServer() {
             return res.status(404).send('No agent processes are currently running.');
         }
 
+        // Stop uIOhook to clean up keyboard listeners
+        try {
+            uIOhook.stop();
+            logToFile('uIOhook stopped');
+        } catch (error) {
+            logToFile(`Error stopping uIOhook: ${error.message}`);
+        }
+
         agentProcesses.forEach(agentProcess => {
             agentProcess.agentProcess.kill();
         });
@@ -343,6 +486,7 @@ function startServer() {
         profiles = newSettings.profiles;
         load_memory = newSettings.load_memory;
 
+        // Start agent processes first
         for (let profile of profiles) {
             const profileBotName = profile.name;
             const agentProcess = new AgentProcess(notifyBotKicked);
@@ -350,6 +494,10 @@ function startServer() {
             agentProcesses.push(agentProcess);
         }
         agentProcessStarted = true;
+
+        // Set up push-to-talk functionality with the new settings
+        setupVoice(settings, userDataDir, agentProcesses);
+
         logToFile('API: Settings updated and AgentProcess started for all profiles');
         res.send('Settings updated and AgentProcess started for all profiles');
     });
@@ -388,6 +536,13 @@ function startServer() {
 
     const shutdown = () => {
         logToFile('Shutting down gracefully...');
+        
+        // Close WebSocket server
+        if (wss) {
+            wss.close(() => {
+                logToFile('WebSocket server closed');
+            });
+        }
         
         // Stop uIOhook to clean up keyboard listeners
         try {
