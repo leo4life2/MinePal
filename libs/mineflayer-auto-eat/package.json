@@ -1,0 +1,45 @@
+{
+    "name": "mineflayer-auto-eat",
+    "version": "5.0.0",
+    "description": "An auto eat plugin for mineflayer",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "type": "module",
+    "license": "MIT",
+    "scripts": {
+        "build": "tsc",
+        "prepare": "npm run build",
+        "test": "node ./test/index.js"
+    },
+    "dependencies": {
+        "mineflayer": "^4.20.1",
+        "@nxg-org/mineflayer-util-plugin": "^1.8.0",
+        "strict-event-emitter-types": "^2.0.0"
+    },
+    "devDependencies": {
+        "prismarine-item": "^1.14.0",
+        "typescript": "^5.4.5"
+    },
+    "author": {
+        "name": "Link",
+        "url": "https://github.com/link-discord/"
+    },
+    "contributors": [
+        {
+            "name": "Rocco A",
+            "url": "https://github.com/GenerelSchwerz"
+        }
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/link-discord/mineflayer-auto-eat"
+    },
+    "keywords": [
+        "mineflayer",
+        "plugin",
+        "minecraft",
+        "autoeat",
+        "auto",
+        "eat"
+    ]
+}

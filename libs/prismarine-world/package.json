@@ -1,0 +1,53 @@
+{
+  "name": "prismarine-world",
+  "version": "3.6.3",
+  "description": "The core implementation of the world for prismarine",
+  "main": "index.js",
+  "types": "./types/index.d.ts",
+  "scripts": {
+    "pretest": "npm run lint",
+    "lint": "standard",
+    "fix": "standard --fix",
+    "test": "mocha --reporter spec --exit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PrismarineJS/prismarine-world.git"
+  },
+  "keywords": [
+    "prismarine",
+    "minecraft",
+    "world",
+    "voxel",
+    "game"
+  ],
+  "engines": {
+    "node": ">=8.0.0"
+  },
+  "enginesStrict": true,
+  "author": "Will Franzen <wtfranzen@gmail.com> (http://will.xyz/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/PrismarineJS/prismarine-world/issues"
+  },
+  "homepage": "https://github.com/PrismarineJS/prismarine-world",
+  "devDependencies": {
+    "buffer-equal": "^1.0.0",
+    "expect": "^29.1.0",
+    "flatmap": "0.0.3",
+    "minecraft-data": "^3.0.0",
+    "mkdirp": "^0.5.1",
+    "mocha": "^11.0.1",
+    "prismarine-chunk": "^1.31.0",
+    "prismarine-provider-anvil": "^2.0.0",
+    "prismarine-provider-raw": "^1.0.1",
+    "prismarine-world": "file:.",
+    "process": "^0.11.0",
+    "range": "0.0.3",
+    "rimraf": "^3.0.2",
+    "standard": "^17.0.0"
+  },
+  "dependencies": {
+    "vec3": "^0.1.7"
+  }
+}

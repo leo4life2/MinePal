@@ -11,6 +11,16 @@ jobs:
   #   steps:
   #     - name: Checkout code
   #       uses: actions/checkout@v3
+  #       with:
+  #         submodules: recursive
+
+  #     - name: Cache node modules
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: '**/node_modules'
+  #         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-node-
 
   #     - name: Set up Node.js
   #       uses: actions/setup-node@v3
@@ -27,6 +37,19 @@ jobs:
   #       run: |
   #         cd frontend
   #         npx vite build
+
+  #     - name: Install & Build Submodules
+  #       run: |
+  #         for dir in ./libs/*; do
+  #           if [ -f "$dir/package.json" ]; then
+  #             cd "$dir"
+  #             npm install
+  #             if [ -f "./tsconfig.json" ]; then
+  #               npm run build
+  #             fi
+  #             cd -
+  #           fi
+  #         done
 
   #     - name: Prepare for code signing
   #       run: |
@@ -57,6 +80,16 @@ jobs:
   #   steps:
   #     - name: Checkout code
   #       uses: actions/checkout@v3
+  #       with:
+  #         submodules: recursive
+
+  #     - name: Cache node modules
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: '**/node_modules'
+  #         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-node-
 
   #     - name: Set up Node.js
   #       uses: actions/setup-node@v3
@@ -73,6 +106,19 @@ jobs:
   #       run: |
   #         cd frontend
   #         npx vite build
+
+  #     - name: Install & Build Submodules
+  #       run: |
+  #         for dir in ./libs/*; do
+  #           if [ -f "$dir/package.json" ]; then
+  #             cd "$dir"
+  #             npm install
+  #             if [ -f "./tsconfig.json" ]; then
+  #               npm run build
+  #             fi
+  #             cd -
+  #           fi
+  #         done
 
   #     - name: Prepare for code signing
   #       run: |
@@ -107,6 +153,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -123,6 +179,19 @@ jobs:
         run: |
           cd frontend
           npx vite build
+
+      - name: Install & Build Submodules
+        run: |
+          for dir in ./libs/*; do
+            if [ -f "$dir/package.json" ]; then
+              cd "$dir"
+              npm install
+              if [ -f "./tsconfig.json" ]; then
+                npm run build
+              fi
+              cd -
+            fi
+          done
 
       - name: Build/release Electron app (non-macOS)
         uses: samuelmeuli/action-electron-builder@v1.6.0
