@@ -1,0 +1,18 @@
+[submodule "libs/mineflayer-collectblock"]
+	path = libs/mineflayer-collectblock
+	url = git@github.com:leo4life2/mineflayer-collectblock.git
+[submodule "libs/mineflayer-pvp"]
+	path = libs/mineflayer-pvp
+	url = git@github.com:leo4life2/mineflayer-pvp.git
+[submodule "libs/prismarine-world"]
+	path = libs/prismarine-world
+	url = git@github.com:leo4life2/prismarine-world.git
+[submodule "libs/minecraft-protocol"]
+	path = libs/minecraft-protocol
+	url = git@github.com:leo4life2/node-minecraft-protocol.git
+[submodule "libs/mineflayer"]
+	path = libs/mineflayer
+	url = git@github.com:leo4life2/mineflayer.git
+[submodule "libs/mineflayer-auto-eat"]
+	path = libs/mineflayer-auto-eat
+	url = git@github.com:leo4life2/mineflayer-auto-eat.git
