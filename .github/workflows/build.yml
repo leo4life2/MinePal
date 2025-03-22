@@ -181,9 +181,10 @@ jobs:
           npx vite build
 
       - name: Install & Build Submodules
+        shell: bash
         run: |
-          for dir in ./libs/*; do
-            if [ -f "$dir/package.json" ]; then
+          for dir in ./libs/*/; do
+            if [ -f "${dir}package.json" ]; then
               cd "$dir"
               npm install
               if [ -f "./tsconfig.json" ]; then
@@ -193,7 +194,7 @@ jobs:
                   npm run prepare
                 fi
               fi
-              cd -
+              cd - > /dev/null
             fi
           done
 
@@ -202,4 +203,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          publish: always
