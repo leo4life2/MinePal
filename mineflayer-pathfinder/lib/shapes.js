@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { Vec3 } = require('vec3')
 
 function getShapeFaceCenters (shapes, direction, half = null) {

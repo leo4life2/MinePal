@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { performance } = require('perf_hooks')
 
 const Heap = require('./heap.js')

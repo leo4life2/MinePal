@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { Vec3 } = require('vec3')
 const nbt = require('prismarine-nbt')
 const Move = require('./move')

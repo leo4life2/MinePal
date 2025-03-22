@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { EventEmitter, on } = require('events')
 
 class Lock {

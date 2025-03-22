@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { Vec3 } = require('vec3')
 
 class Move extends Vec3 {

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 function error (name, message) {
   const err = new Error(message)
   err.name = name

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 class BinaryHeapOpenSet {
   constructor () {
     // Initialing the array heap and adding a dummy element at index 0

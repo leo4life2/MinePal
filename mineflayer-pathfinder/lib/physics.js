@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { PlayerState } = require('prismarine-physics')
 
 class Physics {
