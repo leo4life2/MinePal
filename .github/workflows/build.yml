@@ -169,12 +169,6 @@ jobs:
         with:
           node-version: '22'
 
-          # Might remove this once we submodule mineflayer-pathfinder
-      - name: Install & build mineflayer-pathfinder
-        run: |
-          cd mineflayer-pathfinder
-          npm install
-
       - name: Install dependencies
         run: |
           npm install --include=dev
