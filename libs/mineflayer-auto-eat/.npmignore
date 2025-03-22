@@ -1,7 +1,0 @@
-test
-src
-.prettierrc
-.github
-.vscode
-package-lock.json
-tsconfig.json

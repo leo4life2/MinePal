@@ -1,6 +1,0 @@
-node_modules
-test/npm-debug.log
-test/server_*
-package-lock.json
-versions/
-src/client/*.json
