@@ -187,7 +187,11 @@ jobs:
               cd "$dir"
               npm install
               if [ -f "./tsconfig.json" ]; then
-                npm run build
+                if npm run | grep -q "build"; then
+                  npm run build
+                elif npm run | grep -q "prepare"; then
+                  npm run prepare
+                fi
               fi
               cd -
             fi
