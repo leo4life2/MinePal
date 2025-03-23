@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
 import { User as UserIcon, X as CloseIcon, Award } from 'react-feather';
-import { PricingModal, ModalWrapper } from '..';
+import { PricingModal, ModalWrapper, AuthModal } from '..';
 import './AccountModal.css';
 import { HTTPS_BACKEND_URL } from '../../../constants';
 
@@ -11,19 +11,31 @@ const electron = isElectron ? window.require('electron') : null;
 const shell = electron?.shell;
 
 function AccountModal() {
-  const { user, signOut, isPaying, tierQuota, stripeData, refreshSubscription } = useSupabase();
+  const { user, signOut, isPaying, tierQuota, stripeData, refreshSubscription, clearAuthError } = useSupabase();
   const [showModal, setShowModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!user) {
     return (
       <div className="account-container">
-        <button className="account-button account-button-placeholder">
+        <button 
+          className="account-button account-button-placeholder"
+          onClick={() => setShowAuthModal(true)}
+        >
           <UserIcon size={18} className="account-icon" />
           <span className="account-name">Not signed in</span>
         </button>
+        
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => {
+            setShowAuthModal(false);
+            clearAuthError();
+          }} 
+        />
       </div>
     );
   }

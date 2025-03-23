@@ -206,8 +206,8 @@
 }
 
 .error-message {
-  color: #e53935;
-  background-color: rgba(229, 57, 53, 0.1);
+  color: var(--error-message-color);
+  background-color: rgba(var(--error-message-color-rgb), 0.1);
   padding: 12px;
   border-radius: 8px;
   margin: 12px 0;

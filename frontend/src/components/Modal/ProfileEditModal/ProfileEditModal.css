@@ -232,9 +232,13 @@
 }
 
 .error-message {
-  color: #e05757;
+  color: var(--error-message-color);
   font-size: 14px;
   margin-top: 8px;
+  padding: 8px;
+  background-color: rgba(var(--error-message-color-rgb), 0.1);
+  border-radius: 8px;
+  text-align: center;
 }
 
 .memories-modal h3 {
@@ -252,14 +256,6 @@
   overflow-y: auto;
 }
 
-.memory-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border-color);
-}
-
 .memory-row:last-child {
   border-bottom: none;
 }
@@ -271,7 +267,7 @@
 }
 
 .delete-memory-button:hover {
-  color: #c04545;
+  background-color: rgba(242, 95, 76, 0.1);
 }
 
 .no-memories {
@@ -431,7 +427,6 @@
 
 .memory-text {
   flex: 1;
-  margin-right: 16px;
   word-break: break-word;
   color: var(--text-color);
   line-height: 1.5;
@@ -444,14 +439,13 @@
   font-size: 24px;
   cursor: pointer;
   color: #c04545;
-  padding: 4px 8px;
+  padding: 0 8px;
   border-radius: 4px;
   transition: all 0.3s ease;
 }
 
 .delete-memory-button:hover {
   background-color: rgba(242, 95, 76, 0.1);
-  transform: scale(1.1);
 }
 
 .automated-messages-group {

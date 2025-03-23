@@ -7,13 +7,10 @@
 .guides-link {
   color: var(--primary-color);
   text-decoration: none;
-  padding: 2px 4px;
-  margin-left: -4px;
-  border-radius: 4px;
   transition: all 0.3s ease;
   display: inline-block;
 }
 
 .guides-link:hover {
-  background: rgba(255, 137, 6, 0.1);
+  opacity: 0.8;
 } 

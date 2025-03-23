@@ -5,9 +5,12 @@
   --bg-color: #f0e6d2;          /* Parchment background */
   --bg-light-color: #fff;       /* Light background */
   --primary-color: #606c38;      /* Lighter earthy green */
+  --primary-color-rgb: 96, 108, 56; /* RGB values for primary color */
   --secondary-color: #e67e22;    /* Warm orange */
   --text-color: #2c1810;        /* Dark brown text */
   --error-color: #e63946;       /* Alert red */
+  --error-message-color: #e53935; /* Standardized error message color */
+  --error-message-color-rgb: 229, 57, 53; /* RGB values for error message color */
   --success-color: #606c38;     /* Same as primary */
   --accent-color: #d35400;      /* Deeper orange */
   --hover-color: #6b7841;       /* Slightly lighter green for hover */
@@ -20,9 +23,12 @@
   --bg-color: #000000;          /* Space black background */
   --bg-light-color: #1a1a1a;    /* Dark background */
   --primary-color: #8a9a5b;     /* Lighter green for dark mode */
+  --primary-color-rgb: 138, 154, 91; /* RGB values for primary color in dark mode */
   --secondary-color: #ff8c00;   /* Brighter orange for contrast */
   --text-color: #e0e0e0;        /* Light gray text */
   --error-color: #ff6b6b;       /* Brighter red for dark mode */
+  --error-message-color: #f44336; /* Slightly brighter for dark mode */
+  --error-message-color-rgb: 244, 67, 54; /* RGB values for error message color in dark mode */
   --success-color: #8a9a5b;     /* Same as primary */
   --accent-color: #ff8c00;      /* Same as secondary */
   --hover-color: #9baa6c;       /* Lighter green for hover in dark mode */
@@ -65,9 +71,9 @@ h1 {
 }
 
 .error-message {
-  background-color: #ffebee;
-  color: #d32f2f;
-  border-radius: 4px;
+  background-color: rgba(var(--error-message-color-rgb), 0.1);
+  color: var(--error-message-color);
+  border-radius: 8px;
   padding: 10px 15px;
   margin-top: 20px;
   font-size: 14px;

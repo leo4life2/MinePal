@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Memory, deleteMemory, fetchBotMemories, sendMessage } from '../../../utils/api';
 import { Profile } from '../../../types/apiTypes';
-import { Settings as SettingsIcon, X as CloseIcon, ChevronDown } from 'react-feather';
+import { Settings as SettingsIcon, X as CloseIcon, ChevronDown, Trash2 } from 'react-feather';
 import './ProfileEditModal.css';
 import { ModalWrapper } from '..';
 
@@ -244,7 +244,7 @@ function ProfileEditModal({
                       className="delete-memory-button"
                       onClick={() => handleDeleteMemory(memory.id)}
                     >
-                      ×
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 ))

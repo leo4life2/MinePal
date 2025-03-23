@@ -16,12 +16,10 @@
 
 .profile-box:hover {
   transform: translateY(-2px);
-  background: var(--bg-color);
-  box-shadow: 0 4px 12px rgba(44, 24, 16, 0.05);
 }
 
-[data-theme='dark'] .profile-box:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+.profile-box.empty:hover {
+  transform: translateY(-1px);
 }
 
 .profile-box input {
@@ -48,10 +46,17 @@
   justify-content: center;
   padding: 5px;
   font-size: 24px;
-  color: var(--secondary-color);
+  color: var(--hover-color);
   border-style: dashed;
   border-width: 3px;
   background: transparent;
+  transition: opacity 0.3s ease;
+  opacity: 0.5;
+}
+
+.profile-box.empty:hover {
+  opacity: 1;
+  transition: opacity 0.3s ease;
 }
 
 .profile-box input[type="checkbox"] {
