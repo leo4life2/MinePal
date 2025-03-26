@@ -21,6 +21,7 @@
     "mineflayer-auto-eat": "file:libs/mineflayer-auto-eat",
     "mineflayer-collectblock": "file:libs/mineflayer-collectblock",
     "mineflayer-pvp": "file:libs/mineflayer-pvp",
+    "node-minecraft-protocol-forge": "file:libs/node-minecraft-protocol-forge",
     "prismarine-world": "file:libs/prismarine-world",
     "mineflayer-pathfinder": "file:mineflayer-pathfinder",
     "patch-package": "^8.0.0",

@@ -6,6 +6,8 @@ import { plugin as pvp } from 'mineflayer-pvp';
 import { plugin as collectblock } from 'mineflayer-collectblock';
 import { loader as autoEat } from 'mineflayer-auto-eat';
 import plugin from 'mineflayer-armor-manager';
+import protocolForge from 'minecraft-protocol-forge';
+
 const armorManager = plugin;
 
 class MCData {
@@ -42,6 +44,13 @@ class MCData {
         this.bot.loadPlugin(collectblock);
         this.bot.loadPlugin(autoEat);
         this.bot.loadPlugin(armorManager); // auto equip armor
+
+        const options = {
+            forgeMods: undefined,
+            channels: undefined
+        }
+        protocolForge.autoVersionForge(this.bot._client, options);
+
         return this.bot;
     }
 

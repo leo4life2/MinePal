@@ -16,3 +16,6 @@
 [submodule "libs/mineflayer-auto-eat"]
 	path = libs/mineflayer-auto-eat
 	url = git@github.com:leo4life2/mineflayer-auto-eat.git
+[submodule "libs/node-minecraft-protocol-forge"]
+	path = libs/node-minecraft-protocol-forge
+	url = git@github.com:leo4life2/node-minecraft-protocol-forge.git
