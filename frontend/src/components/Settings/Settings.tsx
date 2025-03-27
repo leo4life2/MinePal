@@ -8,20 +8,6 @@ import useInputDevices from '../../hooks/useInputDevices';
 import { BrowserKeyCodeMap, KeyDisplayMap } from '../../utils/keyCodes';
 import './Settings.css';
 
-// Helper function to clean device labels
-const cleanDeviceLabel = (label: string): string => {
-  if (!label) return '';
-  
-  // First, remove parentheses and content inside them
-  let cleanedLabel = label.replace(/\s*\([^)]*\)\s*/g, '');
-  
-  // Then, remove "Default - " prefix if it exists
-  cleanedLabel = cleanedLabel.replace(/^Default\s*-\s*/i, '');
-  
-  // Finally, trim any whitespace
-  return cleanedLabel.trim();
-};
-
 interface SettingsSectionProps {
   title: string;
   isExpanded?: boolean;
@@ -71,15 +57,12 @@ function Settings() {
   // Initialize selected device when inputDevices are loaded
   useEffect(() => {
     if (inputDevices.length) {
-      // Try to find device matching the stored clean label
-      const storedDeviceLabel = userSettings.input_device_id;
+      // Try to find device matching the stored device ID
+      const storedDeviceId = userSettings.input_device_id;
       
-      // Only try to match if we have a stored label
-      if (storedDeviceLabel) {
-        const matchingDevice = inputDevices.find(device => 
-          cleanDeviceLabel(device.label).includes(storedDeviceLabel) || 
-          storedDeviceLabel.includes(cleanDeviceLabel(device.label))
-        );
+      // Only try to match if we have a stored device ID
+      if (storedDeviceId) {
+        const matchingDevice = inputDevices.find(device => device.deviceId === storedDeviceId);
 
         if (matchingDevice) {
           setSelectedDevice(matchingDevice);
@@ -87,11 +70,10 @@ function Settings() {
         }
       }
       
-      // Fallback to first device if no match found or no stored label
+      // Fallback to first device if no match found or no stored ID
       setSelectedDevice(inputDevices[0]);
-      // Update settings with clean label of first device
-      const cleanedLabel = cleanDeviceLabel(inputDevices[0].label);
-      updateField('input_device_id', cleanedLabel);
+      // Update settings with device ID of first device
+      updateField('input_device_id', inputDevices[0].deviceId);
     }
   }, [inputDevices, userSettings, updateField]);
 
@@ -152,9 +134,8 @@ function Settings() {
     const device = inputDevices.find(d => d.deviceId === deviceId);
     if (device) {
       setSelectedDevice(device);
-      // Save the cleaned label instead of device ID
-      const cleanedLabel = cleanDeviceLabel(device.label);
-      updateField('input_device_id', cleanedLabel);
+      // Save the device ID directly
+      updateField('input_device_id', device.deviceId);
     }
   };
 
@@ -337,7 +318,7 @@ function Settings() {
                 >
                   {inputDevices.map(device => (
                     <option key={device.deviceId} value={device.deviceId}>
-                      {cleanDeviceLabel(device.label) || `Device ${device.deviceId}`}
+                      {device.label || `Device ${device.deviceId}`}
                     </option>
                   ))}
                 </select>

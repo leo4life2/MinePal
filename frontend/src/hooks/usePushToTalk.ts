@@ -3,14 +3,6 @@ import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContex
 import { useUserSettings } from '../contexts/UserSettingsContext/UserSettingsContext';
 import settings from '../utils/settings';
 
-const cleanDeviceLabel = (label: string) => {
-  if (!label) return '';
-  return label
-    .replace(/\s*\([^)]*\)\s*/g, '') // Remove parentheses and their contents
-    .replace(/^Default\s*-\s*/i, '') // Remove "Default - " prefix
-    .trim();
-};
-
 export default function usePushToTalk() {
   const wsRef = useRef<WebSocket | null>(null);
   const { declareError } = useErrorReport();
@@ -19,38 +11,14 @@ export default function usePushToTalk() {
   const audioChunksRef = useRef<Blob[]>([]);
   const isRecordingRef = useRef(false);
 
-  const findDeviceIdByLabel = useCallback(async (targetLabel: string) => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioDevices = devices.filter(device => device.kind === 'audioinput');
-      
-      const cleanedTargetLabel = cleanDeviceLabel(targetLabel);
-      
-      for (const device of audioDevices) {
-        const cleanedDeviceLabel = cleanDeviceLabel(device.label);
-        if (cleanedDeviceLabel.includes(cleanedTargetLabel)) {
-          return device.deviceId;
-        }
-      }
-      
-      // If no match found, return undefined to use default device
-      return undefined;
-    } catch (error) {
-      console.error('Error finding device:', error);
-      return undefined;
-    }
-  }, []);
-
   const handleStartRecording = useCallback(async () => {
     if (isRecordingRef.current) return; // Already recording
     isRecordingRef.current = true;
 
     try {
-      const deviceId = await findDeviceIdByLabel(userSettings.input_device_id);
-
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
+          deviceId: userSettings.input_device_id ? { exact: userSettings.input_device_id } : undefined,
           echoCancellation: true,
           noiseSuppression: true,
         },
@@ -76,7 +44,7 @@ export default function usePushToTalk() {
       isRecordingRef.current = false;
       declareError('usePushToTalk', error as Error);
     }
-  }, [findDeviceIdByLabel, userSettings.input_device_id, declareError]);
+  }, [userSettings.input_device_id, declareError]);
 
   const handleStopRecording = useCallback(() => {
     if (!isRecordingRef.current || !mediaRecorderRef.current) return;
