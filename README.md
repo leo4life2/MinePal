@@ -2,36 +2,42 @@
 
 ## Overview
 
-MinePal is a Minecraft companion app with a React frontend, a local backend, and an AI agent.
+MinePal is a desktop Minecraft companion app built with Electron that adds an AI agent to your Minecraft world.
 
 ## Structure
 
 ![MinePal Structure](diagram.png)
 
 - **Frontend**: Located in `frontend/`, built with React and Vite.
-- **Backend**: Local backend APIs in `server.js`.
 - **Agent**: Minecraft agent logic in `src/agent/`.
 
 ## Setup
 
-### Frontend
+### Prerequisites
 
-1. Navigate to `frontend/`.
+- [Node.js](https://nodejs.org/) (v14 or later)
+- [Electron](https://www.electronjs.org/)
+
+### Installation
+
+1. Clone the repository
 2. Install dependencies:
 
    ```sh
    npm install
    ```
 
-3. Build the frontend:
+3. Build the app:
 
    ```sh
-   npm run build
+   npm run buildLocal
    ```
 
-### Backend
+### Running the App
 
-Refer to the backend repository: [minepal-backend](https://github.com/leo4life2/minepal-backend).
+```sh
+npm start
+```
 
 ### Agent
 
