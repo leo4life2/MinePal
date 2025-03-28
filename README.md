@@ -10,6 +10,14 @@ MinePal is a desktop Minecraft companion app built with Electron that adds an AI
 
 - **Frontend**: Located in `frontend/`, built with React and Vite.
 - **Agent**: Minecraft agent logic in `src/agent/`.
+- **Libraries**: Located in `libs/`, contains several submodules:
+  - `node-minecraft-protocol-forge/`
+  - `mineflayer-collectblock/`
+  - `mineflayer-auto-eat/`
+  - `mineflayer-pvp/`
+  - `prismarine-world/`
+  - `mineflayer/`
+  - `minecraft-protocol/`
 
 ## Setup
 
@@ -27,7 +35,25 @@ MinePal is a desktop Minecraft companion app built with Electron that adds an AI
    npm install
    ```
 
-3. Build the app:
+3. Install and build submodules:
+
+   ```sh
+   cd libs
+   for dir in */; do
+     cd "$dir"
+     npm install
+     if [ -f "package.json" ] && grep -q "\"build\"" "package.json"; then
+       npm run build
+     fi
+     if [ -f "package.json" ] && grep -q "\"prepare\"" "package.json"; then
+       npm run prepare
+     fi
+     cd ..
+   done
+   cd ..
+   ```
+
+4. Build the app:
 
    ```sh
    npm run buildLocal
