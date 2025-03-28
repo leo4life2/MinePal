@@ -15,6 +15,7 @@ export type UserSettings = {
   player_username: string;
   profiles: Profile[];
   whisper_to_player: boolean;
+  voice_mode: boolean;
   key_binding: string;
   language: string;
   openai_api_key: string;
