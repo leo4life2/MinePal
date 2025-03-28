@@ -2,7 +2,6 @@ import { useState, useEffect, ReactNode } from 'react';
 import { Settings as SettingsIcon, ChevronDown, X } from 'react-feather';
 import { useUserSettings } from '../../contexts/UserSettingsContext/UserSettingsContext';
 import supportedLocales from '../../utils/supportedLocales';
-import { minecraftVersions } from '../../utils/minecraftVersions';
 import { useAgent } from '../../contexts/AgentContext/AgentContext';
 import useInputDevices from '../../hooks/useInputDevices';
 import { BrowserKeyCodeMap, KeyDisplayMap } from '../../utils/keyCodes';
@@ -52,7 +51,10 @@ function Settings() {
   useEffect(() => {
     const currentHost = userSettings.host || '';
     setGameMode(currentHost === 'localhost' ? 'singleplayer' : 'multiplayer');
-  }, [userSettings]);
+    
+    // Hardcode Minecraft version to 1.21.4 (but it's actually auto)
+    updateField('minecraft_version', '1.21.4');
+  }, [userSettings, updateField]);
 
   // Initialize selected device when inputDevices are loaded
   useEffect(() => {
@@ -217,6 +219,7 @@ function Settings() {
               />
             </div>
 
+            {/* Minecraft version dropdown commented out and hardcoded to 1.21.4
             <div className="setting-item">
               <label htmlFor="minecraft_version" className="input-label">
                 Minecraft Version
@@ -244,6 +247,7 @@ function Settings() {
                 <ChevronDown className="select-arrow" size={16} strokeWidth={2} />
               </div>
             </div>
+            */}
             
             <div className="setting-item">
               <label htmlFor="whisper_to_player" className="input-label">

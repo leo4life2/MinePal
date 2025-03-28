@@ -37,8 +37,10 @@ class MCData {
             host: this.settings.host,
             port: this.settings.port,
             auth: this.settings.auth,
-            version: this.settings.minecraft_version,
+            version: false,
+            // version: this.settings.minecraft_version,
         });
+
         this.bot.loadPlugin(pathfinder);
         this.bot.loadPlugin(pvp);
         this.bot.loadPlugin(collectblock);

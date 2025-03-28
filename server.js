@@ -23,8 +23,20 @@ function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
 }
 
-function notifyBotKicked() {
-    logToFile("Bot was kicked");
+function notifyBotKicked(reason = 'unknown') {
+    logToFile(`Bot was kicked. Reason: ${reason}`);
+    
+    // Broadcast bot-kicked event to all connected clients with the reason
+    if (wss) {
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({ 
+                    type: 'bot-kicked',
+                    reason: reason
+                }));
+            }
+        });
+    }
 }
 
 // Get JWT for authentication with backend

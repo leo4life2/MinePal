@@ -35,7 +35,23 @@ const settingsPath = path.join(argv.userDataDir, 'settings.json');
 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
 
 const agent = new Agent();
-agent.start(argv.profile, argv.userDataDir, argv.appPath, argv.load_memory);
+try {
+    agent.start(argv.profile, argv.userDataDir, argv.appPath, argv.load_memory).then(() => {
+        agent.bot._client.on('error', (error) => {
+            console.error('[Client Error]', error);
+            
+            // Check if it's an unsupported protocol version error
+            if (error.message && error.message.includes('Unsupported protocol version')) {
+                console.error('[Version Error] Minecraft version incompatibility detected');
+                process.exit(129);
+            } else {
+                process.exit(1);
+            }
+        });
+    });
+} catch (error) {
+    console.error('[Agent Start Error]', error);
+}
 
 process.on('message', (e) => {
     console.log("message", e);

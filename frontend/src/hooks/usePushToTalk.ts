@@ -1,12 +1,14 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContext';
 import { useUserSettings } from '../contexts/UserSettingsContext/UserSettingsContext';
+import { useAgent } from '../contexts/AgentContext/AgentContext';
 import settings from '../utils/settings';
 
 export default function usePushToTalk() {
   const wsRef = useRef<WebSocket | null>(null);
   const { declareError } = useErrorReport();
   const { userSettings } = useUserSettings();
+  const { stop } = useAgent();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const isRecordingRef = useRef(false);
@@ -137,6 +139,21 @@ export default function usePushToTalk() {
             handleStartRecording().catch((err) => declareError('usePushToTalk', err));
           } else if (data.type === 'keyup') {
             handleStopRecording();
+          } else if (data.type === 'bot-kicked') {
+            // Create appropriate error message based on the reason
+            let errorMessage = "Bot disconnected";
+            if (data.reason === 'version_incompatible') {
+              errorMessage = "Unsupported Minecraft version.";
+            } else if (data.reason === 'kicked_from_server') {
+              errorMessage = "Bot was kicked from the Minecraft server.";
+            } else if (data.reason === 'terminated') {
+              errorMessage = "Bot process was terminated.";
+            }
+            
+            // Call stop function to update UI state
+            await stop();
+
+            declareError('usePushToTalk', new Error(errorMessage), true);
           }
         } catch (error) {
           console.error('Error handling WebSocket message:', error);
@@ -159,7 +176,7 @@ export default function usePushToTalk() {
       console.error('Failed to create WebSocket:', error);
       declareError('usePushToTalk', error instanceof Error ? error : new Error(String(error)));
     }
-  }, [userSettings.input_device_id, declareError, handleStartRecording, handleStopRecording]);
+  }, [userSettings.input_device_id, declareError, handleStartRecording, handleStopRecording, stop]);
 
   const disconnect = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {

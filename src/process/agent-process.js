@@ -95,14 +95,21 @@ export class AgentProcess {
                 return;
             }
 
-            if (code === 128 || signal === 'SIGTERM' || signal === 'SIGINT') {
+            if (code === 129) {
+                logToFile('Agent process terminated due to Minecraft version incompatibility. Not restarting.');
+                if (agentLogStream.writable) {
+                    agentLogStream.write('Agent process terminated due to Minecraft version incompatibility. Not restarting.\n');
+                    agentLogStream.end();
+                }
+                this.notifyBotKicked('version_incompatible');
+            } else if (code === 128 || signal === 'SIGTERM' || signal === 'SIGINT') {
                 const reason = code === 128 ? 'bot being kicked' : 'SIGTERM';
                 logToFile(`Agent process terminated due to ${reason}. Not restarting.`);
                 if (agentLogStream.writable) {
                     agentLogStream.write(`Agent process terminated due to ${reason}. Not restarting.\n`);
                     agentLogStream.end();
                 }
-                this.notifyBotKicked();
+                this.notifyBotKicked(code === 128 ? 'kicked_from_server' : 'terminated');
             } else if (code !== 0) {
                 logToFile('Restarting agent...');
                 if (agentLogStream.writable) {
