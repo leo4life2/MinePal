@@ -102,6 +102,13 @@ export class AgentProcess {
                     agentLogStream.end();
                 }
                 this.notifyBotKicked('version_incompatible');
+            } else if (code === 130) {
+                logToFile('Agent process terminated due to modded server incompatibility. Not restarting.');
+                if (agentLogStream.writable) {
+                    agentLogStream.write('Agent process terminated due to modded server incompatibility. Not restarting.\n');
+                    agentLogStream.end();
+                }
+                this.notifyBotKicked('modded_server');
             } else if (code === 128 || signal === 'SIGTERM' || signal === 'SIGINT') {
                 const reason = code === 128 ? 'bot being kicked' : 'SIGTERM';
                 logToFile(`Agent process terminated due to ${reason}. Not restarting.`);

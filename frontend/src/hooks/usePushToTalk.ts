@@ -148,6 +148,8 @@ export default function usePushToTalk() {
               errorMessage = "Bot was kicked from the Minecraft server.";
             } else if (data.reason === 'terminated') {
               errorMessage = "Bot process was terminated.";
+            } else if (data.reason === 'modded_server') {
+              errorMessage = "Server appears to have mods that MinePal doesn't support yet.";
             }
             
             // Call stop function to update UI state

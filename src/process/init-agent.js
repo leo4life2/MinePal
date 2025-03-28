@@ -44,6 +44,9 @@ try {
             if (error.message && error.message.includes('Unsupported protocol version')) {
                 console.error('[Version Error] Minecraft version incompatibility detected');
                 process.exit(129);
+            } else if (error.message && (error.message.includes('ECONNRESET') || error.message.includes('read ECONNRESET'))) {
+                console.error('[Connection Error] Modded server detected that MinePal does not support');
+                process.exit(130);
             } else {
                 process.exit(1);
             }
