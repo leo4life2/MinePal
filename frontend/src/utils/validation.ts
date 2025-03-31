@@ -5,6 +5,11 @@ export function isValidMinecraftUsername(username: string) {
   return regex.test(username);
 }
 
+export function isValidEmail(email: string) {
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return regex.test(email);
+}
+
 export function validateUserSettings({
   useOwnApiKey,
   openai_api_key,

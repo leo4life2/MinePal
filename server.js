@@ -190,7 +190,6 @@ function startServer() {
       minecraft_version: "select",
       host: "localhost",
       port: "25565",
-      auth: "offline",
       player_username: "",
       profiles: ["./ethan.json"],
       load_memory: true,
@@ -383,6 +382,7 @@ function startServer() {
           autoMessage: profileData.autoMessage || "",
           triggerOnJoin: !!profileData.triggerOnJoin,
           triggerOnRespawn: !!profileData.triggerOnRespawn,
+          auth: profileData.auth || "offline",
         });
       }
     });
@@ -592,7 +592,6 @@ function startServer() {
     // removed from UI, hardcoding these settings
     newSettings.allow_insecure_coding = false;
     newSettings.code_timeout_mins = 10;
-    newSettings.auth = "offline";
     newSettings.load_memory = true;
 
     Object.assign(settings, newSettings);
@@ -660,6 +659,7 @@ function startServer() {
       profileData.autoMessage = profile.autoMessage || "";
       profileData.triggerOnJoin = !!profile.triggerOnJoin;
       profileData.triggerOnRespawn = !!profile.triggerOnRespawn;
+      profileData.auth = profile.auth || "offline";
       fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
     });
 

@@ -4,6 +4,7 @@ export interface Profile {
   autoMessage?: string;
   triggerOnJoin?: boolean;
   triggerOnRespawn?: boolean;
+  auth?: "offline" | "mojang" | "microsoft";
 }
 
 export type OpenAIModel = "gpt-4o-mini" | "gpt-4o";
