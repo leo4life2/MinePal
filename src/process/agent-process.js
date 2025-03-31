@@ -41,7 +41,7 @@ export class AgentProcess {
         args.push('-p', profilePath, '-u', userDataDir, '-e', app.getAppPath());
         if (load_memory)
             args.push('-l', load_memory.toString()); // Ensure it's a string
-
+        
         const logDir = path.join(userDataDir, 'runlogs');
         // Create log directory if it doesn't exist
         if (!fs.existsSync(logDir)) {
@@ -123,7 +123,7 @@ export class AgentProcess {
                     agentLogStream.write('Restarting agent...\n');
                     agentLogStream.end();
                 }
-                this.start(profile, userDataDir, useOwnApiKey, openai_api_key, true, 'Agent process restarted.');
+                this.start(profile, userDataDir, useOwnApiKey, openai_api_key, true);
             }
         });
     

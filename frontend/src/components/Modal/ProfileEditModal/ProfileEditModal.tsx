@@ -64,7 +64,8 @@ function ProfileEditModal({
       personality: editingProfile.personality.trim(),
       autoMessage: editingProfile.autoMessage?.trim() || '',
       triggerOnJoin: !!editingProfile.triggerOnJoin,
-      triggerOnRespawn: !!editingProfile.triggerOnRespawn
+      triggerOnRespawn: !!editingProfile.triggerOnRespawn,
+      auth: editingProfile.auth
     };
 
     if (sanitized.name === '' || sanitized.personality === '') {
@@ -142,6 +143,20 @@ function ProfileEditModal({
               <div className="more-settings-content">
                 <div className="automated-messages-group">
                   <div className="input-group">
+                    <label className="input-label">Authentication</label>
+                    <select
+                      value={editingProfile.auth}
+                      onChange={({ target: { value } }) => setEditingProfile((current) => ({
+                        ...current,
+                        auth: value as 'offline' | 'mojang' | 'microsoft',
+                      }))}
+                      className="auth-select"
+                    >
+                      <option value="offline">Offline</option>
+                      {/* <option value="mojang">Mojang</option> */}
+                      <option value="microsoft">Microsoft</option>
+                    </select>
+
                     <label className="sub-input-label">Auto Message</label>
                     <div className="message-input">
                       <input

@@ -68,7 +68,7 @@ export class Agent {
 
         console.log('Logging in...');
         this.mcdata = MCData.getInstance(this.settings); // Use singleton with settings
-        this.bot = this.mcdata.initBot(this.name); // Initialize bot with agent's name
+        this.bot = this.mcdata.initBot(this.name, this.profile); // Initialize bot with agent's name
 
         this.bot.whisper_to_player = this.settings.whisper_to_player;
         this.bot.owner = this.owner;
@@ -103,7 +103,7 @@ export class Agent {
                 this.handleMessage(username, message);
             });
 
-            await this.sendMessage('Hello world! I am ' + this.name);
+            await this.sendMessage('Hello world! I am ' + this.bot.username);
             
             // Handle auto-message on join
             if ((this.profile.triggerOnJoin || this.profile.triggerOnRespawn) && this.profile.autoMessage) {
