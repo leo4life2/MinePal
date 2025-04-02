@@ -16,7 +16,6 @@ const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
 let isKeyDown = false; // Track push-to-talk key state
 let keyCode = null; // Store the key code for push-to-talk
-let selectedInputDevice = ''; // Store the selected input device ID
 let wss = null; // WebSocket server instance
 
 function logToFile(message) {
@@ -63,61 +62,56 @@ function setupVoice(settings, userDataDir, agentProcesses) {
         logToFile(`Error stopping previous uIOhook: ${error.message}`);
     }
 
-    // Check if both key binding and input device are available
-    if (!key_binding || !input_device_id) {
-        const missingItems = [];
-        if (!key_binding) missingItems.push('key binding');
-        if (!input_device_id) missingItems.push('input device');
-        
-        logToFile(`Push-to-talk setup skipped. Missing: ${missingItems.join(' and ')}`);
-        console.log(`Push-to-talk setup skipped. Missing: ${missingItems.join(' and ')}`);
-        return;
-    }
+    // Only set up push-to-talk if both key binding and input device are available
+    if (key_binding && input_device_id) {
+        // Store the selected input device ID
+        selectedInputDevice = input_device_id;
 
-    // Store the selected input device ID
-    selectedInputDevice = input_device_id;
-
-    // Try to set up push-to-talk with the key code and input device
-    try {
-        keyCode = Number(key_binding);
-        
-        // Set up the key down and key up listeners
-        uIOhook.on('keydown', async (e) => {
-            if (e.keycode === keyCode && !isKeyDown) {
-                isKeyDown = true;
-                
-                // Broadcast keydown event to all connected clients
-                if (wss) {
-                    wss.clients.forEach(client => {
-                        if (client.readyState === WebSocket.OPEN) {
-                            client.send(JSON.stringify({ type: 'keydown' }));
-                        }
-                    });
+        // Try to set up push-to-talk with the key code and input device
+        try {
+            keyCode = Number(key_binding);
+            
+            // Set up the key down and key up listeners
+            uIOhook.on('keydown', async (e) => {
+                if (e.keycode === keyCode && !isKeyDown) {
+                    isKeyDown = true;
+                    
+                    // Broadcast keydown event to all connected clients
+                    if (wss) {
+                        wss.clients.forEach(client => {
+                            if (client.readyState === WebSocket.OPEN) {
+                                client.send(JSON.stringify({ type: 'keydown' }));
+                            }
+                        });
+                    }
                 }
-            }
-        });
-        
-        uIOhook.on('keyup', async (e) => {
-            if (e.keycode === keyCode && isKeyDown) {
-                isKeyDown = false;                
-                // Broadcast keyup event to all connected clients
-                if (wss) {
-                    wss.clients.forEach(client => {
-                        if (client.readyState === WebSocket.OPEN) {
-                            client.send(JSON.stringify({ type: 'keyup' }));
-                        }
-                    });
+            });
+            
+            uIOhook.on('keyup', async (e) => {
+                if (e.keycode === keyCode && isKeyDown) {
+                    isKeyDown = false;                
+                    // Broadcast keyup event to all connected clients
+                    if (wss) {
+                        wss.clients.forEach(client => {
+                            if (client.readyState === WebSocket.OPEN) {
+                                client.send(JSON.stringify({ type: 'keyup' }));
+                            }
+                        });
+                    }
                 }
-            }
-        });
-        
-        // Start the hook
-        uIOhook.start();
-        logToFile(`Push-to-talk enabled with key code: ${keyCode} and input device: ${input_device_id}`);
-        console.log(`Push-to-talk enabled with key code: ${keyCode} and input device: ${input_device_id}`);
-    } catch (error) {
-        logToFile(`Error setting up push-to-talk: ${error.message}`);
-        console.error('Error setting up push-to-talk:', error);
+            });
+            
+            // Start the hook
+            uIOhook.start();
+            logToFile(`Push-to-talk enabled with key code: ${keyCode} and input device: ${input_device_id}`);
+            console.log(`Push-to-talk enabled with key code: ${keyCode} and input device: ${input_device_id}`);
+        } catch (error) {
+            logToFile(`Error setting up push-to-talk: ${error.message}`);
+            console.error('Error setting up push-to-talk:', error);
+        }
+    } else {
+        logToFile('Push-to-talk not configured - voice input disabled');
+        console.log('Push-to-talk not configured - voice input disabled');
     }
 }
 
@@ -465,16 +459,18 @@ function startServer() {
         }
 
         const newSettings = req.body;
-        // Check for empty fields in newSettings, except for key_binding if voice_mode is always_on or off
+        // Check for empty fields in newSettings, except for key_binding and input_device_id
         const emptyFields = Object.entries(newSettings)
             .filter(([key, value]) => {
                 // Skip API key and model checks if not using own API key
                 if (!newSettings.useOwnApiKey && (key === 'openai_api_key' || key === 'model')) {
                     return false;
                 }
+                // Skip key_binding and input_device_id as they are optional
+                if (key === 'key_binding' || key === 'input_device_id') {
+                    return false;
+                }
                 if (key === 'profiles') return !Array.isArray(value) || value.length === 0;
-                // Key binding is optional for push-to-talk
-                if (key === 'key_binding') return false;
                 if (key === 'minecraft_version' && value === 'select') return true;
                 return value === "" || value === null || value === undefined;
             })

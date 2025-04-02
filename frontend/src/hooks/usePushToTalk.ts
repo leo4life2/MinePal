@@ -18,13 +18,21 @@ export default function usePushToTalk() {
     isRecordingRef.current = true;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: userSettings.input_device_id ? { exact: userSettings.input_device_id } : undefined,
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
-      });
+      // Only try to get audio stream if input device is configured
+      let stream;
+      if (userSettings.input_device_id) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: { exact: userSettings.input_device_id },
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        });
+      } else {
+        // If no input device configured, don't start recording
+        isRecordingRef.current = false;
+        return;
+      }
 
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -124,11 +132,13 @@ export default function usePushToTalk() {
       
       ws.onopen = () => {
         console.log('WebSocket connected for push-to-talk');
-        // Send initial configuration
-        ws.send(JSON.stringify({
-          type: 'config',
-          deviceId: userSettings.input_device_id
-        }));
+        // Only send device ID if configured
+        if (userSettings.input_device_id) {
+          ws.send(JSON.stringify({
+            type: 'config',
+            deviceId: userSettings.input_device_id
+          }));
+        }
       };
 
       ws.onmessage = async (event) => {
