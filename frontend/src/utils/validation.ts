@@ -12,7 +12,6 @@ export function validateUserSettings({
   profiles,
   key_binding,
   host,
-  minecraft_version,
   port,
 }: UserSettings) {
   const invalidFields: string[] = [];
@@ -26,7 +25,6 @@ export function validateUserSettings({
   if (!key_binding) invalidFields.push("key_binding");
   if (!host) invalidFields.push("host");
   if (!port) invalidFields.push("port");
-  if (!minecraft_version || minecraft_version === "select") invalidFields.push("minecraft_version");
 
   return invalidFields;
 }

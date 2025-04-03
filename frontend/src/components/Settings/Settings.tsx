@@ -47,19 +47,12 @@ function Settings() {
   const [listeningForKey, setListeningForKey] = useState(false);
   const [keyDisplayName, setKeyDisplayName] = useState('');
   const deviceInitialized = useRef(false);
-  const mcVersionInitialized = useRef(false);
   
   // Safely access host using a defensive approach
   useEffect(() => {
     const currentHost = userSettings.host || '';
     setGameMode(currentHost === 'localhost' ? 'singleplayer' : 'multiplayer');
-    
-    // Only set the Minecraft version once to avoid infinite loops
-    if (!mcVersionInitialized.current) {
-      updateField('minecraft_version', '1.21.4');
-      mcVersionInitialized.current = true;
-    }
-  }, [userSettings.host, updateField]);
+  }, [userSettings.host]);
 
   // Initialize selected device when inputDevices are loaded
   useEffect(() => {
@@ -230,36 +223,6 @@ function Settings() {
               />
             </div>
 
-            {/* Minecraft version dropdown commented out and hardcoded to 1.21.4
-            <div className="setting-item">
-              <label htmlFor="minecraft_version" className="input-label">
-                Minecraft Version
-              </label>
-              <div className="select-wrapper">
-                <select
-                  id="minecraft_version"
-                  value={userSettings.minecraft_version}
-                  onChange={(e) => {
-                    updateField('minecraft_version', e.target.value);
-                  }}
-                  className="setting-input"
-                  disabled={agentActive}
-                >
-                  {minecraftVersions.map((group) => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.versions.map((version) => (
-                        <option key={version} value={version}>
-                          {version}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <ChevronDown className="select-arrow" size={16} strokeWidth={2} />
-              </div>
-            </div>
-            */}
-            
             <div className="setting-item">
               <label htmlFor="whisper_to_player" className="input-label">
                 Whisper To Player

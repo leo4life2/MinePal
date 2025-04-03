@@ -9,7 +9,6 @@ export interface Profile {
 export type OpenAIModel = "gpt-4o-mini" | "gpt-4o";
 
 export type UserSettings = {
-  minecraft_version: string;
   host: string;
   port: number;
   player_username: string;

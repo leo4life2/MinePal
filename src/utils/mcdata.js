@@ -15,8 +15,6 @@ class MCData {
         if (!settings) {
             throw new Error("Settings object is required for initialization");
         }
-        this.mcdata = minecraftData(settings.minecraft_version);
-        this.Item = prismarine_items(settings.minecraft_version);
         this.settings = settings;
         this.bot = null;
     }
@@ -38,7 +36,15 @@ class MCData {
             port: this.settings.port,
             auth: this.settings.auth,
             version: false,
-            // version: this.settings.minecraft_version,
+        });
+
+        // Create bot gets the version of the game for us
+        // Now we set mcdata and prismarine_items to the correct version
+        this.bot._client.once('version_detected', (version) => {
+            console.log('Joining game of version: ', version);
+            this.mcdata = minecraftData(version);
+            this.Item = prismarine_items(version);
+            this.bot.minecraft_version = version;
         });
 
         this.bot.loadPlugin(pathfinder);

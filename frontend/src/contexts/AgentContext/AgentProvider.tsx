@@ -13,7 +13,6 @@ const fieldDisplayNames: Record<string, string> = {
   player_username: "Minecraft Username",
   host: "Server Address",
   port: "Port",
-  minecraft_version: "Minecraft Version",
   whisper_to_player: "Whisper To Player",
   key_binding: "Push-to-Talk Key",
   language: "Language/Accent",

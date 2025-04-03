@@ -28,7 +28,6 @@ export async function fetchSettings() {
   const response = await fetch(`${settings.API_BASE_URL}/settings`);
   const data = await response.json();
   const expectedFields = [
-    "minecraft_version",
     "host",
     "port",
     "player_username",

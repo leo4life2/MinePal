@@ -1,7 +1,6 @@
 import { UserSettings } from "../types/apiTypes";
 
 const defaultUserSettings: UserSettings = {
-  minecraft_version: "",
   host: "",
   port: 0,
   player_username: "",

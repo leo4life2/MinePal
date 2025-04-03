@@ -165,7 +165,7 @@ const modes = [
                     this.noticed_at = Date.now();
                 }
                 if (Date.now() - this.noticed_at > this.wait * 1000) {
-                    const metadataIndex = agent.settings.minecraft_version && agent.settings.minecraft_version <= '1.16.5' ? 7 : 8;
+                    const metadataIndex = agent.bot.minecraft_version && agent.bot.minecraft_version <= '1.16.5' ? 7 : 8;
                     const itemName = agent.mcdata.getItemName(item.metadata[metadataIndex]?.itemId) || 'unknown';
                     const itemCount = item.metadata[metadataIndex]?.itemCount || 1;
                     const formattedItemName = itemName.replace(/_/g, ' ');
