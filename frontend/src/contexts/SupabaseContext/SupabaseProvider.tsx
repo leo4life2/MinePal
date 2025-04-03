@@ -10,14 +10,84 @@ const electron = isElectron ? window.require('electron') : null;
 const ipcRenderer = electron?.ipcRenderer;
 const shell = electron?.shell;
 
+// --- START HACK: Throttle Supabase token refresh ---
+let lastRefreshAttemptTimestamp = 0;
+// Set a reasonable minimum interval, e.g., 60 seconds, 
+// potentially longer if needed (like 5 minutes = 300000ms)
+const MIN_REFRESH_INTERVAL_MS = 60 * 1000; 
+// --- END HACK ---
+
 interface SupabaseProviderProps {
   children: ReactNode;
 }
 
 export default function SupabaseProvider({ children }: SupabaseProviderProps) {
-  const [supabase] = useState<SupabaseClient>(() => 
-    createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  );
+  const [supabase] = useState<SupabaseClient>(() => {
+    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false
+      }
+    });
+
+    // --- START HACK: Override the internal _callRefreshToken method ---
+    try { // Add try-catch for safety during override
+        const originalCallRefreshToken = client.auth['_callRefreshToken'].bind(client.auth);
+
+        // Important: Ensure this override happens *after* client initialization
+        // but before any potential refresh calls. Usually placing it right after
+        // createClient is sufficient.
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        client.auth['_callRefreshToken'] = async function(...args: any[]) {
+          const now = Date.now();
+          
+          if (now - lastRefreshAttemptTimestamp < MIN_REFRESH_INTERVAL_MS) {
+            console.warn(`Supabase Auth: Refresh token request throttled. Min interval: ${MIN_REFRESH_INTERVAL_MS}ms. Last attempt: ${new Date(lastRefreshAttemptTimestamp)}`);
+            // Return the expected structure for a failed refresh or empty session
+            // Adjust based on CallRefreshTokenResult type if it differs
+             return { data: null, error: new Error('Refresh throttled client-side to prevent loop.') }; 
+          }
+
+          console.log(`Supabase Auth: Initiating refresh token request at: ${new Date(now)}`);
+          lastRefreshAttemptTimestamp = now; // Record the start time of *this* attempt
+
+          try {
+              // Call the original function
+              const result = await originalCallRefreshToken(...args);
+              
+              // Check if it was successful (adjust condition based on actual result structure)
+              if (result && result.data && result.data.session) {
+                   console.log(`Supabase Auth: Refresh token successful at: ${new Date()}`);
+                   // Keep lastRefreshAttemptTimestamp as the time this successful attempt *started*
+              } else {
+                  // Refresh failed, allow the next attempt sooner by resetting timestamp?
+                  // Or keep the timestamp to enforce cooldown even on failure?
+                  // Let's reset to allow faster retry *if the server allows it*.
+                  // The server's 429 will be the ultimate gatekeeper.
+                  console.error('Supabase Auth: Refresh token attempt failed.', result ? result.error : 'No result');
+                  // Resetting timestamp:
+                  // lastRefreshAttemptTimestamp = 0; 
+                  // OR Keep timestamp (safer against loops if server error is temporary):
+                  // no change needed here, timestamp remains from the start of failed attempt
+              }
+              return result;
+          } catch(e) {
+               lastRefreshAttemptTimestamp = 0; // Reset on unexpected error
+               console.error('Supabase Auth: Unexpected error during _callRefreshToken override:', e);
+               throw e; // Re-throw original error
+          }
+        };
+        console.log("Supabase Auth: _callRefreshToken override applied successfully.");
+
+    } catch (overrideError) {
+        console.error("Supabase Auth: Failed to override _callRefreshToken. Refresh loop protection inactive.", overrideError);
+    }
+    // --- END HACK ---
+
+    return client;
+  });
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPaying, setIsPaying] = useState(false);
