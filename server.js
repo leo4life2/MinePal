@@ -53,7 +53,7 @@ async function getJWT(userDataDir) {
 }
 
 function setupVoice(settings, userDataDir, agentProcesses) {
-    const { key_binding, input_device_id } = settings;
+    const { key_binding } = settings;
 
     // If a hook was previously set up, unregister it first
     try {
@@ -62,12 +62,9 @@ function setupVoice(settings, userDataDir, agentProcesses) {
         logToFile(`Error stopping previous uIOhook: ${error.message}`);
     }
 
-    // Only set up push-to-talk if both key binding and input device are available
-    if (key_binding && input_device_id) {
-        // Store the selected input device ID
-        selectedInputDevice = input_device_id;
-
-        // Try to set up push-to-talk with the key code and input device
+    // Only set up push-to-talk if key binding is available
+    if (key_binding) {
+        // Try to set up push-to-talk with the key code
         try {
             keyCode = Number(key_binding);
             
@@ -103,8 +100,8 @@ function setupVoice(settings, userDataDir, agentProcesses) {
             
             // Start the hook
             uIOhook.start();
-            logToFile(`Push-to-talk enabled with key code: ${keyCode} and input device: ${input_device_id}`);
-            console.log(`Push-to-talk enabled with key code: ${keyCode} and input device: ${input_device_id}`);
+            logToFile(`Push-to-talk enabled with key code: ${keyCode}`);
+            console.log(`Push-to-talk enabled with key code: ${keyCode}`);
         } catch (error) {
             logToFile(`Error setting up push-to-talk: ${error.message}`);
             console.error('Error setting up push-to-talk:', error);

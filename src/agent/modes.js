@@ -104,7 +104,7 @@ const modes = [
          * @param {Object} agent - The agent object containing the bot.
          */
         update: async function (agent) {
-            const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 2);
+            const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 4);
             if (enemy && enemy.name.toLowerCase().trim() === "item") return;
 
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
