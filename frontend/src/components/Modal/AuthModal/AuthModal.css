@@ -41,7 +41,7 @@
 .auth-methods {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 10px;
   margin-bottom: 0.5rem;
 }
 
@@ -82,6 +82,44 @@
 }
 
 .auth-discord-button:hover:not(:disabled) .discord-icon {
+  transform: scale(1.1);
+}
+
+.auth-google-button {
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: white;
+  color: #444;
+  width: 100%;
+}
+
+.auth-google-button:hover:not(:disabled) {
+  background-color: #f8f8f8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.auth-google-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.google-icon {
+  transition: transform 0.3s ease;
+}
+
+.auth-google-button:hover:not(:disabled) .google-icon {
   transform: scale(1.1);
 }
 

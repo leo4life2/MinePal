@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, ReactNode, useRef } from 'react';
 import { Settings as SettingsIcon, ChevronDown, X } from 'react-feather';
 import { useUserSettings } from '../../contexts/UserSettingsContext/UserSettingsContext';
 import supportedLocales from '../../utils/supportedLocales';
@@ -46,19 +46,24 @@ function Settings() {
   const [selectedDevice, setSelectedDevice] = useState<MediaDeviceInfo>();
   const [listeningForKey, setListeningForKey] = useState(false);
   const [keyDisplayName, setKeyDisplayName] = useState('');
+  const deviceInitialized = useRef(false);
+  const mcVersionInitialized = useRef(false);
   
   // Safely access host using a defensive approach
   useEffect(() => {
     const currentHost = userSettings.host || '';
     setGameMode(currentHost === 'localhost' ? 'singleplayer' : 'multiplayer');
     
-    // Hardcode Minecraft version to 1.21.4 (but it's actually auto)
-    updateField('minecraft_version', '1.21.4');
-  }, [userSettings, updateField]);
+    // Only set the Minecraft version once to avoid infinite loops
+    if (!mcVersionInitialized.current) {
+      updateField('minecraft_version', '1.21.4');
+      mcVersionInitialized.current = true;
+    }
+  }, [userSettings.host, updateField]);
 
   // Initialize selected device when inputDevices are loaded
   useEffect(() => {
-    if (inputDevices.length) {
+    if (inputDevices.length && !deviceInitialized.current) {
       // Try to find device matching the stored device ID
       const storedDeviceId = userSettings.input_device_id;
       
@@ -68,16 +73,22 @@ function Settings() {
 
         if (matchingDevice) {
           setSelectedDevice(matchingDevice);
+          deviceInitialized.current = true;
           return;
         }
       }
       
       // Fallback to first device if no match found or no stored ID
       setSelectedDevice(inputDevices[0]);
-      // Update settings with device ID of first device
-      updateField('input_device_id', inputDevices[0].deviceId);
+      
+      // Only update settings if no device ID is stored
+      if (!storedDeviceId) {
+        updateField('input_device_id', inputDevices[0].deviceId);
+      }
+      
+      deviceInitialized.current = true;
     }
-  }, [inputDevices, userSettings, updateField]);
+  }, [inputDevices, userSettings.input_device_id, updateField]);
 
   // Initialize key display name
   useEffect(() => {

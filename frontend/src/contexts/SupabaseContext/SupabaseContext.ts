@@ -16,7 +16,7 @@ export interface SupabaseContextType {
   requestsRemaining: number | null;
   stripeData: StripeData;
   authError: string | null;
-  signInWithDiscord: () => Promise<void>;
+  signInWithProvider: (provider: 'discord' | 'google') => Promise<void>;
   signOut: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
   clearAuthError: () => void;

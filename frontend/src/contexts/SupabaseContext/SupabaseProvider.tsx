@@ -302,14 +302,14 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     if (error) throw error;
   };
 
-  const signInWithDiscord = async () => {
+  const signInWithProvider = async (provider: 'discord' | 'google') => {
     if (!shell) {
-      throw new Error('Cannot sign in with Discord outside of Electron');
+      throw new Error(`Cannot sign in with ${provider} outside of Electron`);
     }
 
     const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?` + 
       new URLSearchParams({
-        provider: 'discord',
+        provider,
         redirect_to: 'minepal://auth/callback',
         close_tab: 'true'
       }).toString();
@@ -326,7 +326,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     requestsRemaining,
     stripeData,
     signOut,
-    signInWithDiscord,
+    signInWithProvider,
     refreshSubscription,
     authError,
     clearAuthError,
