@@ -12,6 +12,7 @@ import * as world from "./library/world.js";
 
 // --- Silence Timer Constants ---
 const MEAN_1 = 30; // Base mean silence duration in seconds for the first silence
+const STD_FACTOR = 10; // STD is MEAN_i / STD_FACTOR
 const R = 3.5;    // Exponential factor for increasing mean silence duration
 // --- End Silence Timer Constants ---
 
@@ -136,6 +137,40 @@ function formatDuration(durationInSeconds) {
     }
     const pluralSuffix = (value !== 1) ? 's' : '';
     return `${value} ${unit}${pluralSuffix}`;
+}
+
+// Helper: Check for clear sky above the bot
+function isClearAbove(bot) {
+    // Check if entity exists and has position
+    if (!bot || !bot.entity || !bot.entity.position) {
+        console.warn("[isClearAbove] Bot entity or position not available.");
+        return false; // Cannot determine if clear if position is unknown
+    }
+    const pos = bot.entity.position.floored();
+    // Adjusted checkpoints to stay within reasonable build height
+    const checkpoints = [2, 8, 16, 32, 64, 128, 192]; 
+
+    for (const offset of checkpoints) {
+        const checkY = pos.y + offset;
+        if (checkY >= bot.game.height) continue; 
+        
+        const checkPos = pos.offset(0, offset, 0);
+        try {
+            const block = bot.blockAt(checkPos);
+            // Check if block exists and is considered obstructive (not 'empty' bounding box)
+            if (block && block.boundingBox !== 'empty') {
+                // console.log(`[isClearAbove] Obstructed at Y=${checkY} by ${block.name}`);
+                return false; // Hit an obstructive block
+            }
+        } catch (err) {
+            // Handle potential errors if blockAt fails for positions outside loaded chunks
+            // console.warn(`[isClearAbove] Error checking block at ${checkPos}: ${err.message}`);
+            return false; // Assume obstructed if we can't check
+        }
+    }
+    
+    // console.log("[isClearAbove] Sky appears clear.");
+    return true; // All checkpoints are clear
 }
 
 /**
@@ -303,6 +338,7 @@ export class Agent {
             gamemode: '',
             health: '',
             hunger: '',
+            dimension: '',
             biome: '',
             weather: '',
             timeOfDay: '',
@@ -336,19 +372,20 @@ export class Agent {
         newHUD.gamemode = this.bot.game.gameMode;
         newHUD.health = `${Math.round(this.bot.health)} / 20`;
         newHUD.hunger = `${Math.round(this.bot.food)} / 20`;
+        newHUD.dimension = this.bot.game.dimension;
         newHUD.biome = world.getBiomeName(this.bot);
 
         newHUD.weather = "Clear";
         if (this.bot.rainState > 0) newHUD.weather = "Rain";
         if (this.bot.thunderState > 0) newHUD.weather = "Thunderstorm";
 
-        if (this.bot.time.timeOfDay < 6000) {
-            newHUD.timeOfDay = "Morning";
-        } else if (this.bot.time.timeOfDay < 12000) {
-            newHUD.timeOfDay = "Afternoon";
-        } else {
-            newHUD.timeOfDay = "Night";
-        }
+        // Corrected time calculation: 0 ticks = 06:00
+        const minecraftTime = this.bot.time.timeOfDay;
+        const adjustedTicks = (minecraftTime + 6000) % 24000; // Add 6 hours (6000 ticks) and wrap around 24000
+        const totalHours = adjustedTicks / 1000; // 1000 ticks = 1 hour
+        const hours = Math.floor(totalHours);
+        const minutes = Math.floor((totalHours - hours) * 60); // Calculate minutes from fractional hour
+        newHUD.timeOfDay = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
         // Keep getting player names here
         newHUD.otherPlayers = world.getNearbyPlayerNames(this.bot);
@@ -389,9 +426,10 @@ export class Agent {
         statsRes += `\n- Gamemode: ${newHUD.gamemode}`;
         statsRes += `\n- Health: ${newHUD.health}`;
         statsRes += `\n- Hunger: ${newHUD.hunger}`;
+        statsRes += `\n- Dimension: ${newHUD.dimension}`;
         statsRes += `\n- Biome: ${newHUD.biome}`;
         statsRes += `\n- Weather: ${newHUD.weather}`;
-        statsRes += `\n- Time: ${newHUD.timeOfDay}`;
+        statsRes += `\n- In-Game Clock Time: ${newHUD.timeOfDay}`;
 
         let inventoryRes = "INVENTORY";
         inventoryRes += "\nBackpack:" + (newHUD.backpack.length ? `\n- ${newHUD.backpack.join("\n- ")}` : " none");
@@ -457,6 +495,9 @@ export class Agent {
 
             // Call the pruning function
             this._pruneHistory();
+
+            // Add notice to prevent self gaslighting
+            this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
 
             // Check if latestHUD is empty
             const { newHUD } = await this.headsUpDisplay();
@@ -538,7 +579,7 @@ export class Agent {
         // --- Set the next silence timer ---
         // Updated calculation for meanSeconds using exponential formula
         const meanSeconds = MEAN_1 * Math.pow(R, this.silences);
-        const stdDevSeconds = meanSeconds / 3;
+        const stdDevSeconds = meanSeconds / STD_FACTOR;
         let plannedSilenceSeconds = boxMullerRandomNormal(meanSeconds, stdDevSeconds);
         // Ensure delay is at least 1 second
         plannedSilenceSeconds = Math.max(1, plannedSilenceSeconds);
@@ -566,16 +607,17 @@ export class Agent {
                 await this.sendMessage(this.profile.autoMessage);
             });
         }
-        // Custom time-based events
+        // Custom time-based events with dimension and sky check
         this.bot.on('time', () => {
-            if (this.bot.time.timeOfDay == 0)
-                this.bot.emit('sunrise');
-            else if (this.bot.time.timeOfDay == 6000)
-                this.bot.emit('noon');
-            else if (this.bot.time.timeOfDay == 12000)
-                this.bot.emit('sunset');
-            else if (this.bot.time.timeOfDay == 18000)
-                this.bot.emit('midnight');
+            // Only trigger time events in overworld with clear sky
+            if (this.bot.game.dimension === 'overworld' && isClearAbove(this.bot)) { 
+                if (this.bot.time.timeOfDay >= 23981 || this.bot.time.timeOfDay == 0) {
+                    this.handleMessage('system', 'It is now sunrise.');
+                }
+                else if (this.bot.time.timeOfDay >= 11981 && this.bot.time.timeOfDay <= 12000) {
+                    this.handleMessage('system', 'It is now sunset.');
+                }
+            }
         });
 
         // Health tracking
