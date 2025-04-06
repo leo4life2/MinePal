@@ -10,6 +10,11 @@ import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
 import * as world from "./library/world.js";
 
+// --- Silence Timer Constants ---
+const MEAN_1 = 30; // Base mean silence duration in seconds for the first silence
+const R = 3.5;    // Exponential factor for increasing mean silence duration
+// --- End Silence Timer Constants ---
+
 // Helper function to generate descriptive time difference string
 function timeAgo(pastDate) {
     const now = new Date();
@@ -82,6 +87,57 @@ function timeAgo(pastDate) {
     return `Your last boot was ${value} ${unit}${pluralSuffix} ago. ${suffixSentence}`;
 }
 
+// Helper: Box-Muller transform for generating normally distributed random numbers
+function boxMullerRandomNormal(mean, stdDev) {
+    let u1 = 0, u2 = 0;
+    // Convert [0,1) to (0,1)
+    while (u1 === 0) u1 = Math.random();
+    while (u2 === 0) u2 = Math.random();
+    const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+    // z1 is the second random normal sample (unused here)
+    // const z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(2.0 * Math.PI * u2);
+    return z0 * stdDev + mean;
+}
+
+// Helper: Format duration in seconds into a human-readable string
+function formatDuration(durationInSeconds) {
+    let value, unit;
+
+    if (durationInSeconds < 60) {
+        value = Math.round(durationInSeconds);
+        unit = 'second';
+    } else {
+        const minutes = Math.round(durationInSeconds / 60);
+        if (minutes < 60) {
+            value = minutes;
+            unit = 'minute';
+        } else {
+            const hours = Math.round(minutes / 60);
+            if (hours < 24) {
+                value = hours;
+                unit = 'hour';
+            } else {
+                const days = Math.round(hours / 24);
+                 if (days < 30) { // Added day/month/year for longer potential silences
+                    value = days;
+                    unit = 'day';
+                } else {
+                    const months = Math.round(days / 30);
+                    if (months < 12) {
+                        value = months;
+                        unit = 'month';
+                    } else {
+                         value = Math.round(days / 365);
+                         unit = 'year';
+                    }
+                }
+            }
+        }
+    }
+    const pluralSuffix = (value !== 1) ? 's' : '';
+    return `${value} ${unit}${pluralSuffix}`;
+}
+
 /**
  * Represents an AI agent that can interact with a Minecraft world.
  */
@@ -107,6 +163,8 @@ export class Agent {
             empty: true // for easy detect, on first use only
         };
         this.hudListFields = ['backpack', 'hotbar', 'offHand', 'armor', 'nearbyBlocks', 'nearbyMobs', 'nearbyPlayers'];
+        this.silences = 0; // Counter for consecutive silences
+        this.silenceTimer = null; // Timeout ID for silence timer
     }
 
     /**
@@ -381,7 +439,17 @@ export class Agent {
             return;
         }
 
-        // await this.history.add("system", "When you wish to do something, never just say you're doing it, you must pick a command from the docs and call it like !commandName(params). NEVER say anything like this: 'Sure, I've stopped.', instead say this: 'Sure, I'll stop. !stop'");
+        // --- Silence Timer Management ---
+        if (this.silenceTimer) {
+            clearTimeout(this.silenceTimer);
+            this.silenceTimer = null;
+        }
+        const isSilenceMessage = source === 'system' && message?.startsWith('[SILENCE]');
+        if (!isSilenceMessage) {
+            this.silences = 0; // Reset silence count on non-silence message
+        }
+        // --- End Silence Timer Management ---
+
         await this.history.add(source, message);
         // Process the message and generate responses
         for (let i = 0; i < 5; i++) {
@@ -396,6 +464,7 @@ export class Agent {
                 // Compare newHUD and latestHUD
                 let diffText = '';
 
+                // hudListFields loop will now correctly handle nearbyMobs and nearbyPlayers
                 this.hudListFields.forEach(field => {
                     const oldList = this.latestHUD[field];
                     const newList = newHUD[field];
@@ -428,11 +497,11 @@ export class Agent {
             let command_name = containsCommand(res);
             // add user message
             if (command_name) {
-                console.log(`Full response: ""${res}""`)
+                console.log(`Full response: ""${res}""`);
                 res = truncCommandMessage(res);
                 if (!commandExists(command_name)) {
                     this.history.add('system', `[HALLUCINATION] Command ${command_name} does not exist.`);
-                    console.log('Agent hallucinated command:', command_name)
+                    console.log('Agent hallucinated command:', command_name);
                     continue;
                 }
                 let pre_message = res.substring(0, res.indexOf(command_name)).trim();
@@ -459,13 +528,32 @@ export class Agent {
                 if (afterSlash) {
                     await this.sendMessage('/' + afterSlash, true);
                 }
-                console.log('Purely conversational response:', res);
                 break;
             }
         }
 
         this.history.save();
         this.bot.emit('finished_executing');
+
+        // --- Set the next silence timer ---
+        // Updated calculation for meanSeconds using exponential formula
+        const meanSeconds = MEAN_1 * Math.pow(R, this.silences);
+        const stdDevSeconds = meanSeconds / 3;
+        let plannedSilenceSeconds = boxMullerRandomNormal(meanSeconds, stdDevSeconds);
+        // Ensure delay is at least 1 second
+        plannedSilenceSeconds = Math.max(1, plannedSilenceSeconds);
+
+        const delayMilliseconds = plannedSilenceSeconds * 1000;
+
+        console.log(`[Silence Timer] Setting next silence prompt in ${formatDuration(plannedSilenceSeconds)} (Mean: ${meanSeconds.toFixed(1)}s, StdDev: ${stdDevSeconds.toFixed(1)}s, Silences: ${this.silences})`);
+
+        this.silenceTimer = setTimeout(() => {
+            this.silences++;
+            const formattedDuration = formatDuration(plannedSilenceSeconds); // Use planned duration for message
+            console.log(`[Silence Timer] Fired after planned ${formattedDuration}. Silences: ${this.silences}`);
+            this.handleMessage('system', `[SILENCE] It's been ${formattedDuration} of silence.`);
+        }, delayMilliseconds);
+        // --- End Set Silence Timer ---
     }
 
     /**
