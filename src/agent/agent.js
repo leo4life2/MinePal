@@ -8,15 +8,79 @@ import { containsCommand, commandExists, executeCommand, truncCommandMessage } f
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
-import { queryList } from './commands/queries.js';
 import * as world from "./library/world.js";
 
-const queryMap = {
-    stats: queryList.find(query => query.name === "!stats").perform,
-    inventory: queryList.find(query => query.name === "!inventory").perform,
-    nearbyBlocks: queryList.find(query => query.name === "!nearbyBlocks").perform,
-    nearbyEntities: queryList.find(query => query.name === "!entities").perform,
-};
+// Helper function to generate descriptive time difference string
+function timeAgo(pastDate) {
+    const now = new Date();
+    let value, unit, suffixSentence;
+
+    if (!(pastDate instanceof Date) || isNaN(pastDate)) {
+        return "an unknown time"; // Handle invalid date
+    }
+    const diffInSeconds = Math.floor((now.getTime() - pastDate.getTime()) / 1000);
+
+    // Determine value and unit based on diffInSeconds
+    if (diffInSeconds < 60) {
+        value = diffInSeconds;
+        unit = 'second';
+    } else {
+        const minutes = Math.floor(diffInSeconds / 60);
+        if (minutes < 60) {
+            value = minutes;
+            unit = 'minute';
+        } else {
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) {
+                value = hours;
+                unit = 'hour';
+            } else {
+                const days = Math.floor(hours / 24);
+                if (days < 30) {
+                    value = days;
+                    unit = 'day';
+                } else {
+                    const months = Math.floor(days / 30); // Approximation
+                    if (months < 12) {
+                        value = months;
+                        unit = 'month';
+                    } else {
+                        value = Math.floor(days / 365); // Approximation
+                        unit = 'year';
+                    }
+                }
+            }
+        }
+    }
+
+    // Determine the suffix sentence based on the unit
+    switch (unit) {
+        case 'second':
+            suffixSentence = "You've just reconnected to the game moments ago.";
+            break;
+        case 'minute':
+            suffixSentence = "You've returned after briefly stepping away.";
+            break;
+        case 'hour':
+            suffixSentence = "It's been a few hours since you were last here.";
+            break;
+        case 'day':
+            suffixSentence = "You've returned after days away from this environment.";
+            break;
+        case 'month':
+            suffixSentence = "It's been months since you were last in this space.";
+            break;
+        case 'year':
+            suffixSentence = "You're finally back after years away from this world.";
+            break;
+        default: // Should not happen with valid date
+             return "an unknown time";
+    }
+
+    // Construct the final string, handling pluralization simply
+    const pluralSuffix = (value !== 1) ? 's' : ''; // Only add 's' if value isn't 1
+    return `Your last boot was ${value} ${unit}${pluralSuffix} ago. ${suffixSentence}`;
+}
 
 /**
  * Represents an AI agent that can interact with a Minecraft world.
@@ -38,10 +102,32 @@ export class Agent {
             offHand: [],
             armor: [],
             nearbyBlocks: [],
-            nearbyEntities: [],
+            nearbyMobs: [],
+            nearbyPlayers: [],
             empty: true // for easy detect, on first use only
         };
-        this.hudListFields = ['otherPlayers', 'backpack', 'hotbar', 'offHand', 'armor', 'nearbyBlocks', 'nearbyEntities'];
+        this.hudListFields = ['backpack', 'hotbar', 'offHand', 'armor', 'nearbyBlocks', 'nearbyMobs', 'nearbyPlayers'];
+    }
+
+    /**
+     * Prunes system messages from the history before the last assistant message.
+     * Operates directly on this.history.turns.
+     */
+    _pruneHistory() {
+        let lastAssistantIndex = -1;
+        for (let j = this.history.turns.length - 1; j >= 0; j--) {
+            if (this.history.turns[j].role === 'assistant') {
+                lastAssistantIndex = j;
+                break;
+            }
+        }
+
+        if (lastAssistantIndex !== -1) {
+            const historyPrefix = this.history.turns.slice(0, lastAssistantIndex);
+            const historySuffix = this.history.turns.slice(lastAssistantIndex);
+            const prunedPrefix = historyPrefix.filter(msg => msg.role !== 'system');
+            this.history.turns = prunedPrefix.concat(historySuffix);
+        }
     }
 
     /**
@@ -56,11 +142,18 @@ export class Agent {
         this.userDataDir = userDataDir;
         this.appPath = appPath
         this.profile = JSON.parse(readFileSync(profile_fp, 'utf8'));
+
+        // Store the last boot time and update the profile with the current boot time
+        const lastBootString = this.profile.lastBootDatetime;
+        this.lastBootDatetime = lastBootString ? new Date(lastBootString) : null;
+        this.profile.lastBootDatetime = new Date().toISOString();
+
         this.prompter = new Prompter(this);
         this.name = this.prompter.getName();
         const settingsPath = `${this.userDataDir}/settings.json`;
         this.settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')); // Changed to instance variable
         this.owner = this.settings.player_username
+        this.ownerEntity = null; // Initialize owner entity
         this.history = new History(this);
         this.coder = new Coder(this);
         this.npc = new NPCContoller(this);
@@ -78,9 +171,20 @@ export class Agent {
         if (load_mem)
             this.history.load();
 
+        // Spawn triggers event listeners to all start
         this.bot.once('spawn', async () => {
             // Wait for a bit so stats are not undefined
             await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Find the owner's entity object
+            if (this.owner && this.bot.players[this.owner]) {
+                this.ownerEntity = this.bot.players[this.owner].entity;
+                if (!this.ownerEntity) {
+                    console.warn(`Could not find the entity for owner: ${this.owner}. This might happen if the owner is not nearby when the bot spawns.`);
+                }
+            } else {
+                console.warn(`Owner username "${this.owner}" not found in settings or player list.`);
+            }
 
             console.log(`${this.name} spawned.`);
             this.coder.clear();
@@ -96,14 +200,25 @@ export class Agent {
             ];
             const eventname = this.settings.profiles.length > 1 ? 'whisper' : 'chat'; // Updated to use instance variable
             
-            // Set up chat event listener
+            // Set up listener for owner messages
             this.bot.on(eventname, (username, message) => {
                 if (username === this.name) return;
                 if (ignore_messages.some((m) => message.startsWith(m))) return;
                 this.handleMessage(username, message);
             });
 
-            await this.sendMessage('Hello world! I am ' + this.name);
+            // Construct the initial system message
+            const prefix = "Your owner booted you into a Minecraft world; glance at your HUD and greet naturally";
+            let suffix = "";
+            if (this.lastBootDatetime === null) {
+                suffix = ". This is your first ever boot as a MinePal!";
+            } else {
+                const timeDiffSentence = timeAgo(this.lastBootDatetime);
+                suffix = `. ${timeDiffSentence}`; // Directly use the full sentence from timeAgo
+            }
+            const initialSystemMessage = prefix + suffix;
+
+            await this.handleMessage('system', initialSystemMessage)
             
             // Handle auto-message on join
             if ((this.profile.triggerOnJoin || this.profile.triggerOnRespawn) && this.profile.autoMessage) {
@@ -139,7 +254,8 @@ export class Agent {
             offHand: [],
             armor: [],
             nearbyBlocks: [],
-            nearbyEntities: []
+            nearbyMobs: [],
+            nearbyPlayers: [],
         };
 
         const armorSlots = {
@@ -176,6 +292,7 @@ export class Agent {
             newHUD.timeOfDay = "Night";
         }
 
+        // Keep getting player names here
         newHUD.otherPlayers = world.getNearbyPlayerNames(this.bot);
 
         // Initializing inventory
@@ -203,9 +320,10 @@ export class Agent {
             newHUD.armor.push(`${slotName}: ${item ? `${item.name}: ${item.count}` : "empty"}`);
         }
 
-        // Initializing nearby blocks and entities
+        // Initializing nearby blocks and entities (mobs)
         newHUD.nearbyBlocks = world.getNearbyBlockTypes(this.bot);
-        newHUD.nearbyEntities = world.getNearbyEntityTypes(this.bot);
+        // Get entity types, filter out 'player', and store in nearbyMobs
+        newHUD.nearbyMobs = world.getNearbyEntityTypes(this.bot).filter(entity => entity !== 'player');
 
         // Construct HUD string
         let statsRes = "STATS";
@@ -216,10 +334,6 @@ export class Agent {
         statsRes += `\n- Biome: ${newHUD.biome}`;
         statsRes += `\n- Weather: ${newHUD.weather}`;
         statsRes += `\n- Time: ${newHUD.timeOfDay}`;
-
-        if (newHUD.otherPlayers.length > 0) {
-            statsRes += "\n- Other Players: " + newHUD.otherPlayers.join(", ");
-        }
 
         let inventoryRes = "INVENTORY";
         inventoryRes += "\nBackpack:" + (newHUD.backpack.length ? `\n- ${newHUD.backpack.join("\n- ")}` : " none");
@@ -234,13 +348,26 @@ export class Agent {
         let blocksRes = "NEARBY_BLOCKS";
         blocksRes += newHUD.nearbyBlocks.length ? `\n- ${newHUD.nearbyBlocks.join("\n- ")}` : ": none";
 
-        let entitiesRes = "NEARBY_ENTITIES";
-        entitiesRes += newHUD.nearbyEntities.length ? `\n- mob: ${newHUD.nearbyEntities.join("\n- mob: ")}` : ": none";
+        // Rename section to NEARBY_MOBS and simplify list
+        let mobsRes = "NEARBY_MOBS";
+        mobsRes += newHUD.nearbyMobs.length ? `\n- ${newHUD.nearbyMobs.join("\n- ")}` : ": none";
 
-        // Return both newHUD and the HUD string
+        // Add new NEARBY_PLAYERS section, simplify list, and highlight owner
+        let playersRes = "NEARBY_PLAYERS";
+        if (newHUD.otherPlayers.length > 0) {
+            const playerListString = newHUD.otherPlayers.map(player => {
+                const prefix = (player === this.owner) ? "Your Owner: " : "";
+                return `- ${prefix}${player}`;
+            }).join("\n");
+            playersRes += `\n${playerListString}`;
+        } else {
+            playersRes += ": none";
+        }
+
+        // Return both newHUD and the updated HUD string
         return {
             newHUD,
-            hudString: `${statsRes}\n${inventoryRes}\n${blocksRes}\n${entitiesRes}`
+            hudString: `${statsRes}\n${inventoryRes}\n${blocksRes}\n${mobsRes}\n${playersRes}`
         };
     }
     
@@ -259,6 +386,9 @@ export class Agent {
         // Process the message and generate responses
         for (let i = 0; i < 5; i++) {
             let history = this.history.getHistory();
+
+            // Call the pruning function
+            this._pruneHistory();
 
             // Check if latestHUD is empty
             const { newHUD } = await this.headsUpDisplay();
@@ -283,14 +413,17 @@ export class Agent {
 
                 if (diffText) {
                     // console.log(`\n\nINVENTORY/STATUS UPDATE:\n${diffText}\n\n`);
-                    this.history.add('system', `Your inventory or status has updated. Here are the changes:\n${diffText}`);
+                    this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
                 }
             }
             this.latestHUD = newHUD; // Update latestHUD
 
             history = this.history.getHistory(); // Get updated history
-            let res = await this.prompter.promptConvo(history);
 
+            // console.log("\n\n -------- Start history ----- \n\n", history.map(entry => `Role: ${entry.role.padEnd(10)} | Content: ${entry.content}`).join('\n'));
+            // console.log("\n\n -------- End history ----- \n\n");
+            
+            let res = await this.prompter.promptConvo(history);
             // Now we parse and execute commands.
             let command_name = containsCommand(res);
             // add user message
@@ -298,7 +431,7 @@ export class Agent {
                 console.log(`Full response: ""${res}""`)
                 res = truncCommandMessage(res);
                 if (!commandExists(command_name)) {
-                    this.history.add('system', `Command ${command_name} does not exist. Use !newAction to perform custom actions.`);
+                    this.history.add('system', `[HALLUCINATION] Command ${command_name} does not exist.`);
                     console.log('Agent hallucinated command:', command_name)
                     continue;
                 }
@@ -316,7 +449,7 @@ export class Agent {
                 console.log('Agent executed:', command_name, 'and got:', execute_res);
 
                 if (execute_res)
-                    this.history.add('system', execute_res);
+                    this.history.add('system', `[EXEC_RES] ${execute_res}`);
                 else
                     break;
             }
@@ -433,7 +566,6 @@ export class Agent {
      * @param {string} msg - Message to log before shutting down.
      */
     cleanKill(msg='Killing agent process...', reason = null) {
-        this.history.add('system', msg);
         this.sendMessage('Goodbye world.')
         this.history.save();
 

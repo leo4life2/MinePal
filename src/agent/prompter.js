@@ -13,12 +13,13 @@ export class Prompter {
         // Create a single proxy instance with userDataDir
         this.proxy = new Proxy(this.agent.userDataDir);
 
-        mkdirSync(`${this.agent.userDataDir}/bots/${name}`, { recursive: true });
-        writeFileSync(`${this.agent.userDataDir}/bots/${name}/last_profile.json`, JSON.stringify(this.profile, null, 4), (err) => {
+        // Overwrite the profile file on boot.
+        const profilePath = `${this.agent.userDataDir}/profiles/${name}.json`;
+        writeFileSync(profilePath, JSON.stringify(this.profile, null, 4), (err) => {
             if (err) {
                 throw err;
             }
-            console.log("Copy profile saved.");
+            console.log(`Profile updated at ${profilePath}.`);
         });
     }
 
