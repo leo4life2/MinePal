@@ -76,7 +76,7 @@ export class Proxy {
             if (err.response) {
                 res += `${err.response.data.error}`;
             } else {
-                res += "Request failed, my brain disconnected.";
+                res += "Cannot reach the internet, my brain disconnected.";
             }
         }
         return res;
