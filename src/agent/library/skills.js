@@ -471,7 +471,6 @@ export async function defendSelf(bot, range = 9) {
         /* might error if entity dies, ignore */
       }
     }
-    console.log("self defense attacking", enemy);
     bot.pvp.attack(enemy);
     attacked = true;
     await new Promise((resolve) => setTimeout(resolve, 500));
