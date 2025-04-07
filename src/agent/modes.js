@@ -261,6 +261,64 @@ const modes = [
          */
         update: function (agent) { /* do nothing */ }
     },
+    {
+        name: 'monitor_rare_blocks',
+        description: 'Monitors for nearby rare blocks like diamond, emerald, and ancient debris.',
+        interrupts: [], // Should not interrupt anything
+        on: true, 
+        active: false, // This mode just observes and emits events, doesn't perform long actions
+        cooldown: 10000, // Check every 10 seconds to avoid spamming checks
+        lastCheckTime: 0,
+        rareBlockNames: [
+            'diamond_ore', 'deepslate_diamond_ore',
+            'emerald_ore', 'deepslate_emerald_ore',
+            'ancient_debris'
+        ],
+        /**
+         * Update function for rare block monitoring.
+         * Finds nearby rare blocks, checks against a cache, and emits an event if new ones are found.
+         * @param {Object} agent - The agent object containing the bot and cache.
+         */
+        update: async function (agent) {
+            const now = Date.now();
+            if (now - this.lastCheckTime < this.cooldown) {
+                return; // Don't check too frequently
+            }
+            this.lastCheckTime = now;
+
+            const bot = agent.bot;
+            const reportedCache = agent.reportedRareBlocks; // Reference to the agent's cache
+
+            // Find nearby blocks of the rare types
+            const nearbyRareBlocks = world.getNearestBlocks(bot, this.rareBlockNames, world.FAR_DISTANCE);
+
+            if (nearbyRareBlocks.length === 0) {
+                return; // No rare blocks found nearby
+            }
+
+            const newlyFoundBlocks = [];
+            for (const block of nearbyRareBlocks) {
+                const posStr = `${block.position.x},${block.position.y},${block.position.z}`;
+                if (!reportedCache.has(posStr)) {
+                    newlyFoundBlocks.push(block); // Keep the whole block object
+                }
+            }
+
+            // If new, unreported rare blocks were found
+            if (newlyFoundBlocks.length > 0) {
+                console.log(`[RARE FIND DEBUG] Found ${newlyFoundBlocks.length} new rare blocks.`);
+                // Add them to the cache immediately
+                newlyFoundBlocks.forEach(block => {
+                    const posStr = `${block.position.x},${block.position.y},${block.position.z}`;
+                    reportedCache.add(posStr);
+                    console.log(`[RARE FIND DEBUG] Caching ${block.name} at ${posStr}`);
+                });
+
+                // Emit the event with the list of new blocks
+                bot.emit('rare_finds', newlyFoundBlocks);
+            }
+        }
+    },
     // {
     //     name: 'farming',
     //     description: 'Plant wheat seeds on hoed dirt.',

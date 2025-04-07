@@ -208,6 +208,7 @@ export class Agent {
         this.currentWeatherState = 'clear'; // Track current weather state ('clear', 'rain', 'thunder')
         this.currentDimension = null; // Track current dimension state (null until first spawn)
         this.ownerHurtCooldownActive = false; // Cooldown flag for owner hurt event
+        this.reportedRareBlocks = new Set(); // Cache for reported rare block locations (stores "x,y,z")
     }
 
     /**
@@ -825,6 +826,26 @@ export class Agent {
                 const message = `[OWNER SLEEP] (${this.owner}) is sleeping. You should sleep too.`;
                 await this.handleMessage('system', message);
             }
+        });
+
+        // Listener for newly discovered rare blocks
+        this.bot.on('rare_finds', async (blockList) => {
+            if (!blockList || blockList.length === 0) return;
+
+            // Aggregate counts by block name
+            const counts = {};
+            blockList.forEach(block => {
+                counts[block.name] = (counts[block.name] || 0) + 1;
+            });
+
+            // Format the message
+            const summary = Object.entries(counts)
+                .map(([name, count]) => `${count} ${name}`)
+                .join(', ');
+            
+            const message = `[RARE FINDS] You spotted nearby: ${summary}.`;
+            console.log(`[EVENT DEBUG] Rare finds detected: ${summary}`);
+            await this.handleMessage('system', message);
         });
     }
 
