@@ -765,7 +765,7 @@ export class Agent {
         this.npc.init();
 
         // Set up update loop for modes
-        const INTERVAL = 1000;
+        const INTERVAL = 500;
         setTimeout(async () => {
             while (true) {
                 let start = Date.now();

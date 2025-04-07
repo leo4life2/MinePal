@@ -123,27 +123,6 @@ const modes = [
         }
     },
     {
-        name: 'hunting',
-        description: 'Hunt nearby animals when idle.',
-        interrupts: ['defaults'],
-        on: true,
-        active: false,
-        /**
-         * Update function for hunting mode.
-         * Detects nearby huntable entities and makes the agent attack them.
-         * @param {Object} agent - The agent object containing the bot.
-         */
-        update: async function (agent) {
-            const huntable = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHuntable(entity), 8);
-            if (huntable && await world.isClearPath(agent.bot, huntable)) {
-                execute(this, agent, async () => {
-                    await agent.sendMessage(`Hunting ${huntable.name}!`);
-                    await skills.attackEntity(agent.bot, huntable);
-                });
-            }
-        }
-    },
-    {
         name: 'item_collecting',
         description: 'Collect nearby items when idle.',
         interrupts: [],
@@ -179,30 +158,6 @@ const modes = [
             }
             else {
                 this.noticed_at = -1;
-            }
-        }
-    },
-    {
-        name: 'torch_placing',
-        description: 'Place torches when idle and there are no torches nearby.',
-        interrupts: ['followPlayer'],
-        on: true,
-        active: false,
-        cooldown: 5,
-        last_place: Date.now(),
-        /**
-         * Update function for torch placing mode.
-         * Places torches in dark areas when the agent is idle and there are no torches nearby.
-         * @param {Object} agent - The agent object containing the bot.
-         */
-        update: function (agent) {
-            if (world.shouldPlaceTorch(agent.bot)) {
-                if (Date.now() - this.last_place < this.cooldown * 1000) return;
-                execute(this, agent, async () => {
-                    const pos = agent.bot.entity.position;
-                    await skills.placeBlock(agent.bot, 'torch', pos.x, pos.y, pos.z, 'bottom', true);
-                });
-                this.last_place = Date.now();
             }
         }
     },
@@ -247,19 +202,6 @@ const modes = [
                 this.next_change = Date.now() + Math.random() * 10000 + 2000;
             }
         }
-    },
-    {
-        name: 'cheat',
-        description: 'Use cheats to instantly place blocks and teleport.',
-        interrupts: [],
-        on: false,
-        active: false,
-        /**
-         * Update function for cheat mode.
-         * Currently does nothing.
-         * @param {Object} agent - The agent object containing the bot.
-         */
-        update: function (agent) { /* do nothing */ }
     },
     // {
     //     name: 'farming',
