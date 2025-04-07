@@ -115,6 +115,76 @@ export function getNearbyEntities(bot, maxDistance=16) {
     return res;
 }
 
+// Helper function to group entities by type/name and format for logging
+function formatEntityCounts(entities) {
+    const counts = {};
+    for (const entity of entities) {
+        const identifier = entity.username || entity.name || `type_${entity.type}` || 'unknown';
+        counts[identifier] = (counts[identifier] || 0) + 1;
+    }
+    if (Object.keys(counts).length === 0) return "None";
+    return Object.entries(counts).map(([name, count]) => `${name}: ${count}`).join(', ');
+}
+
+export async function getVisibleEntities(bot) {
+    /**
+     * Get a list of entities that the bot has a direct line of sight to.
+     * Based on raycasting from the bot's eyes to the entity's position.
+     * Ensures nearby chunks are loaded.
+     * @param {Bot} bot - The bot instance.
+     * 
+     * @returns {Promise<Entity[]>} - A promise resolving to a list of visible entities (excluding the bot itself).
+     */
+    const visibleEntities = [];
+    if (!bot.entity || !bot.entity.position || bot.entity.eyeHeight === undefined) {
+        return visibleEntities; 
+    }
+
+    // Wait for nearby chunks to load
+    try {
+        await bot.waitForChunksToLoad();
+    } catch (err) {
+        console.warn(`[getVisibleEntities] Error waiting for chunks: ${err.message}`);
+        return visibleEntities;
+    }
+
+    const headPos = bot.entity.position.offset(0, bot.entity.eyeHeight, 0);
+    // Get entities immediately after chunk load
+    const allEntities = Object.values(bot.entities).filter(e => e !== bot.entity); 
+
+    for (const entity of allEntities) {
+        // Self already filtered out
+        if (!entity.position) {
+            continue; // Skip entities without a position
+        }
+
+        const targetPos = entity.position.offset(0, entity.height*0.9, 0);
+        const range = headPos.distanceTo(targetPos);
+
+        if (range === 0) continue; // Skip entity at the exact same position
+
+        const dir = targetPos.minus(headPos).normalize();
+        const entityIdentifier = entity.username || entity.name || `ID ${entity.id}`;
+        
+        const match = (block) => block.boundingBox !== 'empty';
+
+        let hitBlock = null; // Initialize hitBlock to null
+        try {
+            hitBlock = bot.world.raycast(headPos, dir, range, match);
+
+            if (hitBlock === null) {
+                visibleEntities.push(entity);
+            } else {
+                // Added log for non-visible entities with reason
+                // console.log(`[getVisibleEntities Debug] Entity ${entityIdentifier} NOT visible. Raycast hit ${hitBlock.name} at ${hitBlock.position}.`);
+            }
+        } catch (err) {
+            console.warn(`[getVisibleEntities] Raycast error for entity ${entityIdentifier}: ${err.message}`); 
+        }
+    }
+    return visibleEntities;
+}
+
 export function getNearestEntityWhere(bot, predicate, maxDistance=16) {
     return bot.nearestEntity(entity => predicate(entity) && bot.entity.position.distanceTo(entity.position) < maxDistance);
 }

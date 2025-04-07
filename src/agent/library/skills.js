@@ -377,17 +377,18 @@ export async function attackNearest(
    * await skills.attackNearest(bot, "zombie", true);
    **/
   bot.modes.pause("cowardice");
-  const nearbyEntities = world.getNearbyEntities(bot, 24);
+  // Replaced getNearbyEntities with await getVisibleEntities
+  const visibleEntities = await world.getVisibleEntities(bot); 
   let mob;
   if (isPlayer) {
-    mob = nearbyEntities.find(
+    mob = visibleEntities.find(
       (entity) =>
         entity !== bot.entity &&
         entity.type === "player" &&
         entity.username === mobType
     );
   } else {
-    mob = nearbyEntities.find(
+    mob = visibleEntities.find(
       (entity) => entity !== bot.entity && entity.name === mobType
     );
   }
@@ -427,7 +428,8 @@ export async function attackEntity(bot, entity, kill = true) {
     await bot.attack(entity);
   } else {
     bot.pvp.attack(entity);
-    while (world.getNearbyEntities(bot, 24).includes(entity)) {
+    // Need to await getVisibleEntities inside the loop condition
+    while ((await world.getVisibleEntities(bot)).includes(entity)) { 
       await new Promise((resolve) => setTimeout(resolve, 1000));
       if (bot.interrupt_code) {
         bot.pvp.stop();
@@ -1384,6 +1386,64 @@ export async function goToBed(bot) {
   return true;
 }
 
+export async function goIntoNetherPortal(bot) {
+  /**
+   * Finds the nearest Nether portal block and walks into its space.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @returns {Promise<boolean>} true if the bot reached the portal block's coordinates, false otherwise.
+   */
+  const portalBlock = world.getNearestBlock(bot, "nether_portal", MID_DISTANCE);
+
+  if (!portalBlock) {
+    log(bot, "Could not find a Nether Portal nearby.");
+    return false;
+  }
+
+  log(bot, `Found Nether Portal at ${portalBlock.position}. Moving into it...`);
+
+  const goal = new pf.goals.GoalBlock(portalBlock.position.x, portalBlock.position.y, portalBlock.position.z);
+  bot.pathfinder.setMovements(new pf.Movements(bot));
+
+  try {
+    await bot.pathfinder.goto(goal);
+    // Once the bot reaches the goal coordinates, it should be inside the portal
+    // The game handles the teleportation delay.
+    log(bot, "Entered Nether Portal block space. Waiting for teleportation...");
+    return true; // Indicates the bot reached the portal coordinates
+  } catch (err) {
+    log(bot, `Failed to move into the Nether Portal: ${err.message}`);
+    return false;
+  }
+}
+
+export async function goIntoEndPortal(bot) {
+  /**
+   * Finds the nearest End portal block and walks into its space.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @returns {Promise<boolean>} true if the bot reached the portal block's coordinates, false otherwise.
+   */
+  const portalBlock = world.getNearestBlock(bot, "end_portal", MID_DISTANCE);
+
+  if (!portalBlock) {
+    log(bot, "Could not find an End Portal nearby.");
+    return false;
+  }
+
+  log(bot, `Found End Portal at ${portalBlock.position}. Moving into it...`);
+
+  const goal = new pf.goals.GoalBlock(portalBlock.position.x, portalBlock.position.y, portalBlock.position.z);
+  bot.pathfinder.setMovements(new pf.Movements(bot));
+
+  try {
+    await bot.pathfinder.goto(goal);
+    log(bot, "Entered End Portal block space. Waiting for teleportation...");
+    return true;
+  } catch (err) {
+    log(bot, `Failed to move into the End Portal: ${err.message}`);
+    return false;
+  }
+}
+
 export async function tillAndSow(bot, x, y, z, seedType = null) {
   /**
    * Till the ground at the given position and plant the given seed type.
@@ -1560,13 +1620,15 @@ export async function useItemOnEntity(bot, entityName, itemName) {
     return false;
   }
 
-  const nearbyEntities = world.getNearbyEntities(bot, 24);
-  const targetEntity = nearbyEntities.find((e) => e.name === entityName);
+  // Replaced getNearbyEntities with await getVisibleEntities
+  const visibleEntities = await world.getVisibleEntities(bot);
+  const targetEntity = visibleEntities.find((e) => e.name === entityName);
   if (!targetEntity) {
-    const visibleEntities = nearbyEntities.map((e) => e.name).join(", ");
+    // Get names from visibleEntities, not nearbyEntities
+    const visibleEntityNames = visibleEntities.map((e) => e.name || e.username || `ID ${e.id}`).join(", ");
     log(
       bot,
-      `${entityName} does not exist nearby. Nearby entities: ${visibleEntities}`
+      `${entityName} does not exist nearby. Visible entities: ${visibleEntityNames}`
     );
     return false;
   }
@@ -2202,10 +2264,14 @@ export async function tameMob(bot, mobType) {
   }
 
   // Find nearest untamed mob
-  const nearbyEntities = world.getNearbyEntities(bot, 24);
+  // Replaced getNearbyEntities with await getVisibleEntities
+  const visibleEntities = await world.getVisibleEntities(bot);
   let targetMob = null;
   
-  for (const entity of nearbyEntities) {
+  // Need to sort by distance if we want the nearest visible
+  visibleEntities.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+
+  for (const entity of visibleEntities) {
     if (entity.name !== mobType) continue;
     
     // Check if any metadata value is a UUID (contains dashes)
@@ -2215,12 +2281,12 @@ export async function tameMob(bot, mobType) {
     
     if (!isTamed) {
       targetMob = entity;
-      break;
+      break; // Found the nearest untamed one
     }
   }
 
   if (!targetMob) {
-    log(bot, `No untamed ${mobType} found nearby.`);
+    log(bot, `No untamed ${mobType} found among visible entities.`); // Updated log message
     return false;
   }
 
@@ -2290,4 +2356,64 @@ export async function tameMob(bot, mobType) {
   }
   log(bot, `Failed to tame ${mobType} after ${maxAttempts} attempts.`);
   return false;
+}
+
+// Added function to handle attacking multiple creatures sequentially
+export async function attackMultipleCreatures(bot, mobType, count) {
+  /**
+   * Attacks and kills a specified number of the nearest creatures of a given type sequentially.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} mobType - The type of creature to attack.
+   * @param {number} count - The number of creatures to attack and kill.
+   * @returns {Promise<string>} A message summarizing the outcome.
+   */
+  bot.modes.pause("cowardice");
+  let killedCount = 0;
+  const maxRange = 24; // Note: maxRange is no longer used by getVisibleEntities
+
+  for (let i = 0; i < count; i++) {
+    if (bot.interrupt_code) {
+      const message = `Attack sequence interrupted after killing ${killedCount} ${mobType}(s).`;
+      log(bot, message);
+      return message;
+    }
+
+    // Find the *current* nearest visible creature of the specified type in each iteration
+    // Replaced getNearbyEntities with await getVisibleEntities
+    const visibleEntities = await world.getVisibleEntities(bot); 
+
+    // Need to sort by distance to find the nearest one
+    visibleEntities.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+    
+    const target = visibleEntities.find(
+      (entity) => entity !== bot.entity && entity.name === mobType
+    );
+
+    if (!target) {
+      // Keep final log for no more targets
+      const message = killedCount > 0
+        ? `Successfully killed ${killedCount} ${mobType}(s). Could not find any more visible nearby.` // Updated log
+        : `Could not find any ${mobType} visible nearby to attack.`; // Updated log
+      log(bot, message);
+      return message;
+    }
+
+    const success = await attackEntity(bot, target, true); // Call attackEntity to handle the kill
+
+    if (success) {
+      killedCount++;
+    } else {
+      // attackEntity returned false, likely due to interruption or error during combat
+      const message = `Attack sequence stopped after killing ${killedCount} ${mobType}(s) due to an issue killing target #${i+1}.`;
+      log(bot, message);
+      return message;
+    }
+    
+    // Small delay to allow things to settle (e.g., item drops)
+    await new Promise(resolve => setTimeout(resolve, 300)); 
+  }
+
+  const finalMessage = `Successfully completed attack sequence. Killed ${killedCount} ${mobType}(s).`;
+  log(bot, finalMessage);
+  return finalMessage;
 }

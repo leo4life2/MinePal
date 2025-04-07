@@ -236,15 +236,27 @@ export const actionsList = [
     }),
   },
   {
-    name: "!attack",
-    description: "Attack and kill the nearest entity of a given type.",
+    name: "!attackPlayer",
+    description: "Attack and kill the specified player.",
     params: {
-      type: "(string) The type of entity to attack. If it's a player, give the player's name.",
-      isPlayer:
-        "(boolean) Whether the target is a player or not. If type is not a Minecraft mob type, this is true.",
+      player_name: "(string) The name of the player to attack.",
     },
-    perform: wrapExecution(async (agent, type, isPlayer) => {
-      await skills.attackNearest(agent.bot, type, true, isPlayer);
+    perform: wrapExecution(async (agent, player_name) => {
+      await skills.attackNearest(agent.bot, player_name, true, true);
+    }),
+  },
+  {
+    name: "!attackCreature",
+    description: "Attack and kill the nearest creature(s) of a given type.",
+    params: {
+      type: "(string) The type of creature to attack (e.g., 'zombie', 'skeleton').",
+      count: "(number, optional) How many creatures of this type to attack. Defaults to 1.",
+    },
+    perform: wrapExecution(async (agent, type, count = 1) => {
+      const numAttacks = parseInt(count) || 1;
+      if (numAttacks <= 0) return "Attack count must be positive.";
+
+      return await skills.attackMultipleCreatures(agent.bot, type, numAttacks);
     }),
   },
   {
@@ -436,7 +448,23 @@ export const actionsList = [
     perform: wrapExecution(async (agent, mobType) => {
       return await skills.tameMob(agent.bot, mobType);
     }),
-  }
+  },
+  {
+    name: "!goIntoNetherPortal",
+    description: "Finds the nearest Nether Portal and walks into it to trigger teleportation.",
+    params: {}, // No parameters needed
+    perform: wrapExecution(async (agent) => {
+      await skills.goIntoNetherPortal(agent.bot);
+    }),
+  },
+  {
+    name: "!goIntoEndPortal",
+    description: "Finds the nearest End Portal and walks into it to trigger teleportation.",
+    params: {}, // No parameters needed
+    perform: wrapExecution(async (agent) => {
+      await skills.goIntoEndPortal(agent.bot);
+    }),
+  },
   // {
   //   name: "!goal",
   //   description: "Set a goal to automatically work towards.",

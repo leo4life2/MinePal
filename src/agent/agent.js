@@ -11,10 +11,15 @@ import fs from 'fs/promises';
 import * as world from "./library/world.js";
 
 // --- Silence Timer Constants ---
-const MEAN_1 = 30; // Base mean silence duration in seconds for the first silence
+const MEAN_1 = 45; // Base mean silence duration in seconds for the first silence
 const STD_FACTOR = 10; // STD is MEAN_i / STD_FACTOR
 const R = 3.5;    // Exponential factor for increasing mean silence duration
 // --- End Silence Timer Constants ---
+
+// --- Weather Constants ---
+const WEATHER_LOW = 0.991;
+const WEATHER_HIGH = 1.0;   // Window to detect weather ending
+// --- End Weather Constants ---
 
 // Helper function to generate descriptive time difference string
 function timeAgo(pastDate) {
@@ -200,6 +205,8 @@ export class Agent {
         this.hudListFields = ['backpack', 'hotbar', 'offHand', 'armor', 'nearbyBlocks', 'nearbyMobs', 'nearbyPlayers'];
         this.silences = 0; // Counter for consecutive silences
         this.silenceTimer = null; // Timeout ID for silence timer
+        this.currentWeatherState = 'clear'; // Track current weather state ('clear', 'rain', 'thunder')
+        this.currentDimension = null; // Track current dimension state (null until first spawn)
     }
 
     /**
@@ -220,6 +227,43 @@ export class Agent {
             const historySuffix = this.history.turns.slice(lastAssistantIndex);
             const prunedPrefix = historyPrefix.filter(msg => msg.role !== 'system');
             this.history.turns = prunedPrefix.concat(historySuffix);
+        }
+    }
+
+    /**
+     * Consolidates consecutive system messages at the tail of the history into a single message.
+     * Operates directly on this.history.turns.
+     */
+    _consolidateTailSystemMessages() {
+        const turns = this.history.turns;
+        if (turns.length === 0) return; // Nothing to consolidate
+
+        let firstTailSystemIndex = -1;
+        // Find the start index of the trailing block of system messages
+        for (let i = turns.length - 1; i >= 0; i--) {
+            if (turns[i].role === 'system') {
+                firstTailSystemIndex = i;
+            } else {
+                break; // Found the last non-system message
+            }
+        }
+
+        // Check if there are any trailing system messages
+        if (firstTailSystemIndex !== -1) {
+            const systemBlockLength = turns.length - firstTailSystemIndex;
+            
+            // Only consolidate if there are 2 or more consecutive system messages at the end
+            if (systemBlockLength > 1) {
+                const systemMessagesToConsolidate = turns.slice(firstTailSystemIndex);
+                const combinedContent = systemMessagesToConsolidate.map(msg => msg.content).join('\n');
+                
+                // Create the new consolidated message
+                const consolidatedMessage = { role: 'system', content: combinedContent };
+                
+                // Replace the block with the single message
+                this.history.turns.splice(firstTailSystemIndex, systemBlockLength, consolidatedMessage);
+                // console.log(`[DEBUG] Consolidated ${systemBlockLength} tail system messages.`);
+            }
         }
     }
 
@@ -282,6 +326,9 @@ export class Agent {
             console.log(`${this.name} spawned.`);
             this.coder.clear();
             
+            // Set the initial dimension after spawning
+            this.currentDimension = this.bot.game.dimension;
+
             // Define messages to ignore
             const ignore_messages = [
                 "Set own game mode to",
@@ -375,9 +422,22 @@ export class Agent {
         newHUD.dimension = this.bot.game.dimension;
         newHUD.biome = world.getBiomeName(this.bot);
 
-        newHUD.weather = "Clear";
-        if (this.bot.rainState > 0) newHUD.weather = "Rain";
-        if (this.bot.thunderState > 0) newHUD.weather = "Thunderstorm";
+        // Check dimension before setting weather
+        if (this.bot.game.dimension === 'overworld') {
+            // Updated weather logic to include intensity percentage (only for overworld)
+            if (this.bot.thunderState > 0) {
+                const intensity = (this.bot.thunderState * 100).toFixed(0);
+                newHUD.weather = `Thunderstorm (${intensity}%)`;
+            } else if (this.bot.rainState > 0) {
+                const intensity = (this.bot.rainState * 100).toFixed(0);
+                newHUD.weather = `Rain (${intensity}%)`;
+            } else {
+                newHUD.weather = "Clear";
+            }
+        } else {
+            // Set weather to N/A if not in the overworld
+            newHUD.weather = "N/A";
+        }
 
         // Corrected time calculation: 0 ticks = 06:00
         const minecraftTime = this.bot.time.timeOfDay;
@@ -417,8 +477,19 @@ export class Agent {
 
         // Initializing nearby blocks and entities (mobs)
         newHUD.nearbyBlocks = world.getNearbyBlockTypes(this.bot);
-        // Get entity types, filter out 'player', and store in nearbyMobs
-        newHUD.nearbyMobs = world.getNearbyEntityTypes(this.bot).filter(entity => entity !== 'player');
+        
+        // Get VISIBLE mobs and count them by type
+        const visibleEntities = await world.getVisibleEntities(this.bot);
+        const visibleMobs = visibleEntities.filter(entity => entity.type !== 'player');
+        const mobCounts = {};
+        for (const mob of visibleMobs) {
+            const name = mob.name || 'unknown_mob'; // Use name, fallback if needed
+            mobCounts[name] = (mobCounts[name] || 0) + 1;
+        }
+        // Format counts into strings for HUD and diff tracking, sort alphabetically
+        newHUD.nearbyMobs = Object.entries(mobCounts)
+            .map(([name, count]) => `${name}: ${count}`)
+            .sort(); 
 
         // Construct HUD string
         let statsRes = "STATS";
@@ -444,7 +515,7 @@ export class Agent {
         let blocksRes = "NEARBY_BLOCKS";
         blocksRes += newHUD.nearbyBlocks.length ? `\n- ${newHUD.nearbyBlocks.join("\n- ")}` : ": none";
 
-        // Rename section to NEARBY_MOBS and simplify list
+        // Updated section to use visible mob counts
         let mobsRes = "NEARBY_MOBS";
         mobsRes += newHUD.nearbyMobs.length ? `\n- ${newHUD.nearbyMobs.join("\n- ")}` : ": none";
 
@@ -460,10 +531,13 @@ export class Agent {
             playersRes += ": none";
         }
 
+        const hudString = `${statsRes}\n${inventoryRes}\n${blocksRes}\n${mobsRes}\n${playersRes}`;
+        // console.log(`\n\n[DEBUG] HUD: ${hudString} \n\n`);
+
         // Return both newHUD and the updated HUD string
         return {
             newHUD,
-            hudString: `${statsRes}\n${inventoryRes}\n${blocksRes}\n${mobsRes}\n${playersRes}`
+            hudString
         };
     }
     
@@ -528,11 +602,11 @@ export class Agent {
             }
             this.latestHUD = newHUD; // Update latestHUD
 
+            // Call consolidation function before getting history for the prompt
+            this._consolidateTailSystemMessages();
+
             history = this.history.getHistory(); // Get updated history
 
-            // console.log("\n\n -------- Start history ----- \n\n", history.map(entry => `Role: ${entry.role.padEnd(10)} | Content: ${entry.content}`).join('\n'));
-            // console.log("\n\n -------- End history ----- \n\n");
-            
             let res = await this.prompter.promptConvo(history);
             // Now we parse and execute commands.
             let command_name = containsCommand(res);
@@ -586,12 +660,9 @@ export class Agent {
 
         const delayMilliseconds = plannedSilenceSeconds * 1000;
 
-        console.log(`[Silence Timer] Setting next silence prompt in ${formatDuration(plannedSilenceSeconds)} (Mean: ${meanSeconds.toFixed(1)}s, StdDev: ${stdDevSeconds.toFixed(1)}s, Silences: ${this.silences})`);
-
         this.silenceTimer = setTimeout(() => {
             this.silences++;
             const formattedDuration = formatDuration(plannedSilenceSeconds); // Use planned duration for message
-            console.log(`[Silence Timer] Fired after planned ${formattedDuration}. Silences: ${this.silences}`);
             this.handleMessage('system', `[SILENCE] It's been ${formattedDuration} of silence.`);
         }, delayMilliseconds);
         // --- End Set Silence Timer ---
@@ -610,13 +681,38 @@ export class Agent {
         // Custom time-based events with dimension and sky check
         this.bot.on('time', () => {
             // Only trigger time events in overworld with clear sky
-            if (this.bot.game.dimension === 'overworld' && isClearAbove(this.bot)) { 
+            if (this.bot.game.dimension === 'overworld' && isClearAbove(this.bot)) {
+                // Time 
                 if (this.bot.time.timeOfDay >= 23981 || this.bot.time.timeOfDay == 0) {
                     this.handleMessage('system', 'It is now sunrise.');
                 }
                 else if (this.bot.time.timeOfDay >= 11981 && this.bot.time.timeOfDay <= 12000) {
                     this.handleMessage('system', 'It is now sunset.');
                 }
+            }
+        });
+
+        // Weather event listener using state tracking
+        this.bot.on('weatherUpdate', () => {
+            // Only trigger in overworld with clear sky (though weather usually happens regardless of sky)
+            if (this.bot.game.dimension !== 'overworld') return; 
+
+            const currentRain = this.bot.rainState;
+            const currentThunder = this.bot.thunderState;
+            let newWeatherState = 'clear';
+
+            if (currentThunder > 0) {
+                newWeatherState = 'thunder';
+            } else if (currentRain > 0) {
+                newWeatherState = 'rain';
+            }
+            
+            // Check if state has changed
+            if (newWeatherState !== this.currentWeatherState) {
+                console.log(`[WEATHER DEBUG] State change: ${this.currentWeatherState} -> ${newWeatherState} (R:${currentRain.toFixed(3)}, T:${currentThunder.toFixed(3)})`);
+                this.handleMessage('system', `[WEATHER] Important: Weather changed from ${this.currentWeatherState} to ${newWeatherState}!`);
+                // Update the current state
+                this.currentWeatherState = newWeatherState;
             }
         });
 
@@ -681,6 +777,19 @@ export class Agent {
         }, INTERVAL);
 
         this.bot.emit('idle');
+
+        // Add a listener for respawn events, checking for dimension change
+        this.bot.on('respawn', async () => {
+            const newDimension = this.bot.game.dimension;
+            
+            if (newDimension !== this.currentDimension) {
+                const message = `[WORLD CHANGE] You have respawned in a different dimension: ${newDimension}.`;
+                // Update the current dimension state
+                this.currentDimension = newDimension;
+                // Send the message about the change
+                await this.handleMessage('system', message);
+            }
+        });
     }
 
     /**
