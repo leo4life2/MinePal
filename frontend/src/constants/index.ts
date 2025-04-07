@@ -18,21 +18,21 @@ const TEST_PRICING_PLANS: PricingPlan[] = [
     id: 1,
     name: 'Basic',
     price: 2.99,
-    quota: 1200,
+    quota: 1800,
     priceId: 'price_1R0YEFAbdM8AcunxnUxj07sw'
   },
   {
     id: 2,
     name: 'Standard',
     price: 7.99,
-    quota: 3600,
+    quota: 5400,
     priceId: 'price_1R0YFHAbdM8AcunxY1rm8fkw'
   },
   {
     id: 3,
     name: 'Pro',
     price: 13.99,
-    quota: 7000,
+    quota: 10500,
     priceId: 'price_1R0YFYAbdM8AcunxKH04jHck'
   }
 ];
@@ -42,21 +42,21 @@ const LIVE_PRICING_PLANS: PricingPlan[] = [
     id: 1,
     name: 'Basic',
     price: 2.99,
-    quota: 1200,
+    quota: 1800,
     priceId: 'price_1R2MrRAbdM8AcunxfX4snQNi'
   },
   {
     id: 2,
     name: 'Standard',
     price: 7.99,
-    quota: 3600,
+    quota: 5400,
     priceId: 'price_1R2MrTAbdM8AcunxqGPVw0ZR'
   },
   {
     id: 3,
     name: 'Pro',
     price: 13.99,
-    quota: 7000,
+    quota: 10500,
     priceId: 'price_1R2MrVAbdM8AcunxMUql3BtU'
   }
 ];
