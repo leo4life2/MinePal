@@ -1357,33 +1357,65 @@ export async function useDoor(bot, door_pos = null) {
 
 export async function goToBed(bot) {
   /**
-   * Sleep in the nearest bed.
+   * Tries to sleep in the nearest available bed.
+   * Will iterate through nearby beds if the first one fails.
    * @param {MinecraftBot} bot, reference to the minecraft bot.
-   * @returns {Promise<boolean>} true if the bed was found, false otherwise.
+   * @returns {Promise<boolean>} true if the bot successfully slept, false otherwise.
    * @example
    * await skills.goToBed(bot);
    **/
   const beds = bot.findBlocks({
-    matching: (block) => {
-      return block.name.includes("bed");
-    },
+    matching: (block) => block.name.includes("bed"),
     maxDistance: 32,
-    count: 1,
+    count: 10, // Find up to 10 nearby beds
   });
+
   if (beds.length === 0) {
-    log(bot, `Could not find a bed to sleep in.`);
+    log(bot, `Could not find any beds nearby to sleep in.`);
     return false;
   }
-  let loc = beds[0];
-  await goToPosition(bot, loc.x, loc.y, loc.z);
-  const bed = bot.blockAt(loc);
-  await bot.sleep(bed);
-  log(bot, `You are in bed.`);
-  while (bot.isSleeping) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+
+  for (const loc of beds) {
+    const bedPosition = loc; // findBlocks returns Vec3 positions directly
+    try {
+      // Go near the bed first
+      await goToPosition(bot, bedPosition.x, bedPosition.y, bedPosition.z, 1); // Aim closer
+      
+      const bed = bot.blockAt(bedPosition);
+      if (!bed || !bed.name.includes('bed')) { // Double-check block exists
+          continue;
+      }
+
+      // Attempt to sleep
+      await bot.sleep(bed);
+      log(bot, `Successfully entered bed at ${bedPosition}.`);
+      
+      // Wait until woken up
+      while (bot.isSleeping) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (bot.interrupt_code) {
+           log(bot, "Sleep interrupted.");
+           // Might need to wake up manually if interrupted? Mineflayer usually handles this.
+           return false; // Indicate interruption
+        }
+      }
+      log(bot, `You have woken up.`);
+      return true; // Successfully slept and woke up
+
+    } catch (err) {
+      log(bot, `Could not use bed at ${bedPosition}: ${err.message}. Trying next bed...`);
+      // Optional: Check for specific errors like occupied, monsters nearby, daytime
+    }
+    
+    if (bot.interrupt_code) {
+        log(bot, "goToBed sequence interrupted.");
+        return false;
+    }
   }
-  log(bot, `You have woken up.`);
-  return true;
+
+  // If loop finishes without returning true
+  log(bot, "Tried all nearby beds, but could not sleep in any.");
+  return false;
 }
 
 export async function goIntoNetherPortal(bot) {

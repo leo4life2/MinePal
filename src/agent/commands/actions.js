@@ -260,7 +260,7 @@ export const actionsList = [
     }),
   },
   {
-    name: "!goToBed",
+    name: "!sleepOnBed",
     description: "Go to the nearest bed and sleep.",
     perform: wrapExecution(async (agent) => {
       await skills.goToBed(agent.bot);

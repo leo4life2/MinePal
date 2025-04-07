@@ -7,10 +7,11 @@ import util from 'util';
 const minepal_response_schema = {
     type: "object",
     properties: {
-        chat_response: { type: "string" },
+        thought: { type: "string" },
+        say_in_game: { type: "string" },
         execute_command: { type: "string" }
     },
-    required: ["chat_response", "execute_command"],
+    required: ["thought", "say_in_game", "execute_command"],
     additionalProperties: false
 };
 
@@ -73,6 +74,7 @@ export class Proxy {
 
             const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, { headers });
             res = response.data;
+            console.log('[THOUGHT] thought was: ', res.thought);
         } catch (err) {
             res = "Error: ";
             if (err.response) {

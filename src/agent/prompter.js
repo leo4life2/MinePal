@@ -100,7 +100,7 @@ export class Prompter {
         let systemPrompt = this.profile.conversing;
         systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
         
-        let chat_response, execute_command;
+        let say_in_game, execute_command;
         let response = await this.proxy.sendRequest(messages, systemPrompt);
         if (typeof response === 'string') {
             // If it's an error message, return it directly
@@ -115,11 +115,11 @@ export class Prompter {
                 return "Oops! OpenAI's server took an arrow to the knee. Mind trying that prompt again?";
             }
         }
-        ({ chat_response, execute_command } = response);
-        console.log('Chat Response:', chat_response);
+        ({ say_in_game, execute_command } = response);
+        console.log('Chat Response:', say_in_game);
         console.log('Execute Command:', execute_command);
         
-        if (chat_response === undefined || execute_command === undefined) {
+        if (say_in_game === undefined || execute_command === undefined) {
             return "Oops! OpenAI's server took an arrow to the knee. Mind trying that prompt again?";
         }
         
@@ -127,7 +127,7 @@ export class Prompter {
             execute_command = '!' + execute_command;
         }
         
-        return (chat_response || "On it.") + " " + execute_command;
+        return (say_in_game || "On it.") + " " + execute_command;
     }
 
     async promptMemSaving(prev_mem, to_summarize) {

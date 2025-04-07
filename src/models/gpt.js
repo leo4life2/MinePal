@@ -2,10 +2,10 @@ import axios from 'axios';
 const minepal_response_schema = {
     type: "object",
     properties: {
-        chat_response: { type: "string" },
+        say_in_game: { type: "string" },
         execute_command: { type: "string" }
     },
-    required: ["chat_response", "execute_command"],
+    required: ["say_in_game", "execute_command"],
     additionalProperties: false
 };
 export class GPT {

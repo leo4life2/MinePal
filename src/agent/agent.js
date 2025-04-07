@@ -207,6 +207,7 @@ export class Agent {
         this.silenceTimer = null; // Timeout ID for silence timer
         this.currentWeatherState = 'clear'; // Track current weather state ('clear', 'rain', 'thunder')
         this.currentDimension = null; // Track current dimension state (null until first spawn)
+        this.ownerHurtCooldownActive = false; // Cooldown flag for owner hurt event
     }
 
     /**
@@ -787,6 +788,41 @@ export class Agent {
                 // Update the current dimension state
                 this.currentDimension = newDimension;
                 // Send the message about the change
+                await this.handleMessage('system', message);
+            }
+        });
+
+        // Owner-specific entity event listeners
+        this.bot.on('entityDead', async (entity) => {
+            if (entity.type === 'player' && entity.username === this.owner) {
+                const message = `[OWNER DIED] (${this.owner}) has just died!!`;
+                await this.handleMessage('system', message);
+            }
+        });
+
+        this.bot.on('entityHurt', async (entity) => {
+            if (entity.type === 'player' && entity.username === this.owner) {
+                // Check if cooldown is active
+                if (!this.ownerHurtCooldownActive) {
+                    // Activate cooldown
+                    this.ownerHurtCooldownActive = true;
+                    
+                    const message = `[OWNER HURT] (${this.owner}) was just hurt!`;
+                    // Send the message
+                    await this.handleMessage('system', message);
+
+                    // Set timeout to deactivate cooldown after 10 seconds
+                    setTimeout(() => {
+                        this.ownerHurtCooldownActive = false;
+                        console.log("[EVENT DEBUG] Owner hurt cooldown reset.");
+                    }, 10000); // 10000 milliseconds = 10 seconds
+                }
+            }
+        });
+
+        this.bot.on('entitySleep', async (entity) => {
+            if (entity.type === 'player' && entity.username === this.owner) {
+                const message = `[OWNER SLEEP] (${this.owner}) is sleeping. You should sleep too.`;
                 await this.handleMessage('system', message);
             }
         });
