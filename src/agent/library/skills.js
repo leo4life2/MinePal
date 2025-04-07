@@ -1377,10 +1377,19 @@ export async function goToBed(bot) {
 
   for (const loc of beds) {
     const bedPosition = loc; // findBlocks returns Vec3 positions directly
-    try {
-      // Go near the bed first
-      await goToPosition(bot, bedPosition.x, bedPosition.y, bedPosition.z, 1); // Aim closer
+
+    // Check distance and navigate if necessary
+    if (bot.entity.position.distanceTo(bedPosition) > NEAR_DISTANCE) {
+      try {
+        await goToPosition(bot, bedPosition.x, bedPosition.y, bedPosition.z, 1); // Aim close
+      } catch (navErr) {
+        console.log(`Failed to navigate to bed at ${bedPosition}: ${navErr.message}, ${navErr.stack}. Trying next bed.`);
+        continue; // Skip to the next bed if navigation fails
+      }
+    }
       
+    // Now attempt to use the bed (outer try for sleep-related errors)
+    try {
       const bed = bot.blockAt(bedPosition);
       if (!bed || !bed.name.includes('bed')) { // Double-check block exists
           continue;
