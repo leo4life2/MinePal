@@ -243,6 +243,15 @@ class MCData {
     makeItem(name, amount = 1) {
         return new this.Item(this.getItemId(name), amount);
     }
+
+    getEffectById(effectId) {
+        if (!this.mcdata || !this.mcdata.effects) {
+            console.warn("[MCData] Effects data not loaded yet.");
+            return null;
+        }
+        const effect = this.mcdata.effects[effectId];
+        return effect || null; // Return the effect object or null if ID not found
+    }
 }
 
 export default MCData;

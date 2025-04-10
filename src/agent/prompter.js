@@ -83,10 +83,7 @@ export class Prompter {
     }
 
     async promptConvo(messages) {
-        // Get the latest user message
         const latestUserMessage = messages.findLast(msg => msg.role === 'user')?.content;
-        
-        // Get relevant memories if there's a user message
         let relevantMemories = '';
         if (latestUserMessage) {
             const memories = await this.agent.history.searchRelevant(latestUserMessage, 5);
@@ -100,34 +97,65 @@ export class Prompter {
         let systemPrompt = this.profile.conversing;
         systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
         
-        let say_in_game, execute_command;
-        let response = await this.proxy.sendRequest(messages, systemPrompt);
-        if (typeof response === 'string') {
-            // If it's an error message, return it directly
-            if (response.includes('Error')) {
-                return response;
+        let responseData;
+        let chatMessage = null;
+        let command = null;
+        let error = null;
+
+        try {
+            responseData = await this.proxy.sendRequest(messages, systemPrompt);
+            
+            if (typeof responseData === 'string') {
+                if (responseData.includes('Error')) {
+                    error = responseData;
+                } else {
+                    // Attempt to parse if it's not explicitly an error string
+                    try {
+                        responseData = JSON.parse(responseData);
+                    } catch (e) {
+                        error = "Oops! The LLM returned invalid data. Please try again.";
+                    }
+                }
             }
-            // Otherwise try to parse as JSON
-            try {
-                response = JSON.parse(response);
-            } catch (e) {
-                // Bad json
-                return "Oops! OpenAI's server took an arrow to the knee. Mind trying that prompt again?";
+
+            // If no error so far, process the response object
+            if (!error) {
+                if (typeof responseData !== 'object' || responseData === null) {
+                     error = "Oops! The LLM returned an unexpected data format. Please try again.";
+                     console.log('[Prompter] bad format:', responseData);
+                } else {
+                    const { say_in_game, execute_command } = responseData;
+
+                    // Validate required fields
+                    if (say_in_game === undefined || execute_command === undefined) {
+                         error = "Oops! The LLM response is missing required fields. Please try again.";
+                         console.log('[Prompter] bad response:', responseData);
+                    } else {
+                        chatMessage = say_in_game || null; // Use null if empty string
+                        command = execute_command || null; // Use null if empty string
+
+                        console.log('Chat Response:', chatMessage);
+                        console.log('Execute Command:', command);
+
+                        // Add prefix to command if needed
+                        if (command && command.trim() !== '' && !command.startsWith('!') && !command.startsWith('/')) {
+                            command = '!' + command;
+                        }
+                        // Ensure empty/whitespace commands become null
+                        if (command && command.trim() === '') {
+                            command = null;
+                        }
+                    }
+                }
             }
+        } catch (e) { 
+             // Catch errors during the proxy request itself
+             console.error("Error during LLM request:", e);
+             error = e.message;
         }
-        ({ say_in_game, execute_command } = response);
-        console.log('Chat Response:', say_in_game);
-        console.log('Execute Command:', execute_command);
-        
-        if (say_in_game === undefined || execute_command === undefined) {
-            return "Oops! OpenAI's server took an arrow to the knee. Mind trying that prompt again?";
-        }
-        
-        if (execute_command && !execute_command.startsWith('!') && !execute_command.startsWith('/')) {
-            execute_command = '!' + execute_command;
-        }
-        
-        return (say_in_game || "On it.") + " " + execute_command;
+
+        // Return the structured object
+        return { chatMessage, command, error };
     }
 
     async promptMemSaving(prev_mem, to_summarize) {

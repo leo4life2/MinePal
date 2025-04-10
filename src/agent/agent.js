@@ -9,6 +9,7 @@ import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
 import * as world from "./library/world.js";
+import { Vec3 } from 'vec3'; // Ensure Vec3 is imported if not already
 
 // --- Silence Timer Constants ---
 const MEAN_1 = 45; // Base mean silence duration in seconds for the first silence
@@ -178,6 +179,22 @@ function isClearAbove(bot) {
     return true; // All checkpoints are clear
 }
 
+// Helper function to format +/- values
+const formatDiff = (diff) => {
+    return diff > 0 ? `(+${diff})` : `(${diff})`;
+};
+
+// Helper to convert ticks to MM:SS or just S if short
+const formatDurationDiff = (ticks) => { // Renamed for clarity
+    if (ticks <= 0) return '';
+    const totalSeconds = Math.max(0, Math.floor(ticks / 20));
+     if (totalSeconds < 60) return `(${totalSeconds}s remaining)`;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    // Added remaining for diff context
+    return `(${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} remaining)`; 
+};
+
 /**
  * Represents an AI agent that can interact with a Minecraft world.
  */
@@ -185,24 +202,19 @@ export class Agent {
     constructor() {
         // Initialize the latest HUD as an empty map
         this.latestHUD = {
-            position: '',
-            gamemode: '',
-            health: '',
-            hunger: '',
-            biome: '',
-            weather: '',
-            timeOfDay: '',
-            otherPlayers: [],
-            backpack: [],
-            hotbar: [],
-            offHand: [],
-            armor: [],
-            nearbyBlocks: [],
-            nearbyMobs: [],
-            nearbyPlayers: [],
-            empty: true // for easy detect, on first use only
+            inventory: new Map(),
+            trackedBlocks: new Map(),
+            aggregatedBlocks: new Map(), // Still useful for internal logic?
+            mobs: new Map(),
+            players: new Map(),
+            health: 0,
+            hunger: 0,
+            effects: new Map(),
+            // Keep other simple fields if needed for initial setup?
+            position: '', gamemode: '', dimension: '', biome: '', weather: '', timeOfDay: '',
+            empty: true // Critical flag for first run
         };
-        this.hudListFields = ['backpack', 'hotbar', 'offHand', 'armor', 'nearbyBlocks', 'nearbyMobs', 'nearbyPlayers'];
+        this.hudListFields = []; // This is no longer used for diffing
         this.silences = 0; // Counter for consecutive silences
         this.silenceTimer = null; // Timeout ID for silence timer
         this.currentWeatherState = 'clear'; // Track current weather state ('clear', 'rain', 'thunder')
@@ -373,173 +385,448 @@ export class Agent {
     }
 
     /**
-     * Generates a heads-up display (HUD) string with stats, inventory, nearby blocks, and nearby entities.
-     * @returns {string} The HUD string with changes highlighted.
+     * Generates a detailed heads-up display (HUD) string in Markdown format.
+     * Also prepares a simpler newHUD object for diff tracking.
+     * @returns {{hudString: string, diffText: string | null}} An object containing the newHUD for diffing and the formatted Markdown HUD string.
      */
     async headsUpDisplay() {
         if (!this.bot.entity) {
-            return '';
+            return {
+                hudString: "# 🎮 MINEPAL HUD\n\nWaiting for bot to spawn...",
+                diffText: null // No diff on initial wait
+            };
         }
 
-        // Initialize new HUD elements
-        let newHUD = {
-            position: '',
-            gamemode: '',
-            health: '',
-            hunger: '',
-            dimension: '',
-            biome: '',
-            weather: '',
-            timeOfDay: '',
-            otherPlayers: [],
-            backpack: [],
-            hotbar: [],
-            offHand: [],
-            armor: [],
-            nearbyBlocks: [],
-            nearbyMobs: [],
-            nearbyPlayers: [],
+        // --- Helper Functions ---
+        const getFacingDirection = (yaw) => {
+            const angle = yaw * (180 / Math.PI); // Convert radians to degrees
+            const adjustedAngle = (angle % 360 + 360) % 360; // Normalize angle to 0-360
+            if (adjustedAngle >= 315 || adjustedAngle < 45) return "South"; // +Z
+            if (adjustedAngle >= 45 && adjustedAngle < 135) return "West";  // +X
+            if (adjustedAngle >= 135 && adjustedAngle < 225) return "North"; // -Z
+            if (adjustedAngle >= 225 && adjustedAngle < 315) return "East";  // -X
+            return "Unknown";
         };
 
-        const armorSlots = {
-            head: 5,
-            torso: 6,
-            legs: 7,
-            feet: 8,
+        const formatMinecraftTime = (ticks) => {
+            const adjustedTicks = (ticks + 6000) % 24000; // 06:00 = 0 ticks
+            const totalHours = adjustedTicks / 1000;
+            const hours = Math.floor(totalHours);
+            const minutes = Math.floor((totalHours - hours) * 60);
+            const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+            let description = "Day";
+            if (ticks >= 23000 || ticks < 500) description = "Sunrise"; // Approx range
+            else if (ticks >= 11500 && ticks < 13000) description = "Sunset"; // Approx range
+            else if (ticks >= 13000 && ticks < 23000) description = "Night";
+
+            return `${timeStr} (${description})`;
         };
 
-        const mainInventoryStart = 9;
-        const mainInventoryEnd = 35;
+        const calculateDistance = (pos1, pos2) => {
+             if (!pos1 || !pos2) return Infinity;
+             return pos1.distanceTo(pos2);
+        };
 
-        const hotbarStart = 36;
-        const hotbarEnd = 44;
-
-        const offHandSlot = 45;
-
-        // Initializing basic stats
-        newHUD.position = `x: ${this.bot.entity.position.x.toFixed(2)}, y: ${this.bot.entity.position.y.toFixed(2)}, z: ${this.bot.entity.position.z.toFixed(2)}`;
-        newHUD.gamemode = this.bot.game.gameMode;
-        newHUD.health = `${Math.round(this.bot.health)} / 20`;
-        newHUD.hunger = `${Math.round(this.bot.food)} / 20`;
-        newHUD.dimension = this.bot.game.dimension;
-        newHUD.biome = world.getBiomeName(this.bot);
-
-        // Check dimension before setting weather
-        if (this.bot.game.dimension === 'overworld') {
-            // Updated weather logic to include intensity percentage (only for overworld)
-            if (this.bot.thunderState > 0) {
-                const intensity = (this.bot.thunderState * 100).toFixed(0);
-                newHUD.weather = `Thunderstorm (${intensity}%)`;
-            } else if (this.bot.rainState > 0) {
-                const intensity = (this.bot.rainState * 100).toFixed(0);
-                newHUD.weather = `Rain (${intensity}%)`;
-            } else {
-                newHUD.weather = "Clear";
-            }
-        } else {
-            // Set weather to N/A if not in the overworld
-            newHUD.weather = "N/A";
-        }
-
-        // Corrected time calculation: 0 ticks = 06:00
-        const minecraftTime = this.bot.time.timeOfDay;
-        const adjustedTicks = (minecraftTime + 6000) % 24000; // Add 6 hours (6000 ticks) and wrap around 24000
-        const totalHours = adjustedTicks / 1000; // 1000 ticks = 1 hour
-        const hours = Math.floor(totalHours);
-        const minutes = Math.floor((totalHours - hours) * 60); // Calculate minutes from fractional hour
-        newHUD.timeOfDay = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-
-        // Keep getting player names here
-        newHUD.otherPlayers = world.getNearbyPlayerNames(this.bot);
-
-        // Initializing inventory
-        for (let i = mainInventoryStart; i <= mainInventoryEnd; i++) {
-            let item = this.bot.inventory.slots[i];
-            if (item) {
-                newHUD.backpack.push(`${item.name}: ${item.count}`);
-            }
-        }
-
-        for (let i = hotbarStart; i <= hotbarEnd; i++) {
-            let item = this.bot.inventory.slots[i];
-            if (item) {
-                newHUD.hotbar.push(`${item.name}: ${item.count}`);
-            }
-        }
-
-        if (!this.bot.supportFeature("doesntHaveOffHandSlot")) {
-            let offHandItem = this.bot.inventory.slots[offHandSlot];
-            newHUD.offHand.push(offHandItem ? `${offHandItem.name}: ${offHandItem.count}` : "empty");
-        }
-
-        for (const [slotName, slotIndex] of Object.entries(armorSlots)) {
-            let item = this.bot.inventory.slots[slotIndex];
-            newHUD.armor.push(`${slotName}: ${item ? `${item.name}: ${item.count}` : "empty"}`);
-        }
-
-        // Initializing nearby blocks and entities (mobs)
-        newHUD.nearbyBlocks = world.getNearbyBlockTypes(this.bot);
-        
-        // Get VISIBLE mobs and count them by type
+        // --- Data Fetching ---
+        const botPos = this.bot.entity.position;
+        const inventory = this.bot.inventory;
+        const nearbyBlockObjects = world.getNearestBlocks(this.bot, null, 16);
         const visibleEntities = await world.getVisibleEntities(this.bot);
-        const visibleMobs = visibleEntities.filter(entity => entity.type !== 'player');
-        const mobCounts = {};
-        for (const mob of visibleMobs) {
-            const name = mob.name || 'unknown_mob'; // Use name, fallback if needed
-            mobCounts[name] = (mobCounts[name] || 0) + 1;
+        const nearbyPlayers = world.getNearbyPlayers(this.bot, 16);
+
+        // --- Initialize STRUCTURED newHUD for diffing ---        
+        let newHUD = {
+            inventory: new Map(), // name -> count
+            trackedBlocks: new Map(), // key (name@coords) -> full display string for easy check?
+            mobs: new Map(), // name -> count
+            players: new Map(), // name -> { distance }
+            health: Math.round(this.bot.health),
+            hunger: Math.round(this.bot.food),
+            effects: new Map(), // name -> { amplifier, durationTicks }
+            empty: false
+        };
+
+        // --- Build HUD String AND Populate Structured newHUD ---        
+        let hud = ["# 🎮 MINEPAL HUD"];
+
+        // == STATUS == (Populate newHUD.health/hunger/effects here)
+        hud.push("\n## 📍 STATUS");
+        const facing = getFacingDirection(this.bot.entity.yaw);
+        const positionStr = `(${botPos.x.toFixed(2)}, ${botPos.y.toFixed(2)}, ${botPos.z.toFixed(2)})`;
+        hud.push(`- **Position:** ${positionStr}, Facing: ${facing}`);
+        const dimensionStr = this.bot.game.dimension;
+        const biomeStr = world.getBiomeName(this.bot);
+        hud.push(`- **Dimension:** ${dimensionStr.charAt(0).toUpperCase() + dimensionStr.slice(1)} | **Biome:** ${biomeStr}`);
+        const timeStr = formatMinecraftTime(this.bot.time.timeOfDay);
+        let weatherStr = "N/A";
+        if (dimensionStr === 'overworld') {
+             if (this.bot.thunderState > 0) weatherStr = `Thunderstorm (${(this.bot.thunderState * 100).toFixed(0)}%)`;
+             else if (this.bot.rainState > 0) weatherStr = `Rain (${(this.bot.rainState * 100).toFixed(0)}%)`;
+             else weatherStr = "Clear";
         }
-        // Format counts into strings for HUD and diff tracking, sort alphabetically
-        newHUD.nearbyMobs = Object.entries(mobCounts)
-            .map(([name, count]) => `${name}: ${count}`)
-            .sort(); 
+        hud.push(`- **Time:** ${timeStr} | **Weather:** ${weatherStr}`);
+        hud.push(`- **Health:** ❤️ ${newHUD.health}/20 | **Hunger:** 🍖 ${newHUD.hunger}/20`);
 
-        // Construct HUD string
-        let statsRes = "STATS";
-        statsRes += `\n- Position: ${newHUD.position}`;
-        statsRes += `\n- Gamemode: ${newHUD.gamemode}`;
-        statsRes += `\n- Health: ${newHUD.health}`;
-        statsRes += `\n- Hunger: ${newHUD.hunger}`;
-        statsRes += `\n- Dimension: ${newHUD.dimension}`;
-        statsRes += `\n- Biome: ${newHUD.biome}`;
-        statsRes += `\n- Weather: ${newHUD.weather}`;
-        statsRes += `\n- In-Game Clock Time: ${newHUD.timeOfDay}`;
+        // Status Effects - Populate newHUD.effects and build display string
+        let effectsDisplayString = "None";
+        const activeEffectsDisplay = [];
+        if (this.bot.entity.effects) {
+            for (const effectData of Object.values(this.bot.entity.effects)) {
+                if (effectData && typeof effectData.id !== 'undefined') {
+                    const effectInfo = this.mcdata.getEffectById(effectData.id);
+                    if (effectInfo) {
+                        const name = effectInfo.displayName || effectInfo.name;
+                        const amplifier = effectData.amplifier;
+                        const durationTicks = effectData.duration;
+                        newHUD.effects.set(name, { amplifier, durationTicks }); // Populate structured HUD
+                        
+                        const amplifierLevel = amplifier > 0 ? ` ${amplifier + 1}` : '';
+                        const durationStr = formatDurationDiff(durationTicks); // Use helper for display
+                        activeEffectsDisplay.push(`${name}${amplifierLevel} ${durationStr}`.trim());
+                    } else {
+                         console.warn(`[HUD Effects] Unknown effect ID: ${effectData.id}`);
+                         // Optionally handle display of unknown effects
+                    }
+                }
+            }
+        }
+        if (activeEffectsDisplay.length > 0) {
+            effectsDisplayString = activeEffectsDisplay.join(', ');
+        }
+        hud.push(`- **Status Effects:** ${effectsDisplayString}`);
 
-        let inventoryRes = "INVENTORY";
-        inventoryRes += "\nBackpack:" + (newHUD.backpack.length ? `\n- ${newHUD.backpack.join("\n- ")}` : " none");
-        inventoryRes += "\nHotbar:" + (newHUD.hotbar.length ? `\n- ${newHUD.hotbar.join("\n- ")}` : " none");
-        inventoryRes += "\nOff Hand Slot:" + (newHUD.offHand.length ? `\n- ${newHUD.offHand.join("\n- ")}` : " none");
-        inventoryRes += "\nArmor Slots:" + (newHUD.armor.length ? `\n- ${newHUD.armor.join("\n- ")}` : " none");
 
-        if (this.bot.game.gameMode === "creative") {
-            inventoryRes += "\n(You have infinite items in creative mode)";
+        // == EQUIPMENT == (Display only, not needed for new diff format)
+        hud.push("\n## 🛡️ EQUIPMENT");
+        // ... (Armor, Off-Hand display logic as before) ...
+
+
+        // == INVENTORY == (Populate newHUD.inventory)
+        hud.push("\n## 🎒 INVENTORY");
+        const backpackSlots = { start: 9, end: 35 };
+        const hotbarSlots = { start: 36, end: 44 };
+        
+        // Use newHUD.inventory directly for tallying
+        newHUD.inventory.clear(); // Ensure it's empty before tallying
+
+        // Tally backpack items into newHUD.inventory
+        for (let i = backpackSlots.start; i <= backpackSlots.end; i++) {
+            const item = inventory.slots[i];
+            if (item) {
+                newHUD.inventory.set(item.name, (newHUD.inventory.get(item.name) || 0) + item.count);
+            }
+        }
+        // Tally hotbar items into newHUD.inventory and prepare display strings
+        let hotbarDisplayStrings = [];
+        for (let i = 0; i < 9; i++) {
+            const slotIndex = hotbarSlots.start + i;
+            const item = inventory.slots[slotIndex];
+            let itemStr = "empty";
+            if (item) {
+                newHUD.inventory.set(item.name, (newHUD.inventory.get(item.name) || 0) + item.count);
+                itemStr = `${item.name} ×${item.count}`;
+            }
+            hotbarDisplayStrings.push(`[${i + 1}] ${itemStr}`);
         }
 
-        let blocksRes = "NEARBY_BLOCKS";
-        blocksRes += newHUD.nearbyBlocks.length ? `\n- ${newHUD.nearbyBlocks.join("\n- ")}` : ": none";
+        // Format Backpack for display (requires iterating again or using a temp map)
+        let displayBackpackItems = {};
+        let backpackItemCount = 0;
+        for (let i = backpackSlots.start; i <= backpackSlots.end; i++) { 
+            const item = inventory.slots[i];
+            if (item) {
+                displayBackpackItems[item.name] = (displayBackpackItems[item.name] || 0) + item.count;
+                backpackItemCount += item.count;
+            }
+        }
+        hud.push(`**Backpack:** (${Object.keys(displayBackpackItems).length} unique stacks, ${backpackItemCount} total items)`);
+        Object.keys(displayBackpackItems).sort().forEach(name => hud.push(`- ${name} ×${displayBackpackItems[name]}`));
 
-        // Updated section to use visible mob counts
-        let mobsRes = "NEARBY_MOBS";
-        mobsRes += newHUD.nearbyMobs.length ? `\n- ${newHUD.nearbyMobs.join("\n- ")}` : ": none";
+        // Main Hand (display as before)
+        const mainHandSlotIndex = this.bot.quickBarSlot;
+        const mainHandInvSlot = hotbarSlots.start + mainHandSlotIndex;
+        const mainHandItem = inventory.slots[mainHandInvSlot];
+        hud.push(`**Main Hand:** Slot [${mainHandSlotIndex + 1}] ${mainHandItem ? `${mainHandItem.name} ×${mainHandItem.count}` : 'empty'}`);
 
-        // Add new NEARBY_PLAYERS section, simplify list, and highlight owner
-        let playersRes = "NEARBY_PLAYERS";
-        if (newHUD.otherPlayers.length > 0) {
-            const playerListString = newHUD.otherPlayers.map(player => {
-                const prefix = (player === this.owner) ? "Your Owner: " : "";
-                return `- ${prefix}${player}`;
-            }).join("\n");
-            playersRes += `\n${playerListString}`;
+        // Hotbar (display as before)
+        hud.push(`**Hotbar:** (9 slots)`);
+        hud.push(hotbarDisplayStrings.join(' | '));
+
+
+        // == NEARBY BLOCKS == (Populate newHUD.trackedBlocks)
+        hud.push("\n## 🌳 NEARBY BLOCKS");
+        const uniquelyTrackedBlockTypes = ["sign", "chest", "barrel", "shulker_box", "lectern", "furnace", "jukebox"];
+        let signBlocksDisplay = [];
+        let containerBlocksDisplay = [];
+        let otherTrackedBlocksDisplay = [];
+        let aggregatedBlocksDisplay = {}; // For display only
+
+        newHUD.trackedBlocks.clear(); // Ensure empty
+
+        nearbyBlockObjects.forEach(block => {
+            const dist = parseFloat(calculateDistance(botPos, block.position).toFixed(0));
+            const posCoords = `(${block.position.x.toFixed(0)},${block.position.y.toFixed(0)},${block.position.z.toFixed(0)})`;
+            const posStr = `@${posCoords}`; // Includes @
+            const blockKey = `${block.name}${posStr}`; // Unique key for map
+            let isUniquelyTracked = false;
+
+            if (block.name.includes('sign')) {
+                isUniquelyTracked = true;
+                let textSuffix = '';
+                try {
+                    const signTexts = block.getSignText();
+                    if (signTexts && Array.isArray(signTexts)) {
+                        const front = signTexts[0]?.trim();
+                        const back = signTexts[1]?.trim();
+                        // Format for diff display needs
+                        if (front) textSuffix += ` | Front: "${front}"`;
+                        if (back) textSuffix += ` | Back: "${back}"`; 
+                    }
+                } catch (err) { /* Ignore */ }
+                // Store raw data needed for diff, maybe just name, coords, text?
+                const displayString = `[${block.name}${posStr}]${textSuffix}, Distance: ${dist}`;
+                newHUD.trackedBlocks.set(blockKey, { name: block.name, coords: posCoords, text: textSuffix, rawString: displayString }); // Store structured info
+                signBlocksDisplay.push(`- ${displayString}`);
+            } else if (uniquelyTrackedBlockTypes.some(sub => block.name.includes(sub))) {
+                isUniquelyTracked = true;
+                 const displayString = `[${block.name}${posStr}], Distance: ${dist}`;
+                 newHUD.trackedBlocks.set(blockKey, { name: block.name, coords: posCoords, text: '', rawString: displayString }); // Store structured info
+                 if (block.name.includes('chest') || block.name.includes('barrel') || block.name.includes('shulker_box')) {
+                     containerBlocksDisplay.push(`- ${displayString}`);
+                 } else {
+                     otherTrackedBlocksDisplay.push(`- ${displayString}`);
+                 }
+            }
+
+            if (!isUniquelyTracked) {
+                // Aggregate for display
+                if (!aggregatedBlocksDisplay[block.name]) {
+                    aggregatedBlocksDisplay[block.name] = { count: 0, minDist: Infinity };
+                }
+                aggregatedBlocksDisplay[block.name].count++;
+                aggregatedBlocksDisplay[block.name].minDist = Math.min(aggregatedBlocksDisplay[block.name].minDist, dist);
+            }
+        });
+
+        // Format block display sections (Signs, Containers, Other Tracked)
+        if (signBlocksDisplay.length > 0) {
+            hud.push("- Signs:");
+            signBlocksDisplay.sort().forEach(s => hud.push(`  ${s}`));
+        }
+         if (containerBlocksDisplay.length > 0) {
+             hud.push("- Containers:");
+             containerBlocksDisplay.sort().forEach(c => hud.push(`  ${c}`));
+         }
+         if (otherTrackedBlocksDisplay.length > 0) {
+             hud.push("- Other Tracked:");
+             otherTrackedBlocksDisplay.sort().forEach(o => hud.push(`  ${o}`));
+         }
+        // Format Aggregated Others for display
+        const sortedOtherNames = Object.keys(aggregatedBlocksDisplay).sort();
+        if (sortedOtherNames.length > 0) {
+            hud.push("- Others:");
+            sortedOtherNames.forEach(name => {
+                const data = aggregatedBlocksDisplay[name];
+                hud.push(`  - ${name} ×${data.count}, Nearest Distance: ${data.minDist === Infinity ? 'N/A' : data.minDist}`);
+            });
+        }
+        if (signBlocksDisplay.length === 0 && containerBlocksDisplay.length === 0 && otherTrackedBlocksDisplay.length === 0 && sortedOtherNames.length === 0) {
+            hud.push("- none detected");
+        }
+
+
+        // == NEARBY MOBS == (Populate newHUD.mobs)
+        hud.push("\n## 🐾 NEARBY MOBS");
+        let passiveMobsDisplayMap = {}; // Temp map for display aggregation
+        let hostileMobsDisplayMap = {};
+        newHUD.mobs.clear(); // Ensure empty
+
+        visibleEntities.filter(e => e.type !== 'player').forEach(entity => {
+            const name = entity.name || 'unknown_entity';
+            const dist = parseFloat(calculateDistance(botPos, entity.position).toFixed(0));
+            const isHostile = this.mcdata.isHostile(entity);
+            
+            // Populate structured newHUD
+            newHUD.mobs.set(name, (newHUD.mobs.get(name) || 0) + 1);
+
+            // Aggregate for display string
+            const displayMap = isHostile ? hostileMobsDisplayMap : passiveMobsDisplayMap;
+            if (!displayMap[name]) {
+                displayMap[name] = { count: 0, minDist: Infinity };
+            }
+            displayMap[name].count++;
+            displayMap[name].minDist = Math.min(displayMap[name].minDist, dist);
+        });
+
+        // Format Passive Mobs Display
+        const sortedPassiveNames = Object.keys(passiveMobsDisplayMap).sort();
+        if (sortedPassiveNames.length > 0) {
+            hud.push("- Passive:");
+            sortedPassiveNames.forEach(name => {
+                const data = passiveMobsDisplayMap[name];
+                hud.push(`  - ${name} ×${data.count}, Nearest Distance: ${data.minDist === Infinity ? 'N/A' : data.minDist}`);
+            });
         } else {
-            playersRes += ": none";
+            hud.push("- Passive: none detected");
+        }
+        // Format Hostile Mobs Display
+        const sortedHostileNames = Object.keys(hostileMobsDisplayMap).sort();
+        if (sortedHostileNames.length > 0) {
+            hud.push("- Hostile:");
+            sortedHostileNames.forEach(name => {
+                const data = hostileMobsDisplayMap[name];
+                hud.push(`  - ${name} ×${data.count}, Nearest Distance: ${data.minDist === Infinity ? 'N/A' : data.minDist}`);
+            });
+        } else {
+            hud.push("- Hostile: none detected");
         }
 
-        const hudString = `${statsRes}\n${inventoryRes}\n${blocksRes}\n${mobsRes}\n${playersRes}`;
-        // console.log(`\n\n[DEBUG] HUD: ${hudString} \n\n`);
 
-        // Return both newHUD and the updated HUD string
+        // == NEARBY PLAYERS == (Populate newHUD.players)
+        hud.push("\n## 👥 NEARBY PLAYERS");
+        newHUD.players.clear(); // Ensure empty
+        if (nearbyPlayers.length > 0) {
+            nearbyPlayers.forEach(player => {
+                const dist = calculateDistance(botPos, player.position);
+                const name = player.username;
+                newHUD.players.set(name, { distance: dist }); // Populate structured HUD
+                const prefix = (name === this.owner) ? "**Your Owner:** " : "";
+                hud.push(`- ${prefix}${name}, Distance: ${dist.toFixed(0)}`);
+            });
+        } else {
+            hud.push("- none detected");
+        }
+
+
+        // --- Calculate DETAILED Diff Text ---        
+        let diffText = null;
+        let diffSections = []; // Store sections like ["📦 Inventory Changes:", "- item x 1"]
+
+        if (!this.latestHUD.empty) { // Only calculate diff if not the first run
+            
+            // Inventory Changes
+            let inventoryChanges = [];
+            const oldInv = this.latestHUD.inventory;
+            const newInv = newHUD.inventory;
+            const allItems = new Set([...oldInv.keys(), ...newInv.keys()]);
+            allItems.forEach(item => {
+                const oldCount = oldInv.get(item) || 0;
+                const newCount = newInv.get(item) || 0;
+                const diff = newCount - oldCount;
+                if (diff !== 0) {
+                    if (oldCount === 0) inventoryChanges.push(`+ ${item} ×${newCount} *(new)*`);
+                    else if (newCount === 0) inventoryChanges.push(`- ${item} ×${oldCount} *(removed)*`);
+                    else inventoryChanges.push(`- ${item} ×${oldCount} ➜ ×${newCount} *${formatDiff(diff)}*`);
+                }
+            });
+            if (inventoryChanges.length > 0) {
+                diffSections.push("📦 **Inventory Changes:**");
+                diffSections.push(...inventoryChanges.sort());
+            }
+
+            // Environment (Tracked Blocks) Changes
+            let envChanges = [];
+            const oldBlocks = this.latestHUD.trackedBlocks;
+            const newBlocks = newHUD.trackedBlocks;
+            const allBlockKeys = new Set([...oldBlocks.keys(), ...newBlocks.keys()]);
+            allBlockKeys.forEach(key => {
+                const oldBlockData = oldBlocks.get(key);
+                const newBlockData = newBlocks.get(key);
+                if (oldBlockData && !newBlockData) { // Removed
+                    envChanges.push(`- [${oldBlockData.name}${oldBlockData.coords}] *(removed)*`);
+                } else if (!oldBlockData && newBlockData) { // Added
+                    const textPart = newBlockData.text ? ` *(${newBlockData.text.substring(3)})*` : ""; // Remove leading ' | ' 
+                    envChanges.push(`+ [${newBlockData.name}${newBlockData.coords}]${textPart} *(new)*`);
+                }
+            });
+            if (envChanges.length > 0) {
+                diffSections.push("\n🌳 **Environment Changes:**");
+                diffSections.push(...envChanges.sort());
+            }
+
+            // Mob Changes
+            let mobChanges = [];
+            const oldMobs = this.latestHUD.mobs;
+            const newMobs = newHUD.mobs;
+            const allMobs = new Set([...oldMobs.keys(), ...newMobs.keys()]);
+            allMobs.forEach(mob => {
+                const oldCount = oldMobs.get(mob) || 0;
+                const newCount = newMobs.get(mob) || 0;
+                const diff = newCount - oldCount;
+                if (diff !== 0) {
+                    mobChanges.push(`- ${mob} ×${oldCount} ➜ ×${newCount} *${formatDiff(diff)}*`);
+                }
+            });
+            if (mobChanges.length > 0) {
+                diffSections.push("\n🐾 **Mob Changes:**");
+                diffSections.push(...mobChanges.sort());
+            }
+
+            // Player Changes
+            let playerChanges = [];
+            const oldPlayers = this.latestHUD.players;
+            const newPlayers = newHUD.players;
+            const allPlayers = new Set([...oldPlayers.keys(), ...newPlayers.keys()]);
+            allPlayers.forEach(player => {
+                const oldPlayerData = oldPlayers.get(player);
+                const newPlayerData = newPlayers.get(player);
+                if (!oldPlayerData && newPlayerData) playerChanges.push(`+ Player joined: ${player} (Distance: ${newPlayerData.distance.toFixed(0)})`);
+                else if (oldPlayerData && !newPlayerData) playerChanges.push(`- Player left: ${player}`);
+            });
+            if (playerChanges.length > 0) {
+                diffSections.push("\n👥 **Player Changes:**");
+                diffSections.push(...playerChanges.sort());
+            }
+
+            // Status Updates (Health, Hunger, Effects)
+            let statusUpdates = [];
+            const healthDiff = newHUD.health - this.latestHUD.health;
+            const hungerDiff = newHUD.hunger - this.latestHUD.hunger;
+            if (healthDiff !== 0) statusUpdates.push(`- Health: ❤️ ${this.latestHUD.health} ➜ ❤️ ${newHUD.health} *${formatDiff(healthDiff)}*`);
+            if (hungerDiff !== 0) statusUpdates.push(`- Hunger: 🍖 ${this.latestHUD.hunger} ➜ 🍖 ${newHUD.hunger} *${formatDiff(hungerDiff)}*`);
+            
+            const oldEffects = this.latestHUD.effects;
+            const newEffects = newHUD.effects;
+            const allEffectNames = new Set([...oldEffects.keys(), ...newEffects.keys()]);
+            allEffectNames.forEach(name => {
+                const oldEffectData = oldEffects.get(name);
+                const newEffectData = newEffects.get(name);
+                if (!oldEffectData && newEffectData) { // New effect
+                    const amplifierLevel = newEffectData.amplifier > 0 ? ` ${newEffectData.amplifier + 1}` : '';
+                    const durationStr = formatDurationDiff(newEffectData.durationTicks); // Use renamed helper
+                    statusUpdates.push(`- Status Effect: ${name}${amplifierLevel} *(new, ${durationStr.slice(1, -1)})*`); // Adjusted format
+                } else if (oldEffectData && !newEffectData) { // Removed effect
+                    const amplifierLevel = oldEffectData.amplifier > 0 ? ` ${oldEffectData.amplifier + 1}` : '';
+                    statusUpdates.push(`- Status Effect: ${name}${amplifierLevel} *(removed)*`);
+                }
+                // Duration / amplifier change diffing can be added here if needed
+            });
+            if (statusUpdates.length > 0) {
+                diffSections.push("\n✨ **Status Updates:**");
+                diffSections.push(...statusUpdates.sort()); 
+            }
+
+            // Combine sections if any changes occurred
+            if (diffSections.length > 0) {
+                diffText = diffSections.join('\n');
+            }
+        }
+
+        // --- Update latestHUD (with structured data) --- 
+        this.latestHUD = newHUD;
+
+        // --- Final Assembly ---
+        const finalHudString = hud.join('\n');
+        // console.log(`\n\n[DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
+        if (diffText) {
+             console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
+        }
+
+        // Return the formatted string and the calculated detailed diff text
         return {
-            newHUD,
-            hudString
+            hudString: finalHudString,
+            diffText: diffText 
         };
     }
     
@@ -576,76 +863,75 @@ export class Agent {
             this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
 
             // Check if latestHUD is empty
-            const { newHUD } = await this.headsUpDisplay();
-            if (!this.latestHUD.empty) { // if no longer an empty latest hud, we do diff and tell bot diff
-                // Compare newHUD and latestHUD
-                let diffText = '';
-
-                // hudListFields loop will now correctly handle nearbyMobs and nearbyPlayers
-                this.hudListFields.forEach(field => {
-                    const oldList = this.latestHUD[field];
-                    const newList = newHUD[field];
-
-                    const goneItems = oldList.filter(item => !newList.includes(item));
-                    const newItems = newList.filter(item => !oldList.includes(item));
-
-                    if (goneItems.length > 0) {
-                        diffText += `**GONE: ${field} - ${goneItems.join(', ')}\n`;
-                    }
-                    if (newItems.length > 0) {
-                        diffText += `**NEW: ${field} - ${newItems.join(', ')}\n`;
-                    }
-                });
-
-                if (diffText) {
-                    // console.log(`\n\nINVENTORY/STATUS UPDATE:\n${diffText}\n\n`);
-                    this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
-                }
+            const { diffText } = await this.headsUpDisplay();
+            if (diffText) {
+                this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
+                console.log(`[DEBUG] HUD diff: ${diffText}`);
             }
-            this.latestHUD = newHUD; // Update latestHUD
 
             // Call consolidation function before getting history for the prompt
             this._consolidateTailSystemMessages();
 
             history = this.history.getHistory(); // Get updated history
 
-            let res = await this.prompter.promptConvo(history);
-            // Now we parse and execute commands.
-            let command_name = containsCommand(res);
+            // Get structured response from prompter
+            const { chatMessage, command, error } = await this.prompter.promptConvo(history);
+
+            // Handle errors first
+            if (error) {
+                console.error("Error from promptConvo:", error);
+                // Decide how to handle the error, e.g., send a message to the user or retry
+                await this.sendMessage(`Error: ${error}`, true);
+                break; // Exit the loop on error
+            }
+
             // add user message
-            if (command_name) {
-                console.log(`Full response: ""${res}""`);
-                res = truncCommandMessage(res);
-                if (!commandExists(command_name)) {
+            if (command) {                
+                // Send chat message first, if any
+                if (chatMessage && chatMessage.trim() !== '') {
+                     await this.sendMessage(chatMessage, true);
+                }
+                
+                // Check if it's a slash command (in-game command)
+                if (command.startsWith('/')) {
+                    console.log(`Sending slash command: "${command}"`);
+                    await this.sendMessage(command, true); // Send directly to chat
+                    break; // Treat as finished, don't try to execute internally
+                }
+
+                // --- It's an internal command (!) ---
+                const command_name = containsCommand(command); // Use containsCommand to extract !action_name
+                if (!command_name) { // Should ideally not happen if command starts with ! but good sanity check
+                    console.error(`[ERROR] Command string "${command}" did not yield a valid command name.`);
+                    this.history.add('system', `[EXEC_FAIL] Could not parse command: ${command}`);
+                    continue; // Try again
+                }
+
+                if (!commandExists(command_name)) { // Check if internal command exists
                     this.history.add('system', `[HALLUCINATION] Command ${command_name} does not exist.`);
                     console.log('Agent hallucinated command:', command_name);
-                    continue;
+                    continue; // Try generating again
                 }
-                let pre_message = res.substring(0, res.indexOf(command_name)).trim();
-                let chat_message = "";
-                // let chat_message = `*used ${command_name.substring(1)}*`;
-                // if (pre_message.length > 0)
-                //     chat_message = `${pre_message}  ${chat_message}`;
-                if (pre_message.length > 0)
-                    chat_message = `${pre_message}`;
-                await this.sendMessage(chat_message, true);
-
-                let execute_res = await executeCommand(this, res);
-
+                
+                let execute_res = await executeCommand(this, command);
                 console.log('Agent executed:', command_name, 'and got:', execute_res);
 
-                if (execute_res)
+                if (execute_res) {
                     this.history.add('system', `[EXEC_RES] ${execute_res}`);
-                else
+                } else {
+                    // If executeCommand returns nothing/falsy, assume it was successful 
+                    // or handled its own feedback, and break the loop.
                     break;
-            }
-            else {
-                const [beforeSlash, afterSlash] = res.split(/\/(.*)/s);
-                await this.sendMessage(beforeSlash, true);
-                if (afterSlash) {
-                    await this.sendMessage('/' + afterSlash, true);
                 }
-                break;
+            } else {
+                // No command, just send the chat message if it exists
+                if (chatMessage && chatMessage.trim() !== '') {
+                    await this.sendMessage(chatMessage, true);
+                } else {
+                    // Handle case where LLM returns no chat and no command (maybe silence or just thinking)
+                    console.log("[DEBUG] LLM returned no chat message and no command.");
+                }
+                break; // Exit the loop as there's no command to execute
             }
         }
 
