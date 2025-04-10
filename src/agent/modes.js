@@ -306,12 +306,10 @@ const modes = [
 
             // If new, unreported rare blocks were found
             if (newlyFoundBlocks.length > 0) {
-                console.log(`[RARE FIND DEBUG] Found ${newlyFoundBlocks.length} new rare blocks.`);
                 // Add them to the cache immediately
                 newlyFoundBlocks.forEach(block => {
                     const posStr = `${block.position.x},${block.position.y},${block.position.z}`;
                     reportedCache.add(posStr);
-                    console.log(`[RARE FIND DEBUG] Caching ${block.name} at ${posStr}`);
                 });
 
                 // Emit the event with the list of new blocks
