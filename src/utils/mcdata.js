@@ -73,7 +73,7 @@ class MCData {
         
         const dontAttack = [
             'wolf', 'bee', 'polar_bear', 'llama', 'trader_llama', 'allay',
-            'panda', 'iron_golem', 'enderman', 'zombified_piglin', 'cat'
+            'panda', 'iron_golem', 'enderman', 'zombified_piglin', 'cat', 'piglin'
         ];
         
         if (dontAttack.includes(mob.name.toLowerCase())) {

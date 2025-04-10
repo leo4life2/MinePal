@@ -432,6 +432,499 @@ export async function clearNearestFurnace(bot) {
   return true;
 }
 
+export async function sowSeeds(bot, seedType) {
+  /**
+   * Sow seeds on nearby tilled soil.
+   * @param {MinecraftBot} bot, reference to the minecraft bot.
+   * @param {string} seedType, the type of seed to sow.
+   * @returns {Promise<boolean>} true if the seeds were sown, false otherwise.
+   * @example
+   * await skills.sowSeeds(bot, "wheat_seeds");
+   **/
+  if (seedType.endsWith("seed") && !seedType.endsWith("seeds")) seedType += "s"; // fixes common mistake
+
+  let seeds = bot.inventory.items().find((item) => item.name === seedType);
+  if (!seeds) {
+    log(bot, `No ${seedType} to plant.`);
+    return false;
+  }
+
+  await bot.equip(seeds, "hand");
+
+  const tilledSoilBlocks = bot.findBlocks({
+    matching: (block) => block.name === "farmland",
+    maxDistance: 16,
+    count: 64,
+    useExtraInfo: (block) => {
+      const blockAbove = bot.blockAt(block.position.offset(0, 1, 0));
+      return !blockAbove || blockAbove.type === 0;
+    },
+  });
+
+  if (tilledSoilBlocks.length === 0) {
+    log(bot, `No tilled soil found nearby.`);
+    return false;
+  }
+
+  for (const toSowBlock of tilledSoilBlocks) {
+    const block = bot.blockAt(
+      new Vec3(toSowBlock.x, toSowBlock.y, toSowBlock.z)
+    );
+    const distance = bot.entity.position.distanceTo(block.position);
+    if (distance > NEAR_DISTANCE) {
+      await goToPosition(
+        bot,
+        block.position.x,
+        block.position.y,
+        block.position.z,
+        2
+      );
+    }
+
+    await bot.placeBlock(block, new Vec3(0, 1, 0));
+  }
+  log(bot, `Planted ${seedType} on ${tilledSoilBlocks.length} blocks.`);
+
+  return true;
+}
+
+export async function buildHouse(bot, houseType) {
+    const designsDir = path.join(__dirname, '../npc/construction');
+    const designFiles = fs.readdirSync(designsDir).filter(file => file.endsWith('.json'));
+    const designNames = designFiles.map(file => file.replace('.json', ''));
+
+    if (!designNames.includes(houseType)) {
+        log(bot, `Invalid design '${houseType}'. Available designs: ${designNames.join(', ')}`);
+        return null;
+    }
+
+    const filePath = path.join(designsDir, `${houseType}.json`);
+    const data = fs.readFileSync(filePath, 'utf8');
+    const design = JSON.parse(data);
+
+    const specialBlocks = {
+        bed: item => item.name.endsWith('_bed'),
+        log: item => item.name.endsWith('_log'),
+        planks: item => item.name.endsWith('_planks'),
+        door: item => item.name.endsWith('_door'),
+        trapdoor: item => item.name.endsWith('_trapdoor'),
+        fence: item => item.name.endsWith('_fence') && !item.name.endsWith('_fence_gate'),
+        fence_gate: item => item.name.endsWith('_fence_gate'),
+        stairs: item => item.name.endsWith('_stairs'),
+        slab: item => item.name.endsWith('_slab'),
+        button: item => item.name.endsWith('_button'),
+        pressure_plate: item => item.name.endsWith('_pressure_plate'),
+        sign: item => item.name.endsWith('_sign'),
+        banner: item => item.name.endsWith('_banner'),
+        carpet: item => item.name.endsWith('_carpet'),
+        shulker_box: item => item.name.endsWith('_shulker_box'),
+        terracotta: item => item.name.endsWith('_terracotta') && !item.name.startsWith('glazed'),
+        concrete: item => item.name.endsWith('_concrete') && !item.name.endsWith('_powder'),
+        concrete_powder: item => item.name.endsWith('_concrete_powder'),
+        glazed_terracotta: item => item.name.endsWith('_glazed_terracotta')
+    };
+
+    const blocks = design.blocks.flat(2).filter(block => block !== "");
+    const inventoryCounts = world.getInventoryCounts(bot);
+
+    const requiredBlocks = blocks.reduce((acc, block) => {
+        acc[block] = (acc[block] || 0) + 1;
+        return acc;
+    }, {});
+    let missingBlocks = [];
+    for (const [block, count] of Object.entries(requiredBlocks)) {
+        if (block !== 'air') {
+            let found = false;
+            if (specialBlocks[block]) {
+                console.log(`Checking special block: ${block}`);
+                const totalCount = bot.inventory.items().reduce((sum, item) => {
+                    if (specialBlocks[block](item)) {
+                        sum += inventoryCounts[item.name];
+                    }
+                    return sum;
+                }, 0);
+                found = totalCount >= count;
+                console.log(`Block: ${block}, Total Count: ${totalCount}, Required: ${count}, Found: ${found}`);
+            } else {
+                console.log(`Checking regular block: ${block}`);
+                found = inventoryCounts[block] && inventoryCounts[block] >= count;
+                console.log(`Block: ${block}, Count: ${inventoryCounts[block]}, Required: ${count}, Found: ${found}`);
+            }
+            if (!found) {
+                missingBlocks.push(`Not enough ${block}. Required: ${count}, Available: ${inventoryCounts[block] || 0}`);
+            }
+        }
+    }
+    if (missingBlocks.length > 0) {
+        log(bot, missingBlocks.join('\n'));
+        return false;
+    }
+
+    const basePos = bot.entity.position;
+    const offset = design.offset < 0 ? design.offset : 0; // Ensure offset is 0 or negative
+
+    // Clear the area if offset is negative
+    let lastBlockName = "";
+    if (offset < 0) {
+        const layersToClear = Math.abs(offset);
+        for (let y = layersToClear - 1; y >= 0; y--) {
+            console.log(design.blocks[y].map(row => row.join(' ')).join('\n'));
+            for (let z = 0; z < design.blocks[y].length; z++) {
+                for (let x = 0; x < design.blocks[y][z].length; x++) {
+                    let blockType = design.blocks[y][z][x];
+                    if (blockType !== "") {
+                        const pos = basePos.offset(x, y + offset, z);
+                        let block = bot.blockAt(pos);
+                        if (block && block.name !== 'air') {
+                            if (block.name !== lastBlockName) {
+                                await bot.tool.equipForBlock(block);
+                                lastBlockName = block.name;
+                            }
+                            if (bot.entity.position.distanceTo(pos) > NEAR_DISTANCE) {
+                                await goToPosition(bot, pos.x, pos.y, pos.z);
+                            }
+                            await bot.dig(block);
+                        }
+                        if (bot.interrupt_code) {
+                            log(bot, "Interrupted Build House");
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    const delayedBlocks = [];
+
+    const placeBlockAtPosition = async (block, pos) => {
+        const currentBlock = bot.blockAt(pos);
+        if (block === "air" && currentBlock.name !== "air") {
+            if (bot.entity.position.distanceTo(pos) > NEAR_DISTANCE) {
+                await goToPosition(bot, pos.x, pos.y, pos.z);
+            }
+            await bot.dig(currentBlock);
+        } else if (block !== "air" && block !== "") {
+            if (specialBlocks[block]) {
+                const item = bot.inventory.items().find(specialBlocks[block]);
+                if (item) {
+                    block = item.name;
+                } else {
+                    log(bot, `No ${block} found in inventory to place at ${pos}.`);
+                    return false;
+                }
+            }
+            if (bot.entity.position.distanceTo(pos) > NEAR_DISTANCE) {
+                await goToPosition(bot, pos.x, pos.y, pos.z);
+            }
+            await placeBlock(bot, block, pos.x, pos.y, pos.z);
+        }
+    };
+
+    for (let y = 0; y < design.blocks.length; y++) {
+        for (let z = 0; z < design.blocks[y].length; z++) {
+            for (let x = 0; x < design.blocks[y][z].length; x++) {
+                let block = design.blocks[y][z][x];
+                const pos = basePos.offset(x, y + offset, z);
+
+                if (block === "bed" || block === "door") {
+                    delayedBlocks.push({ block, pos });
+                } else {
+                    await placeBlockAtPosition(block, pos);
+                }
+                if (bot.interrupt_code) {
+                    log(bot, "Interrupted Build House");
+                    return false
+                }
+            }
+        }
+    }
+
+    for (const { block, pos } of delayedBlocks) {
+        await placeBlockAtPosition(block, pos);
+        if (bot.interrupt_code) {
+            log(bot, "Interrupted Build House");
+            return false
+        }
+    }
+
+    log(bot, `${houseType} built successfully.`);
+    return true;
+}
+
+export async function tameMob(bot, mobType) {
+  /**
+   * Tame a nearby untamed cat or wolf.
+   * @param {MinecraftBot} bot, reference to the minecraft bot.
+   * @param {string} mobType, the type of mob to tame ('cat' or 'wolf').
+   * @returns {Promise<boolean>} true if the mob was tamed, false otherwise.
+   * @example
+   * await skills.tameMob(bot, "cat");
+   * await skills.tameMob(bot, "wolf");
+   **/
+  
+  const tamingItems = {
+    cat: ["cod", "salmon"],
+    wolf: ["bone"]
+  };
+
+  if (!tamingItems[mobType]) {
+    log(bot, `Can only tame cats or wolves, not ${mobType}.`);
+    return false;
+  }
+
+  // Find required taming item in inventory
+  const validItems = tamingItems[mobType];
+  let tamingItem = null;
+  for (const itemName of validItems) {
+    const item = bot.inventory.items().find(item => item.name === itemName);
+    if (item) {
+      tamingItem = item;
+      break;
+    }
+  }
+
+  if (!tamingItem) {
+    log(bot, `You need ${validItems.join(" or ")} to tame a ${mobType}.`);
+    return false;
+  }
+
+  // Find nearest untamed mob
+  // Replaced getNearbyEntities with await getVisibleEntities
+  const visibleEntities = await world.getVisibleEntities(bot);
+  let targetMob = null;
+  
+  // Need to sort by distance if we want the nearest visible
+  visibleEntities.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+
+  for (const entity of visibleEntities) {
+    if (entity.name !== mobType) continue;
+    
+    // Check if any metadata value is a UUID (contains dashes)
+    const isTamed = entity.metadata.some(meta => 
+      typeof meta === 'string' && meta.includes('-')
+    );
+    
+    if (!isTamed) {
+      targetMob = entity;
+      break; // Found the nearest untamed one
+    }
+  }
+
+  if (!targetMob) {
+    log(bot, `No untamed ${mobType} found among visible entities.`); // Updated log message
+    return false;
+  }
+
+  // Equip taming item and use it on the mob
+  await bot.equip(tamingItem, "hand");
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (attempts < maxAttempts) {
+    try {
+      const distance = bot.entity.position.distanceTo(targetMob.position);
+      
+      // For cats, manage crouching based on distance
+      if (mobType === 'cat') {
+        if (distance > 12) { // Too far, need to catch up
+          stopCrouching(bot);
+        } else if (distance <= 10) { // Close enough to be stealthy
+          startCrouching(bot);
+        }
+      }
+
+      // Move closer if needed
+      if (distance > NEAR_DISTANCE) {
+        await goToPosition(
+          bot,
+          targetMob.position.x,
+          targetMob.position.y,
+          targetMob.position.z,
+          2
+        );
+      }
+      
+      await bot.lookAt(targetMob.position.offset(0, 0.5, 0));
+      await bot.useOn(targetMob);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait to see if taming succeeded
+
+      // Check if any metadata value is a UUID (contains dashes)
+      const isTamed = targetMob.metadata.some(meta => 
+        typeof meta === 'string' && meta.includes('-')
+      );
+      
+      if (isTamed) {
+        if (mobType === 'cat') {
+          stopCrouching(bot);
+        }
+        log(bot, `Successfully tamed ${mobType}!`);
+
+        // make pet stand if it's sitting
+        await bot.unequip('hand');  // Unequip food/bone first
+        await bot.lookAt(targetMob.position.offset(0, 0.5, 0));
+        await bot.useOn(targetMob);
+        return true;
+      }
+      
+      attempts++;
+    } catch (err) {
+      if (mobType === 'cat') {
+        stopCrouching(bot);
+      }
+      log(bot, `Failed to use ${tamingItem.name} on ${mobType}: ${err.message}`);
+      return false;
+    }
+  }
+
+  if (mobType === 'cat') {
+    stopCrouching(bot);
+  }
+  log(bot, `Failed to tame ${mobType} after ${maxAttempts} attempts.`);
+  return false;
+}
+
+// Added function to handle attacking multiple creatures sequentially
+export async function attackMultipleCreatures(bot, mobType, count) {
+  /**
+   * Attacks and kills a specified number of the nearest creatures of a given type sequentially.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} mobType - The type of creature to attack.
+   * @param {number} count - The number of creatures to attack and kill.
+   * @returns {Promise<string>} A message summarizing the outcome.
+   */
+  bot.modes.pause("cowardice");
+  let killedCount = 0;
+  const maxRange = 24; // Note: maxRange is no longer used by getVisibleEntities
+
+  for (let i = 0; i < count; i++) {
+    if (bot.interrupt_code) {
+      const message = `Attack sequence interrupted after killing ${killedCount} ${mobType}(s).`;
+      log(bot, message);
+      return message;
+    }
+
+    // Find the *current* nearest visible creature of the specified type in each iteration
+    // Replaced getNearbyEntities with await getVisibleEntities
+    const visibleEntities = await world.getVisibleEntities(bot); 
+
+    // Need to sort by distance to find the nearest one
+    visibleEntities.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+    
+    const target = visibleEntities.find(
+      (entity) => entity !== bot.entity && entity.name === mobType
+    );
+
+    if (!target) {
+      // Keep final log for no more targets
+      const message = killedCount > 0
+        ? `Successfully killed ${killedCount} ${mobType}(s). Could not find any more visible nearby.` // Updated log
+        : `Could not find any ${mobType} visible nearby to attack.`; // Updated log
+      log(bot, message);
+      return message;
+    }
+
+    const success = await attackEntity(bot, target, true); // Call attackEntity to handle the kill
+
+    if (success) {
+      killedCount++;
+    } else {
+      // attackEntity returned false, likely due to interruption or error during combat
+      const message = `Attack sequence stopped after killing ${killedCount} ${mobType}(s) due to an issue killing target #${i+1}.`;
+      log(bot, message);
+      return message;
+    }
+    
+    // Small delay to allow things to settle (e.g., item drops)
+    await new Promise(resolve => setTimeout(resolve, 300)); 
+  }
+
+  const finalMessage = `Successfully completed attack sequence. Killed ${killedCount} ${mobType}(s).`;
+  log(bot, finalMessage);
+  return finalMessage;
+}
+
+export async function editSign(bot, blockName, positionString, frontText, backText) {
+  /**
+   * Edits the text on a specific sign block.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} blockName - The name of the sign block (e.g., "oak_sign").
+   * @param {string} positionString - The position of the sign in format "(x,y,z)".
+   * @param {string} frontText - The text to set on the front of the sign.
+   * @param {string} backText - The text to set on the back of the sign.
+   * @returns {Promise<string>} A message indicating success or failure.
+   */
+  // Validate block name
+  if (!blockName || !blockName.includes("sign")) {
+    const message = `Invalid block name provided: "${blockName}". It must be a sign block type.`;
+    log(bot, message);
+    return message;
+  }
+
+  // Parse position string
+  let positionVec;
+  try {
+    const coords = positionString.match(/\((-?\d+(\.\d+)?),(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)\)/);
+    if (!coords || coords.length < 6) {
+      throw new Error("Invalid position string format. Expected (x,y,z).");
+    }
+    // Use parseFloat for potentially non-integer coordinates, although block positions are usually integers.
+    positionVec = new Vec3(parseFloat(coords[1]), parseFloat(coords[3]), parseFloat(coords[5])); 
+  } catch (error) {
+    const message = `Failed to parse position string "${positionString}": ${error.message}`;
+    log(bot, message);
+    return message;
+  }
+
+  // Find the block at the specified position
+  const targetBlock = bot.blockAt(positionVec);
+
+  if (!targetBlock) {
+    const message = `Could not find any block at position ${positionString}.`;
+    log(bot, message);
+    return message;
+  }
+
+  // Verify the block is the correct type and is a sign
+  if (targetBlock.name !== blockName) {
+    const message = `Block at ${positionString} is a ${targetBlock.name}, not the expected ${blockName}.`;
+    log(bot, message);
+    return message;
+  }
+  if (!targetBlock.signText) { // Check if the block object has sign capabilities
+    const message = `Block at ${positionString} (${targetBlock.name}) does not appear to be a sign block.`;
+    log(bot, message);
+    return message;
+  }
+
+  // Navigate closer if necessary
+  if (bot.entity.position.distanceTo(targetBlock.position) > NEAR_DISTANCE) {
+    log(bot, `Sign at ${positionString} is too far, moving closer...`);
+    const success = await goToPosition(bot, targetBlock.position.x, targetBlock.position.y, targetBlock.position.z, 2);
+    if (!success) {
+        const message = `Failed to navigate to the sign at ${positionString}.`;
+        log(bot, message);
+        return message;
+    }
+  }
+  
+  // Look at the sign
+  await bot.lookAt(targetBlock.position);
+
+  // Attempt to set the sign text
+  try {
+    // The setSignText method exists on the bot, taking the block object as the first argument
+    await targetBlock.setSignText(frontText, backText); // Corrected: Call on targetBlock
+    const message = `Successfully updated sign at ${positionString}. Front: "${frontText}", Back: "${backText}"`;
+    log(bot, message);
+    return message;
+  } catch (error) {
+    const message = `Failed to edit sign at ${positionString}: ${error.message}`;
+    log(bot, message);
+    return message;
+  }
+}
+
 export async function attackNearest(
   bot,
   mobType,
