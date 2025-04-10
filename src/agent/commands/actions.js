@@ -215,14 +215,21 @@ export const actionsList = [
     }),
   },
   {
-    name: "!smeltItem",
-    description: "Smelt the given item the given number of times.",
+    name: "!smeltWithFurnace",
+    description: "Adds fuel and input items to a specific furnace to begin smelting.",
     params: {
+      furnaceIdentifier: "(string) The identifier of the furnace block in the format '[furnace@(x,y,z)]'.",
       item_name: "(string) The name of the input item to smelt.",
-      num: "(number) The number of times to smelt the item.",
+      fuelItemName: "(string) The name of the item to use as fuel (e.g., 'coal', 'oak_log').",
+      fuelQuantity: "(number) The exact amount of fuel items to add.",
+      num: "(number) The number of input items to add.",
     },
-    perform: wrapExecution(async (agent, recipe_name, num) => {
-      await skills.smeltItem(agent.bot, recipe_name, num);
+    perform: wrapExecution(async (agent, furnaceIdentifier, item_name, fuelItemName, fuelQuantity, num) => {
+      const quantity = parseInt(fuelQuantity);
+      if (isNaN(quantity) || quantity <= 0) {
+          return `Invalid fuelQuantity: ${fuelQuantity}. Must be a positive number.`;
+      }
+      return await skills.smeltWithFurnace(agent.bot, furnaceIdentifier, item_name, fuelItemName, quantity, num);
     }),
   },
   {
@@ -404,23 +411,23 @@ export const actionsList = [
   },
   {
     name: "!lookInFurnace",
-    description: "Look in the nearest furnace and log its contents.",
-    perform: wrapExecution(async (agent) => {
-      const success = await skills.lookInFurnace(agent.bot);
-      return success ? "Furnace contents seen." : "No furnace found nearby.";
+    description: "Look in a specific furnace and log its contents.",
+    params: {
+        furnaceIdentifier: "(string) The identifier of the furnace block in the format '[furnace@(x,y,z)]'."
+    },
+    perform: wrapExecution(async (agent, furnaceIdentifier) => {
+      return await skills.lookInFurnace(agent.bot, furnaceIdentifier);
     }),
   },
   {
     name: "!takeFromFurnace",
-    description: "Take items from the nearest furnace.",
+    description: "Take items from a specific furnace.",
     params: {
-      itemType: "(string) The type of item to take (input, fuel, output).",
+        furnaceIdentifier: "(string) The identifier of the furnace block in the format '[furnace@(x,y,z)]'.",
+        itemType: "(string) The type of item to take (input, fuel, output)."
     },
-    perform: wrapExecution(async (agent, itemType) => {
-      const success = await skills.takeFromFurnace(agent.bot, itemType);
-      return success
-        ? `Successfully took ${itemType} from furnace.`
-        : `Failed to take ${itemType} from furnace.`;
+    perform: wrapExecution(async (agent, furnaceIdentifier, itemType) => {
+        return await skills.takeFromFurnace(agent.bot, furnaceIdentifier, itemType);
     }),
   },
   {

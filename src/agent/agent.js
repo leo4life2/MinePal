@@ -220,7 +220,64 @@ export class Agent {
         this.currentWeatherState = 'clear'; // Track current weather state ('clear', 'rain', 'thunder')
         this.currentDimension = null; // Track current dimension state (null until first spawn)
         this.ownerHurtCooldownActive = false; // Cooldown flag for owner hurt event
+        this.botHurtCooldownActive = false; // Cooldown flag for bot hurt event
         this.reportedRareBlocks = new Set(); // Cache for reported rare block locations (stores "x,y,z")
+    }
+
+    /**
+     * Private helper to identify the likely source of damage to the bot.
+     * @param {MinecraftBot} bot - The bot instance.
+     * @returns {string} A string describing the likely damage source.
+     */
+    _identifyDamageSource(bot) {
+        if (!bot || !bot.entity) return "Unknown"; // Guard clause
+
+        console.log(`[EVENT DEBUG] entity: ${JSON.stringify(bot.entity)}`);
+
+        // Check environmental hazards first
+        if (bot.entity.isInLava) return "Lava";
+        // bot.oxygenLevel doesn't exist, check for bubbles property
+        // if (bot.entity.isInWater && bot.oxygenLevel < 20) return "Drowning";
+        // Alternative drowning check (might need refinement based on game version/specifics)
+        if (bot.entity.isInWater && bot.health < 20) { // Crude check, assumes drowning if in water and health dropping
+             // Check if last damage was recent to correlate
+            if (Date.now() - bot.lastDamageTime < 1500) { // 1.5 seconds threshold
+                return "Drowning";
+            }
+        }
+        if (bot.entity.onFire) return "Fire";
+
+        // Check nearby entities (within 5 blocks)
+        const nearbyEntities = Object.values(bot.entities).filter(e =>
+            e && e.position && bot.entity.position.distanceTo(e.position) < 5 && 
+            e !== bot.entity && // Exclude self
+            e.type !== 'object' && e.type !== 'orb' && e.type !== 'arrow' // Exclude non-damaging/projectile types
+        );
+        
+        // Check nearby hostile entities
+        const hostileMobs = nearbyEntities.filter(e => e.kind === 'Hostile mobs' && e.isValid);
+        if (hostileMobs.length > 0) {
+            // Prioritize the closest hostile mob
+            hostileMobs.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+            return `Hostile mob (${hostileMobs[0].name || 'Unknown'})`;
+        }
+
+        // Check nearby players (PvP)
+        const nearbyPlayers = nearbyEntities.filter(e => e.type === 'player' && e.isValid);
+        if (nearbyPlayers.length > 0) {
+            nearbyPlayers.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+            return `Player (${nearbyPlayers[0].username || 'Unknown'})`;
+        }
+
+        // If no specific source identified, check generic damage causes
+        // Note: Cactus damage might be hard to distinguish without specific event data
+        // Hunger damage usually happens slowly when food is 0
+        if (bot.food === 0 && bot.health < 20 && Date.now() - bot.lastDamageTime < 1500) {
+            return "Starvation";
+        }
+        // Add more checks if possible (e.g., poison, wither effects from status)
+
+        return "Unknown"; // Default if source isn't clear
     }
 
     /**
@@ -862,10 +919,10 @@ export class Agent {
 
         // --- Final Assembly ---
         const finalHudString = hud.join('\n');
-        console.log(`\n\n[DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
-        if (diffText) {
-             console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
-        }
+        // console.log(`\n\n[DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
+        // if (diffText) {
+        //      console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
+        // }
 
         // Return the formatted string and the calculated detailed diff text
         return {
@@ -908,10 +965,9 @@ export class Agent {
 
             // Check if latestHUD is empty
             const { diffText } = await this.headsUpDisplay();
-                if (diffText) {
-                    this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
-                console.log(`[DEBUG] HUD diff: ${diffText}`);
-                }
+            if (diffText) {
+                this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
+            }
 
             // Call consolidation function before getting history for the prompt
             this._consolidateTailSystemMessages();
@@ -925,7 +981,7 @@ export class Agent {
             if (error) {
                 console.error("Error from promptConvo:", error);
                 // Decide how to handle the error, e.g., send a message to the user or retry
-                await this.sendMessage(`Error: ${error}`, true);
+                await this.sendMessage(`${error}`, true);
                 break; // Exit the loop on error
             }
 
@@ -1132,21 +1188,47 @@ export class Agent {
         });
 
         this.bot.on('entityHurt', async (entity) => {
-            if (entity.type === 'player' && entity.username === this.owner) {
-                // Check if cooldown is active
-                if (!this.ownerHurtCooldownActive) {
-                    // Activate cooldown
-                    this.ownerHurtCooldownActive = true;
-                    
-                    const message = `[OWNER HURT] (${this.owner}) was just hurt!`;
-                    // Send the message
-                    await this.handleMessage('system', message);
+            // First, check if the hurt entity is a player
+            if (entity.type === 'player') {
+                // Now check if it's the owner
+                if (entity.username === this.owner) {
+                    // Check if owner hurt cooldown is active
+                    if (!this.ownerHurtCooldownActive) {
+                        // Activate cooldown
+                        this.ownerHurtCooldownActive = true;
+                        
+                        const message = `[OWNER HURT] (${this.owner}) was just hurt!`;
+                        await this.handleMessage('system', message);
 
-                    // Set timeout to deactivate cooldown after 10 seconds
-                    setTimeout(() => {
-                        this.ownerHurtCooldownActive = false;
-                        console.log("[EVENT DEBUG] Owner hurt cooldown reset.");
-                    }, 10000); // 10000 milliseconds = 10 seconds
+                        // Set timeout to deactivate cooldown (using user's 5s)
+                        setTimeout(() => {
+                            this.ownerHurtCooldownActive = false;
+                            console.log("[EVENT DEBUG] Owner hurt cooldown reset.");
+                        }, 5000); 
+                    }
+                } 
+                // Else, check if it's the bot itself
+                else if (entity.username === this.bot.username) { 
+                    // Check if bot hurt cooldown is active
+                    if (!this.botHurtCooldownActive) {
+                        // Activate cooldown
+                        this.botHurtCooldownActive = true;
+
+                        const botHealth = Math.round(this.bot.health);
+                        const damageTaken = Math.round(this.bot.lastDamageTaken);
+                        // Identify damage source
+                        const damageSource = this._identifyDamageSource(this.bot);
+                        
+                        const message = `[SELF HURT] You were just hurt by ${damageSource}! (Damage: ${damageTaken}, Health: ${botHealth}/20)`;
+                        console.log(`[EVENT DEBUG] Bot hurt: ${message}`);
+                        await this.handleMessage('system', message);
+
+                        // Set timeout to deactivate cooldown (using user's 5s)
+                        setTimeout(() => {
+                            this.botHurtCooldownActive = false;
+                            console.log("[EVENT DEBUG] Bot hurt cooldown reset.");
+                        }, 5000); 
+                    }
                 }
             }
         });
