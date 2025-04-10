@@ -2458,3 +2458,372 @@ export async function attackMultipleCreatures(bot, mobType, count) {
   log(bot, finalMessage);
   return finalMessage;
 }
+
+export async function editSign(bot, blockName, positionString, frontText, backText) {
+  /**
+   * Edits the text on a specific sign block.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} blockName - The name of the sign block (e.g., "oak_sign").
+   * @param {string} positionString - The position of the sign in format "(x,y,z)".
+   * @param {string} frontText - The text to set on the front of the sign.
+   * @param {string} backText - The text to set on the back of the sign.
+   * @returns {Promise<string>} A message indicating success or failure.
+   */
+  // Validate block name
+  if (!blockName || !blockName.includes("sign")) {
+    const message = `Invalid block name provided: "${blockName}". It must be a sign block type.`;
+    log(bot, message);
+    return message;
+  }
+
+  // Parse position string
+  let positionVec;
+  try {
+    const coords = positionString.match(/\((-?\d+(\.\d+)?),(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)\)/);
+    if (!coords || coords.length < 6) {
+      throw new Error("Invalid position string format. Expected (x,y,z).");
+    }
+    // Use parseFloat for potentially non-integer coordinates, although block positions are usually integers.
+    positionVec = new Vec3(parseFloat(coords[1]), parseFloat(coords[3]), parseFloat(coords[5])); 
+  } catch (error) {
+    const message = `Failed to parse position string "${positionString}": ${error.message}`;
+    log(bot, message);
+    return message;
+  }
+
+  // Find the block at the specified position
+  const targetBlock = bot.blockAt(positionVec);
+
+  if (!targetBlock) {
+    const message = `Could not find any block at position ${positionString}.`;
+    log(bot, message);
+    return message;
+  }
+
+  // Verify the block is the correct type and is a sign
+  if (targetBlock.name !== blockName) {
+    const message = `Block at ${positionString} is a ${targetBlock.name}, not the expected ${blockName}.`;
+    log(bot, message);
+    return message;
+  }
+  if (!targetBlock.signText) { // Check if the block object has sign capabilities
+    const message = `Block at ${positionString} (${targetBlock.name}) does not appear to be a sign block.`;
+    log(bot, message);
+    return message;
+  }
+
+  // Navigate closer if necessary
+  if (bot.entity.position.distanceTo(targetBlock.position) > NEAR_DISTANCE) {
+    log(bot, `Sign at ${positionString} is too far, moving closer...`);
+    const success = await goToPosition(bot, targetBlock.position.x, targetBlock.position.y, targetBlock.position.z, 2);
+    if (!success) {
+        const message = `Failed to navigate to the sign at ${positionString}.`;
+        log(bot, message);
+        return message;
+    }
+  }
+  
+  // Look at the sign
+  await bot.lookAt(targetBlock.position);
+
+  // Attempt to set the sign text
+  try {
+    // The setSignText method exists on the bot, taking the block object as the first argument
+    await targetBlock.setSignText(frontText, backText); // Corrected: Call on targetBlock
+    const message = `Successfully updated sign at ${positionString}. Front: "${frontText}", Back: "${backText}"`;
+    log(bot, message);
+    return message;
+  } catch (error) {
+    const message = `Failed to edit sign at ${positionString}: ${error.message}`;
+    log(bot, message);
+    return message;
+  }
+}
+
+// --- Container Interaction Skills (Refactored) ---
+
+async function _getAndValidateContainer(bot, containerIdentifier) {
+  /** 
+   * Helper function to parse identifier, find, validate, and navigate to a container block.
+   * @returns {Promise<{targetBlock: Block | null, errorMsg: string | null}>}
+   */
+  let blockName = '';
+  let positionString = '';
+  let errorMsg = null;
+  let positionVec = null;
+
+  // 1. Parse Identifier
+  if (!containerIdentifier || !containerIdentifier.startsWith('[') || !containerIdentifier.endsWith(']')) {
+    errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Expected format '[block_name@(x,y,z)]'. Missing brackets.`;
+  } else {
+    const atIndex = containerIdentifier.indexOf('@');
+    const openParenIndex = containerIdentifier.indexOf('(');
+    if (atIndex === -1 || openParenIndex === -1 || openParenIndex <= atIndex) {
+      errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Expected format '[block_name@(x,y,z)]'. Missing or misplaced '@' or '('.`;
+    } else {
+      blockName = containerIdentifier.slice(1, atIndex);
+      positionString = containerIdentifier.slice(atIndex + 1, -1);
+      if (!blockName) {
+        errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Block name is empty.`;
+      }
+      if (!positionString.startsWith('(') || !positionString.endsWith(')')) {
+        errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Position part is invalid: ${positionString}.`;
+      } else {
+        // 1b. Parse Position String into Vec3
+        try {
+          const coords = positionString.match(/\((-?\d+(\.\d+)?),(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)\)/);
+          if (!coords || coords.length < 6) throw new Error("Regex failed to parse coordinates.");
+          positionVec = new Vec3(parseFloat(coords[1]), parseFloat(coords[3]), parseFloat(coords[5]));
+        } catch (error) {
+          errorMsg = `Failed to parse position string \"${positionString}\" from identifier \"${containerIdentifier}\": ${error.message}`;
+        }
+      }
+    }
+  }
+
+  if (errorMsg) {
+    log(bot, errorMsg);
+    return { targetBlock: null, errorMsg };
+  }
+
+  // 2. Find the block
+  const targetBlock = bot.blockAt(positionVec);
+  if (!targetBlock) {
+    errorMsg = `Could not find any block at position ${positionString} from identifier ${containerIdentifier}.`;
+    log(bot, errorMsg);
+    return { targetBlock: null, errorMsg };
+  }
+
+  // 3. Validate Block Type
+  if (targetBlock.name !== blockName) {
+    errorMsg = `Block at ${positionString} is a ${targetBlock.name}, not the expected ${blockName} from identifier ${containerIdentifier}.`;
+    log(bot, errorMsg);
+    return { targetBlock: null, errorMsg };
+  }
+  
+  // 4. Validate if it's a container (basic check)
+  //    Note: More robust check might involve bot.registry.blocksByName[blockName]?.container? 
+  //    but openContainer failure is also a good indicator.
+  if (typeof bot.openContainer !== 'function') { 
+    errorMsg = `Internal error: bot.openContainer function not available. Cannot interact with container ${containerIdentifier}.`;
+    log(bot, errorMsg);
+    return { targetBlock: null, errorMsg }; 
+  }
+  // Further check implicitly happens when trying to open it.
+
+  // 5. Navigate if necessary
+  if (bot.entity.position.distanceTo(targetBlock.position) > NEAR_DISTANCE) {
+    log(bot, `Container ${containerIdentifier} is too far, moving closer...`);
+    const success = await goToPosition(bot, targetBlock.position.x, targetBlock.position.y, targetBlock.position.z, 2);
+    if (!success) {
+      errorMsg = `Failed to navigate to the container ${containerIdentifier}.`;
+      log(bot, errorMsg);
+      return { targetBlock: null, errorMsg };
+    }
+  }
+
+  return { targetBlock, errorMsg: null }; // Success
+}
+
+export async function lookInContainer(bot, containerIdentifier) {
+  /**
+   * Look in a specific container block and log its contents.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} containerIdentifier - The identifier string, e.g., '[chest@(x,y,z)]'.
+   * @returns {Promise<string>} A message summarizing the contents or an error.
+   */
+  const { targetBlock, errorMsg } = await _getAndValidateContainer(bot, containerIdentifier);
+  if (errorMsg) return errorMsg; // Error already logged by helper
+
+  let container;
+  try {
+    container = await bot.openContainer(targetBlock);
+  } catch (err) {
+    const message = `Failed to open container ${containerIdentifier}: ${err.message}`;
+    log(bot, message);
+    return message;
+  }
+
+  const itemsInContainer = container.containerItems().map((item) => `${item.name} x${item.count}`);
+  let message;
+  if (itemsInContainer.length === 0) {
+    message = `Container ${containerIdentifier} is empty.`;
+  } else {
+    message = `Container ${containerIdentifier} contents:\n- ` + itemsInContainer.join('\n- ');
+  }
+  log(bot, message); 
+
+  try {
+    await container.close();
+  } catch (closeErr) {
+    // Non-critical, just log
+    console.warn(`Error closing container ${containerIdentifier}: ${closeErr.message}`);
+  }
+  return message; // Return the content summary
+}
+
+export async function depositToContainer(bot, containerIdentifier, itemsString) {
+  /**
+   * Deposit specified items into a specific container block.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} containerIdentifier - The identifier string, e.g., '[chest@(x,y,z)]'.
+   * @param {string} itemsString - The items to deposit: 'item1:qty1,item2:qty2,...'.
+   * @returns {Promise<string>} A message summarizing the deposit action or an error.
+   */
+  const { targetBlock, errorMsg: validationError } = await _getAndValidateContainer(bot, containerIdentifier);
+  if (validationError) return validationError; 
+
+  // Parse items string
+  const itemsList = itemsString.split(',').map(item => {
+      const [name, quantity] = item.split(':');
+      const qty = parseInt(quantity, 10);
+      if (!name || isNaN(qty) || qty <= 0) return null;
+      return { name, quantity: qty };
+  }).filter(item => item !== null);
+
+  if (itemsList.length === 0) {
+    const message = `Invalid or empty items string provided: \"${itemsString}\". Format: 'item1:qty1,item2:qty2,...'`;
+    log(bot, message);
+    return message;
+  }
+
+  let container;
+  try {
+    container = await bot.openContainer(targetBlock);
+  } catch (err) {
+    const message = `Failed to open container ${containerIdentifier}: ${err.message}`;
+    log(bot, message);
+    return message;
+  }
+
+  let depositedSummary = [];
+  let errorSummary = [];
+
+  for (const { name, quantity } of itemsList) {
+    const itemInInventory = bot.inventory.items().find(invItem => invItem.name === name);
+    if (!itemInInventory) {
+      errorSummary.push(`You do not have any ${name} to deposit.`);
+      continue; 
+    }
+    // Cannot deposit more than available
+    const depositAmount = Math.min(quantity, itemInInventory.count); 
+    if (depositAmount <= 0) continue; // Should not happen with parsing check, but safe
+
+    try {
+      await container.deposit(itemInInventory.type, null, depositAmount);
+      depositedSummary.push(`${depositAmount} ${name}`);
+    } catch (err) {
+      errorSummary.push(`Could not deposit ${depositAmount} ${name}: ${err.message}`);
+    }
+    if (bot.interrupt_code) {
+        errorSummary.push("Deposit action interrupted.");
+        break;
+    }
+  }
+
+  try {
+    await container.close();
+  } catch (closeErr) {
+      console.warn(`Error closing container ${containerIdentifier}: ${closeErr.message}`);
+  }
+
+  // Construct final message
+  let finalMessage = `Deposit action for ${containerIdentifier}:
+`;
+  if (depositedSummary.length > 0) {
+    finalMessage += `- Deposited: ${depositedSummary.join(', ')}.\n`;
+  }
+  if (errorSummary.length > 0) {
+    finalMessage += `- Errors: ${errorSummary.join('; ')}.`;
+  }
+  if (depositedSummary.length === 0 && errorSummary.length === 0) {
+      finalMessage += `- No items were specified or found to deposit.`;
+  }
+
+  log(bot, finalMessage); // Log the detailed message
+  return finalMessage;
+}
+
+export async function withdrawFromContainer(bot, containerIdentifier, itemsString) {
+  /**
+   * Withdraw specified items from a specific container block.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} containerIdentifier - The identifier string, e.g., '[chest@(x,y,z)]'.
+   * @param {string} itemsString - The items to withdraw: 'item1:qty1,item2:qty2,...'.
+   * @returns {Promise<string>} A message summarizing the withdrawal action or an error.
+   */
+  const { targetBlock, errorMsg: validationError } = await _getAndValidateContainer(bot, containerIdentifier);
+  if (validationError) return validationError;
+
+  // Parse items string
+  const itemsList = itemsString.split(',').map(item => {
+      const [name, quantity] = item.split(':');
+      const qty = parseInt(quantity, 10);
+      if (!name || isNaN(qty) || qty <= 0) return null;
+      return { name, quantity: qty };
+  }).filter(item => item !== null);
+
+  if (itemsList.length === 0) {
+    const message = `Invalid or empty items string provided: \"${itemsString}\". Format: 'item1:qty1,item2:qty2,...'`;
+    log(bot, message);
+    return message;
+  }
+
+  let container;
+  try {
+    container = await bot.openContainer(targetBlock);
+  } catch (err) {
+    const message = `Failed to open container ${containerIdentifier}: ${err.message}`;
+    log(bot, message);
+    return message;
+  }
+
+  let withdrawnSummary = [];
+  let errorSummary = [];
+
+  for (const { name, quantity } of itemsList) {
+    const itemInContainer = container.containerItems().find(contItem => contItem.name === name);
+    if (!itemInContainer) {
+      errorSummary.push(`No ${name} found in the container.`);
+      continue;
+    }
+    // Cannot withdraw more than available
+    const withdrawAmount = Math.min(quantity, itemInContainer.count);
+    if (withdrawAmount <= 0) continue;
+
+    try {
+      await container.withdraw(itemInContainer.type, null, withdrawAmount);
+      withdrawnSummary.push(`${withdrawAmount} ${name}`);
+    } catch (err) { 
+      errorSummary.push(`Could not withdraw ${withdrawAmount} ${name}: ${err.message}`);
+    }
+    if (bot.interrupt_code) {
+        errorSummary.push("Withdraw action interrupted.");
+        break;
+    }
+  }
+
+  try {
+    await container.close();
+  } catch (closeErr) {
+      console.warn(`Error closing container ${containerIdentifier}: ${closeErr.message}`);
+  }
+
+  // Construct final message
+  let finalMessage = `Withdraw action for ${containerIdentifier}:
+`;
+  if (withdrawnSummary.length > 0) {
+    finalMessage += `- Withdrew: ${withdrawnSummary.join(', ')}.\n`;
+  }
+  if (errorSummary.length > 0) {
+    finalMessage += `- Errors: ${errorSummary.join('; ')}.`;
+  }
+  if (withdrawnSummary.length === 0 && errorSummary.length === 0) {
+      finalMessage += `- No items were specified or found to withdraw.`;
+  }
+
+  log(bot, finalMessage); // Log the detailed message
+  return finalMessage;
+}
+
+// --- End Container Interaction Skills ---

@@ -484,7 +484,7 @@ export class Agent {
                         const amplifierLevel = amplifier > 0 ? ` ${amplifier + 1}` : '';
                         const durationStr = formatDurationDiff(durationTicks); // Use helper for display
                         activeEffectsDisplay.push(`${name}${amplifierLevel} ${durationStr}`.trim());
-                    } else {
+        } else {
                          console.warn(`[HUD Effects] Unknown effect ID: ${effectData.id}`);
                          // Optionally handle display of unknown effects
                     }
@@ -497,9 +497,18 @@ export class Agent {
         hud.push(`- **Status Effects:** ${effectsDisplayString}`);
 
 
-        // == EQUIPMENT == (Display only, not needed for new diff format)
+        // == EQUIPMENT == (Display only)
         hud.push("\n## 🛡️ EQUIPMENT");
-        // ... (Armor, Off-Hand display logic as before) ...
+        const armorSlots = { Head: 5, Torso: 6, Legs: 7, Feet: 8 };
+        let armorStrings = [];
+        for (const [name, slotIndex] of Object.entries(armorSlots)) {
+             const item = inventory.slots[slotIndex];
+             armorStrings.push(`${name}: ${item ? item.name : "empty"}`);
+        }
+        hud.push(`- **Armor:** ${armorStrings.join(' | ')}`);
+        const offHandItem = this.bot.supportFeature("doesntHaveOffHandSlot") ? null : inventory.slots[45];
+        hud.push(`- **Off-Hand:** ${offHandItem ? offHandItem.name : "empty"}`);
+
 
 
         // == INVENTORY == (Populate newHUD.inventory)
@@ -566,72 +575,107 @@ export class Agent {
 
         nearbyBlockObjects.forEach(block => {
             const dist = parseFloat(calculateDistance(botPos, block.position).toFixed(0));
-            const posCoords = `(${block.position.x.toFixed(0)},${block.position.y.toFixed(0)},${block.position.z.toFixed(0)})`;
-            const posStr = `@${posCoords}`; // Includes @
+            // Store raw coords for comparison
+            const x = Math.round(block.position.x);
+            const y = Math.round(block.position.y);
+            const z = Math.round(block.position.z);
+            const posCoordsDisplay = `(${x},${y},${z})`; // For display key/string
+            const posStr = `@${posCoordsDisplay}`; // Includes @ for display string
             const blockKey = `${block.name}${posStr}`; // Unique key for map
+            let isSign = false;
+            let isContainer = false;
+            let textFront = null;
+            let textBack = null;
             let isUniquelyTracked = false;
 
             if (block.name.includes('sign')) {
                 isUniquelyTracked = true;
-                let textSuffix = '';
+                isSign = true;
                 try {
                     const signTexts = block.getSignText();
                     if (signTexts && Array.isArray(signTexts)) {
-                        const front = signTexts[0]?.trim();
-                        const back = signTexts[1]?.trim();
-                        // Format for diff display needs
-                        if (front) textSuffix += ` | Front: "${front}"`;
-                        if (back) textSuffix += ` | Back: "${back}"`; 
+                        textFront = signTexts[0]?.trim() || null;
+                        textBack = signTexts[1]?.trim() || null;
                     }
                 } catch (err) { /* Ignore */ }
-                // Store raw data needed for diff, maybe just name, coords, text?
+                let textSuffix = '';
+                if (textFront) textSuffix += ` | Front: "${textFront}"`;
+                if (textBack) textSuffix += ` | Back: "${textBack}"`;
                 const displayString = `[${block.name}${posStr}]${textSuffix}, Distance: ${dist}`;
-                newHUD.trackedBlocks.set(blockKey, { name: block.name, coords: posCoords, text: textSuffix, rawString: displayString }); // Store structured info
-                signBlocksDisplay.push(`- ${displayString}`);
+                // Store numeric coords in value
+                newHUD.trackedBlocks.set(blockKey, { name: block.name, x, y, z, isSign, isContainer, textFront, textBack });
+                signBlocksDisplay.push(`- ${displayString}`); // Add full string for direct display
             } else if (uniquelyTrackedBlockTypes.some(sub => block.name.includes(sub))) {
                 isUniquelyTracked = true;
+                 isContainer = block.name.includes('chest') || block.name.includes('barrel') || block.name.includes('shulker_box');
                  const displayString = `[${block.name}${posStr}], Distance: ${dist}`;
-                 newHUD.trackedBlocks.set(blockKey, { name: block.name, coords: posCoords, text: '', rawString: displayString }); // Store structured info
-                 if (block.name.includes('chest') || block.name.includes('barrel') || block.name.includes('shulker_box')) {
-                     containerBlocksDisplay.push(`- ${displayString}`);
+                 // Store numeric coords in value
+                 newHUD.trackedBlocks.set(blockKey, { name: block.name, x, y, z, isSign, isContainer, textFront, textBack });
+                 if (isContainer) {
+                     containerBlocksDisplay.push(`- ${displayString}`); // Add initial string
                  } else {
                      otherTrackedBlocksDisplay.push(`- ${displayString}`);
                  }
             }
 
             if (!isUniquelyTracked) {
-                // Aggregate for display
-                if (!aggregatedBlocksDisplay[block.name]) {
-                    aggregatedBlocksDisplay[block.name] = { count: 0, minDist: Infinity };
-                }
+                if (!aggregatedBlocksDisplay[block.name]) aggregatedBlocksDisplay[block.name] = { count: 0, minDist: Infinity };
                 aggregatedBlocksDisplay[block.name].count++;
                 aggregatedBlocksDisplay[block.name].minDist = Math.min(aggregatedBlocksDisplay[block.name].minDist, dist);
             }
         });
 
-        // Format block display sections (Signs, Containers, Other Tracked)
-        if (signBlocksDisplay.length > 0) {
-            hud.push("- Signs:");
-            signBlocksDisplay.sort().forEach(s => hud.push(`  ${s}`));
-        }
-         if (containerBlocksDisplay.length > 0) {
-             hud.push("- Containers:");
-             containerBlocksDisplay.sort().forEach(c => hud.push(`  ${c}`));
-         }
-         if (otherTrackedBlocksDisplay.length > 0) {
-             hud.push("- Other Tracked:");
-             otherTrackedBlocksDisplay.sort().forEach(o => hud.push(`  ${o}`));
-         }
-        // Format Aggregated Others for display
-        const sortedOtherNames = Object.keys(aggregatedBlocksDisplay).sort();
-        if (sortedOtherNames.length > 0) {
+        // Post-process container display strings to add labels
+        containerBlocksDisplay = containerBlocksDisplay.map(containerString => {
+            const match = containerString.match(/-\s*\[(.*?)@\((.*?),(.*?),(.*?)\)\]/); // Match name and coords
+            if (!match) return containerString;
+
+            const [, containerName, xStr, yStr, zStr] = match;
+            const containerX = parseInt(xStr);
+            const containerY = parseInt(yStr);
+            const containerZ = parseInt(zStr);
+
+            let labels = [];
+            // Iterate through the collected sign data in newHUD.trackedBlocks
+            for (const blockData of newHUD.trackedBlocks.values()) {
+                // Check if it's a sign adjacent on X axis at same Y/Z
+                if (blockData.isSign &&
+                    blockData.y === containerY &&
+                    blockData.z === containerZ &&
+                    (blockData.x === containerX + 1 || blockData.x === containerX - 1))
+                {
+                    if (blockData.textFront) labels.push(`"${blockData.textFront}"`);
+                    if (blockData.textBack) labels.push(`"${blockData.textBack}"`);
+                }
+            }
+
+            if (labels.length > 0) {
+                const distancePartIndex = containerString.lastIndexOf(', Distance:');
+                const labelString = ` | Label: ${labels.join(' ')}`;
+                if (distancePartIndex !== -1) {
+                    // Insert label before distance
+                    return containerString.substring(0, distancePartIndex) + labelString + containerString.substring(distancePartIndex);
+                } else {
+                    return containerString + labelString; // Fallback append
+                }
+            }
+            return containerString; // No labels found
+        });
+
+        // Format block display sections (using potentially modified containerBlocksDisplay)
+        if (signBlocksDisplay.length > 0) { hud.push("- Signs:"); signBlocksDisplay.sort().forEach(s => hud.push(`  ${s}`)); }
+        if (containerBlocksDisplay.length > 0) { hud.push("- Containers:"); containerBlocksDisplay.sort().forEach(c => hud.push(`  ${c}`)); }
+        if (otherTrackedBlocksDisplay.length > 0) { hud.push("- Other Tracked:"); otherTrackedBlocksDisplay.sort().forEach(o => hud.push(`  ${o}`)); }
+        const sortedOtherNamesDisplay = Object.keys(aggregatedBlocksDisplay).sort(); // Renamed for clarity
+        if (sortedOtherNamesDisplay.length > 0) {
             hud.push("- Others:");
-            sortedOtherNames.forEach(name => {
+            sortedOtherNamesDisplay.forEach(name => {
                 const data = aggregatedBlocksDisplay[name];
                 hud.push(`  - ${name} ×${data.count}, Nearest Distance: ${data.minDist === Infinity ? 'N/A' : data.minDist}`);
             });
         }
-        if (signBlocksDisplay.length === 0 && containerBlocksDisplay.length === 0 && otherTrackedBlocksDisplay.length === 0 && sortedOtherNames.length === 0) {
+        // Check if any blocks were detected at all
+        if (!signBlocksDisplay.length && !containerBlocksDisplay.length && !otherTrackedBlocksDisplay.length && !sortedOtherNamesDisplay.length) {
             hud.push("- none detected");
         }
 
@@ -818,7 +862,7 @@ export class Agent {
 
         // --- Final Assembly ---
         const finalHudString = hud.join('\n');
-        // console.log(`\n\n[DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
+        console.log(`\n\n[DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
         if (diffText) {
              console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
         }
@@ -864,10 +908,10 @@ export class Agent {
 
             // Check if latestHUD is empty
             const { diffText } = await this.headsUpDisplay();
-            if (diffText) {
-                this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
+                if (diffText) {
+                    this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
                 console.log(`[DEBUG] HUD diff: ${diffText}`);
-            }
+                }
 
             // Call consolidation function before getting history for the prompt
             this._consolidateTailSystemMessages();

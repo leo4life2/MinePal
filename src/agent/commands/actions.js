@@ -325,31 +325,35 @@ export const actionsList = [
     }),
   },
   {
-    name: "!depositToChest",
-    description: "Deposit items into the nearest chest.",
+    name: "!depositToContainer",
+    description: "Deposit items into a specific container block.",
     params: {
+      containerIdentifier: "(string) The identifier of the container block in the format '[block_name@(x,y,z)]'.",
       items: "(string) The items to deposit in the format 'item1:quantity1,item2:quantity2,...'.",
     },
-    perform: wrapExecution(async (agent, items) => {
-      await skills.depositToChest(agent.bot, items);
+    perform: wrapExecution(async (agent, containerIdentifier, items) => {
+      return await skills.depositToContainer(agent.bot, containerIdentifier, items);
     }),
   },
   {
-    name: "!withdrawFromChest",
-    description: "Withdraw items from the nearest chest.",
+    name: "!withdrawFromContainer",
+    description: "Withdraw items from a specific container block.",
     params: {
+      containerIdentifier: "(string) The identifier of the container block in the format '[block_name@(x,y,z)]'.",
       items: "(string) The items to withdraw in the format 'item1:quantity1,item2:quantity2,...'.",
     },
-    perform: wrapExecution(async (agent, items) => {
-      await skills.withdrawFromChest(agent.bot, items);
+    perform: wrapExecution(async (agent, containerIdentifier, items) => {
+      return await skills.withdrawFromContainer(agent.bot, containerIdentifier, items);
     }),
   },
   {
-    name: "!lookInChest",
-    description: "Look in the nearest chest and log its contents.",
-    perform: wrapExecution(async (agent) => {
-      const success = await skills.lookInChest(agent.bot);
-      return success ? "Chest contents seen." : "No chest found nearby.";
+    name: "!lookInContainer",
+    description: "Look in a specific container block and log its contents.",
+    params: {
+        containerIdentifier: "(string) The identifier of the container block in the format '[block_name@(x,y,z)]'."
+    },
+    perform: wrapExecution(async (agent, containerIdentifier) => {
+      return await skills.lookInContainer(agent.bot, containerIdentifier);
     }),
   },
   {
@@ -463,6 +467,62 @@ export const actionsList = [
     params: {}, // No parameters needed
     perform: wrapExecution(async (agent) => {
       await skills.goIntoEndPortal(agent.bot);
+    }),
+  },
+  {
+    name: "!editSign",
+    description: "Edits the text on a specific sign block identified by its ID string.",
+    params: {
+        signIdentifier: "(string) The identifier of the sign block in the format '[block_name@(x,y,z)]'. Example: '[oak_sign@(10,64,-20)]'",
+        frontText: "(string) The text to write on the front of the sign.",
+        backText: "(string, optional) The text to write on the back of the sign. Defaults to empty."
+    },
+    perform: wrapExecution(async (agent, signIdentifier, frontText, backText = '') => {
+        // Parse the signIdentifier string without regex
+        let blockName = '';
+        let positionString = '';
+        let errorMsg = null;
+
+        if (!signIdentifier || !signIdentifier.startsWith('[') || !signIdentifier.endsWith(']')) {
+            errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Expected format '[block_name@(x,y,z)]'. Missing brackets.`;
+        } else {
+            const atIndex = signIdentifier.indexOf('@');
+            const openParenIndex = signIdentifier.indexOf('('); // Should be after @
+
+            if (atIndex === -1 || openParenIndex === -1 || openParenIndex <= atIndex) {
+                errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Expected format '[block_name@(x,y,z)]'. Missing or misplaced '@' or '('.`;
+            } else {
+                blockName = signIdentifier.slice(1, atIndex); // Get text between '[' and '@'
+                // Get text between '@' and ']', which should be the position like (x,y,z)
+                positionString = signIdentifier.slice(atIndex + 1, -1); 
+
+                if (!blockName) {
+                   errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Block name is empty.`;
+                }
+                if (!positionString.startsWith('(') || !positionString.endsWith(')')) {
+                   errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Position part is invalid: ${positionString}.`;
+                } 
+            }
+        }
+        
+        if (errorMsg) {
+            skills.log(agent.bot, errorMsg);
+            return errorMsg; // Return error message to agent history
+        }
+
+        // Call the skill function with the parsed arguments
+        return await skills.editSign(agent.bot, blockName, positionString, frontText, backText);
+    })
+  },
+  {
+    name: "!unequip",
+    description: "Unequip an item from a specific body part.",
+    params: {
+        destination:
+        "(string) The body part to unequip the item from (e.g. 'hand', 'torso', 'off-hand').",
+    },
+    perform: wrapExecution(async (agent, destination) => {
+        return await skills.unequip(agent.bot, destination);
     }),
   },
   // {

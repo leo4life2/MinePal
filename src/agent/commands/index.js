@@ -68,29 +68,33 @@ export function truncCommandMessage(message) {
     return message;
 }
 
-function numParams(command) {
-    if (!command.params)
-        return 0;
-    return Object.keys(command.params).length;
+// Helper function to count required parameters (those not marked as optional)
+function numRequiredParams(command) {
+    if (!command.params) return 0;
+    let requiredCount = 0;
+    for (const paramDesc of Object.values(command.params)) {
+        if (!paramDesc.toLowerCase().includes('(optional)')) {
+            requiredCount++;
+        }
+    }
+    return requiredCount;
 }
 
 export async function executeCommand(agent, message) {
     let parsed = parseCommandMessage(message);
     if (parsed) {
         const command = getCommand(parsed.commandName);
-        let numArgs = 0;
-        if (parsed.args) {
-            numArgs = parsed.args.length;
-        }
-        console.log('parsed command:', parsed);
-        if (numArgs !== numParams(command)) {
-            return `Command ${command.name} was given ${numArgs} args, but requires ${numParams(command)} args.`;
-        } else {
-            console.log('Executing command:', command.name);
-            console.log('Agent:', agent.name);
-            console.log('Arguments:', JSON.stringify(parsed.args, null, 2));
-            
+        console.log('Executing command:', command.name);
+        console.log('Agent:', agent.name);
+        console.log('Arguments:', JSON.stringify(parsed.args, null, 2));
+
+        try {
+            // Use spread syntax; JS handles default parameters
             return await command.perform(agent, ...parsed.args);
+        } catch (error) {
+            console.error(`Error executing command ${command.name}:`, error);
+            // Return a generic error message to the agent history
+            return `Error executing command ${command.name}: ${error.message}. Please check arguments.`;
         }
     } else
         return `Command is incorrectly formatted`;
