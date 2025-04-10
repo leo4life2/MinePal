@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { promisify } from 'util';
-import { app, BrowserWindow, systemPreferences } from 'electron';
+import { app, BrowserWindow, systemPreferences, Menu, shell } from 'electron';
 import path from 'path';
 import { startServer } from './server.js';
 import { createStream } from 'rotating-file-stream';
@@ -124,6 +124,126 @@ if (!gotTheLock) {
 
   app.on('ready', async () => {
     createWindow(); // Create the window first
+
+    // --- Define the application menu ---
+    const isMac = process.platform === 'darwin';
+
+    const menuTemplate = [
+      // {App Menu} for macOS
+      ...(isMac ? [{
+        label: app.name,
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit' }
+        ]
+      }] : []),
+      // {File Menu}
+      {
+        label: 'File',
+        submenu: [
+          {
+            label: 'Locate App Log',
+            click: async () => {
+              const userDataPath = app.getPath('userData');
+              const appLogPath = path.join(userDataPath, 'app.log');
+              shell.showItemInFolder(appLogPath);
+            }
+          },
+          {
+            label: 'Locate Agent Log',
+            click: async () => {
+              const userDataPath = app.getPath('userData');
+              // Assuming the agent log is in a subdirectory like runlogs
+              // You might need to adjust this path based on where AgentProcess actually logs
+              const agentLogPath = path.join(userDataPath, 'runlogs', 'agent.log'); 
+              shell.showItemInFolder(agentLogPath);
+            }
+          },
+          { type: 'separator' },
+          isMac ? { role: 'close' } : { role: 'quit' }
+        ]
+      },
+      // {Edit Menu}
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          ...(isMac ? [
+            { role: 'pasteAndMatchStyle' },
+            { role: 'delete' },
+            { role: 'selectAll' },
+            { type: 'separator' },
+            {
+              label: 'Speech',
+              submenu: [
+                { role: 'startSpeaking' },
+                { role: 'stopSpeaking' }
+              ]
+            }
+          ] : [
+            { role: 'delete' },
+            { type: 'separator' },
+            { role: 'selectAll' }
+          ])
+        ]
+      },
+      // {View Menu}
+      {
+        label: 'View',
+        submenu: [
+          { role: 'reload' },
+          { role: 'forceReload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { role: 'resetZoom' },
+          { role: 'zoomIn' },
+          { role: 'zoomOut' },
+          { type: 'separator' },
+          { role: 'togglefullscreen' }
+        ]
+      },
+      // {Window Menu}
+      {
+        label: 'Window',
+        submenu: [
+          { role: 'minimize' },
+          { role: 'zoom' },
+          ...(isMac ? [
+            { type: 'separator' },
+            { role: 'front' },
+            { type: 'separator' },
+            { role: 'window' }
+          ] : [
+            { role: 'close' }
+          ])
+        ]
+      },
+      {
+        role: 'help',
+        submenu: [
+          {
+            label: 'Learn More' // You can customize this or remove it
+            // Add click handler if needed, e.g., open a website
+          }
+        ]
+      }
+    ];
+    const menu = Menu.buildFromTemplate(menuTemplate);
+    Menu.setApplicationMenu(menu);
+    // --- End menu definition ---
+
     logToFile(`Platform: ${process.platform}`);
     if (process.platform === 'darwin') { // Check if the platform is macOS
         try {
