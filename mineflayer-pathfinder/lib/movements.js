@@ -277,6 +277,23 @@ class Movements {
       }
     }
 
+    // Allow breaking only specific block types provided by the user
+    const allowedToBreak = new Set([
+      "sand", "gravel", "dirt", "grass_block", "grass", "tall_grass",
+      "dead_bush", "fern", "large_fern", "leaves", "leaves2", "cobweb",
+      "snow_layer", "vine", "seagrass", "kelp", "poppy", "dandelion",
+      "red_mushroom", "brown_mushroom", "bamboo", "lily_pad", "sugar_cane",
+      "cactus"
+      // Note: 'leaves' and 'leaves2' might represent specific types or require checking names ending in '_leaves'.
+      // This implementation strictly uses the provided names.
+    ]);
+
+    // Check if the block is NOT in the allowed list AND is NOT a door/gate/trapdoor
+    const isDoorGateOrTrapdoor = block.name.includes('gate') || block.name.includes('door') || block.name.includes('trapdoor');
+    if (block.type && !allowedToBreak.has(block.name) && !isDoorGateOrTrapdoor) {
+        return false; // Not in the allowed list and not a door/gate/trapdoor
+    }
+
     return block.type && !this.blocksCantBreak.has(block.type) && this.exclusionBreak(block) < 100
   }
 

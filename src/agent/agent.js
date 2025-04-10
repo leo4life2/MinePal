@@ -232,8 +232,6 @@ export class Agent {
     _identifyDamageSource(bot) {
         if (!bot || !bot.entity) return "Unknown"; // Guard clause
 
-        console.log(`[EVENT DEBUG] entity: ${JSON.stringify(bot.entity)}`);
-
         // Check environmental hazards first
         if (bot.entity.isInLava) return "Lava";
         // bot.oxygenLevel doesn't exist, check for bubbles property
@@ -1203,7 +1201,6 @@ export class Agent {
                         // Set timeout to deactivate cooldown (using user's 5s)
                         setTimeout(() => {
                             this.ownerHurtCooldownActive = false;
-                            console.log("[EVENT DEBUG] Owner hurt cooldown reset.");
                         }, 5000); 
                     }
                 } 
@@ -1220,13 +1217,11 @@ export class Agent {
                         const damageSource = this._identifyDamageSource(this.bot);
                         
                         const message = `[SELF HURT] You were just hurt by ${damageSource}! (Damage: ${damageTaken}, Health: ${botHealth}/20)`;
-                        console.log(`[EVENT DEBUG] Bot hurt: ${message}`);
                         await this.handleMessage('system', message);
 
                         // Set timeout to deactivate cooldown (using user's 5s)
                         setTimeout(() => {
                             this.botHurtCooldownActive = false;
-                            console.log("[EVENT DEBUG] Bot hurt cooldown reset.");
                         }, 5000); 
                     }
                 }
@@ -1256,7 +1251,6 @@ export class Agent {
                 .join(', ');
             
             const message = `[RARE FINDS] You spotted nearby: ${summary}.`;
-            console.log(`[EVENT DEBUG] Rare finds detected: ${summary}`);
             await this.handleMessage('system', message);
         });
     }

@@ -2810,4 +2810,33 @@ export async function withdrawFromContainer(bot, containerIdentifier, itemsStrin
   return finalMessage;
 }
 
+export async function unequip(bot, destination) {
+  /**
+   * Unequip an item from a specific body part.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} destination - The body part to unequip from (e.g., 'hand', 'torso', 'off-hand').
+   * @returns {Promise<string>} A message indicating success or failure.
+   * @example
+   * await skills.unequip(bot, 'hand');
+   * await skills.unequip(bot, 'off-hand');
+   */
+  if (!destination) {
+    const message = "No destination specified for unequipping.";
+    log(bot, message);
+    return message;
+  }
+
+  try {
+    await bot.unequip(destination);
+    const message = `Successfully unequipped item from ${destination}.`;
+    log(bot, message);
+    return message;
+  } catch (err) {
+    // Catch potential errors, although bot.unequip is usually forgiving.
+    const message = `Failed to unequip from ${destination}: ${err.message}`;
+    log(bot, message);
+    return message;
+  }
+}
+
 // --- End Container Interaction Skills ---
