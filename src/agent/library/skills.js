@@ -2908,7 +2908,7 @@ export async function unequip(bot, destination) {
 
   try {
     await bot.unequip(destination);
-    const message = `Successfully unequipped item from ${destination}.`;
+    const message = `Your ${destination} armor is now in your backpack.`;
     log(bot, message);
     return message;
   } catch (err) {
