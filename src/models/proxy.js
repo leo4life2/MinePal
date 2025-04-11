@@ -16,7 +16,7 @@ const minepal_response_schema = {
         },
         execute_command: { 
             type: "string",
-            description: "MinePal custom command (!command) or Minecraft slash-command to execute. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
+            description: "A single MinePal custom command (!command) or Minecraft slash-command to execute. Do not make multiple commands calls. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
         },
         continue_autonomously: {
             type: "boolean",
