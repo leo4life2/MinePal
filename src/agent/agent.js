@@ -918,7 +918,7 @@ export class Agent {
 
         // --- Final Assembly ---
         const finalHudString = hud.join('\n');
-        console.log(`\n\n[HUD DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
+        // console.log(`\n\n[HUD DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
         // if (diffText) {
         //      console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
         // }

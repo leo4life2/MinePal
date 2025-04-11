@@ -150,7 +150,8 @@ export async function getVisibleEntities(bot) {
         const dir = targetPos.minus(headPos).normalize();
         const entityIdentifier = entity.username || entity.name || `ID ${entity.id}`;
         
-        const match = (block) => block.boundingBox !== 'empty';
+        // Raycast should hit any block that isn't empty and doesn't contain "glass" in its name.
+        const match = (block) => block.boundingBox !== 'empty' && !(block.name?.includes('glass'));
 
         let hitBlock = null; // Initialize hitBlock to null
         try {
