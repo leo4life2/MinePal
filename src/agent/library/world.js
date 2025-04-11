@@ -169,22 +169,23 @@ export async function getVisibleEntities(bot) {
     return visibleEntities;
 }
 
-export function getNearbyPlayers(bot, maxDistance) {
-    if (maxDistance == null) maxDistance = 16;
-    let players = [];
-    for (const entity of Object.values(bot.entities)) {
-        const distance = entity.position.distanceTo(bot.entity.position);
-        if (distance > maxDistance) continue;
-        if (entity.type == 'player' && entity.username != bot.username) {
-            players.push({ entity: entity, distance: distance });
-        } 
-    }
-    players.sort((a, b) => a.distance - b.distance);
-    let res = [];
-    for (let i = 0; i < players.length; i++) {
-        res.push(players[i].entity);
-    }
-    return res;
+export async function getNearbyPlayers(bot) {
+    /**
+     * Get a list of all visible players.
+     * @param {Bot} bot - The bot instance.
+     * @returns {Promise<Entity[]>} - A promise resolving to a list of nearby visible player entities.
+     */
+    const visibleEntities = await getVisibleEntities(bot); // Use the existing async function
+
+    const nearbyPlayers = visibleEntities.filter(entity => 
+        entity.type === 'player' && 
+        entity.username !== bot.username
+    );
+
+    // Sort by distance (optional, but often useful)
+    nearbyPlayers.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+
+    return nearbyPlayers;
 }
 
 
@@ -254,7 +255,7 @@ export function getNearbyEntityTypes(bot) {
 }
 
 
-export function getNearbyPlayerNames(bot) {
+export async function getNearbyPlayerNames(bot) {
     /**
      * Get a list of all nearby player names.
      * @param {Bot} bot - The bot to get nearby players for.
@@ -262,7 +263,7 @@ export function getNearbyPlayerNames(bot) {
      * @example
      * let players = world.getNearbyPlayerNames(bot);
      **/
-    let players = getNearbyPlayers(bot, 16);
+    let players = await getNearbyPlayers(bot); // Await the async call
     let found = [];
     for (let i = 0; i < players.length; i++) {
         if (!found.includes(players[i].username) && players[i].username != bot.username) {

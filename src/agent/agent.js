@@ -488,7 +488,7 @@ export class Agent {
         const inventory = this.bot.inventory;
         const nearbyBlockObjects = world.getNearestBlocks(this.bot, null, 16);
         const visibleEntities = await world.getVisibleEntities(this.bot);
-        const nearbyPlayers = world.getNearbyPlayers(this.bot, 16);
+        const nearbyPlayers = await world.getNearbyPlayers(this.bot, 16);
 
         // --- Initialize STRUCTURED newHUD for diffing ---        
         let newHUD = {
@@ -918,7 +918,7 @@ export class Agent {
 
         // --- Final Assembly ---
         const finalHudString = hud.join('\n');
-        // console.log(`\n\n[HUD DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
+        console.log(`\n\n[HUD DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
         // if (diffText) {
         //      console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
         // }
