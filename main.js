@@ -2,6 +2,7 @@ import fs from 'fs';
 import { promisify } from 'util';
 import { app, BrowserWindow, systemPreferences, Menu, shell } from 'electron';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { startServer } from './server.js';
 import { createStream } from 'rotating-file-stream';
 import pkg from 'electron-updater';
@@ -16,6 +17,9 @@ autoUpdater.setFeedURL({
 const copyFile = promisify(fs.copyFile);
 const mkdir = promisify(fs.mkdir);
 const access = promisify(fs.access);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let mainWindow;
 
@@ -59,6 +63,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
+            preload: path.join(__dirname, 'preload.js')
         },
     });
 
