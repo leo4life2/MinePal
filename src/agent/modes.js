@@ -79,7 +79,15 @@ const modes = [
          * @param {Object} agent - The agent object containing the bot.
          */
         update: async function (agent) {
-            const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 16);
+            // Find nearest visible hostile entity within 16 blocks
+            const visibleEntities = await world.getVisibleEntities(agent.bot);
+            const hostileMobsInRange = visibleEntities.filter(entity => 
+                MCData.getInstance().isHostile(entity) &&
+                agent.bot.entity.position.distanceTo(entity.position) <= 16
+            );
+            hostileMobsInRange.sort((a, b) => agent.bot.entity.position.distanceTo(a.position) - agent.bot.entity.position.distanceTo(b.position));
+            const enemy = hostileMobsInRange.length > 0 ? hostileMobsInRange[0] : null;
+
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
                 await agent.sendMessage(`Aaa! A ${enemy.name.replace(/_/g, ' ').toLowerCase()}!`);
 
@@ -104,7 +112,15 @@ const modes = [
          * @param {Object} agent - The agent object containing the bot.
          */
         update: async function (agent) {
-            const enemy = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHostile(entity), 4);
+            // Find nearest visible hostile entity within 4 blocks
+            const visibleEntities = await world.getVisibleEntities(agent.bot);
+            const hostileMobsInRange = visibleEntities.filter(entity => 
+                MCData.getInstance().isHostile(entity) &&
+                agent.bot.entity.position.distanceTo(entity.position) <= 4
+            );
+            hostileMobsInRange.sort((a, b) => agent.bot.entity.position.distanceTo(a.position) - agent.bot.entity.position.distanceTo(b.position));
+            let enemy = hostileMobsInRange.length > 0 ? hostileMobsInRange[0] : null;
+
             if (enemy && enemy.name.toLowerCase().trim() === "item") return;
 
             if (enemy && await world.isClearPath(agent.bot, enemy)) {
@@ -134,7 +150,15 @@ const modes = [
          * @param {Object} agent - The agent object containing the bot.
          */
         update: async function (agent) {
-            const huntable = world.getNearestEntityWhere(agent.bot, entity => MCData.getInstance().isHuntable(entity), 8);
+            // Find nearest visible huntable entity within 8 blocks
+            const visibleEntities = await world.getVisibleEntities(agent.bot);
+            const huntableMobsInRange = visibleEntities.filter(entity => 
+                MCData.getInstance().isHuntable(entity) &&
+                agent.bot.entity.position.distanceTo(entity.position) <= 8
+            );
+            huntableMobsInRange.sort((a, b) => agent.bot.entity.position.distanceTo(a.position) - agent.bot.entity.position.distanceTo(b.position));
+            const huntable = huntableMobsInRange.length > 0 ? huntableMobsInRange[0] : null;
+
             if (huntable && await world.isClearPath(agent.bot, huntable)) {
                 execute(this, agent, async () => {
                     await agent.sendMessage(`Hunting ${huntable.name}!`);
@@ -159,7 +183,15 @@ const modes = [
          * @param {Object} agent - The agent object containing the bot.
          */
         update: async function (agent) {
-            let item = world.getNearestEntityWhere(agent.bot, entity => entity.name === 'item', 8);
+            // Find nearest visible item entity within 8 blocks
+            const visibleEntities = await world.getVisibleEntities(agent.bot);
+            const itemsInRange = visibleEntities.filter(entity => 
+                entity.name === 'item' &&
+                agent.bot.entity.position.distanceTo(entity.position) <= 8
+            );
+            itemsInRange.sort((a, b) => agent.bot.entity.position.distanceTo(a.position) - agent.bot.entity.position.distanceTo(b.position));
+            let item = itemsInRange.length > 0 ? itemsInRange[0] : null;
+
             if (item && item !== this.prev_item && await world.isClearPath(agent.bot, item)) {
                 if (this.noticed_at === -1) {
                     this.noticed_at = Date.now();

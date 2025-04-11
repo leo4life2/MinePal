@@ -150,7 +150,7 @@ export async function smeltWithFurnace(bot, furnaceIdentifier, itemName, fuelIte
    * Puts fuel and items in a specific furnace to begin smelting.
    * Does NOT wait for smelting to finish or collect output.
    * @param {MinecraftBot} bot - Reference to the minecraft bot.
-   * @param {string} furnaceIdentifier - The identifier string, e.g., '[furnace@(x,y,z)]'.
+   * @param {string} furnaceIdentifier - The identifier string, e.g., 'furnace@(x,y,z)'.
    * @param {string} itemName - The item name to put in the input slot.
    * @param {string} fuelItemName - The name of the item to use as fuel.
    * @param {number} fuelQuantity - The exact amount of fuel items to add.
@@ -268,7 +268,7 @@ export async function lookInFurnace(bot, furnaceIdentifier) {
   /**
    * Look in a specific furnace and log its contents.
    * @param {MinecraftBot} bot - Reference to the minecraft bot.
-   * @param {string} furnaceIdentifier - The identifier string, e.g., '[furnace@(x,y,z)]'.
+   * @param {string} furnaceIdentifier - The identifier string, e.g., 'furnace@(x,y,z)'.
    * @returns {Promise<string>} A message summarizing the contents or an error.
    */
   // Validate and get the specific furnace block
@@ -317,7 +317,7 @@ export async function takeFromFurnace(bot, furnaceIdentifier, itemType) {
   /**
    * Take items from a specific furnace.
    * @param {MinecraftBot} bot - Reference to the minecraft bot.
-   * @param {string} furnaceIdentifier - The identifier string, e.g., '[furnace@(x,y,z)]'.
+   * @param {string} furnaceIdentifier - The identifier string, e.g., 'furnace@(x,y,z)'.
    * @param {string} itemType - The type of item to take (input, fuel, output).
    * @returns {Promise<string>} A message summarizing the action or an error.
    */
@@ -945,25 +945,39 @@ export async function attackNearest(
   const visibleEntities = await world.getVisibleEntities(bot); 
   let mob;
   if (isPlayer) {
+    // First, try to find a player with the given username
     mob = visibleEntities.find(
       (entity) =>
         entity !== bot.entity &&
         entity.type === "player" &&
         entity.username === mobType
     );
+    // If no player found, check if there's a mob with that name
+    if (!mob) {
+      const foundMob = visibleEntities.find(
+        (entity) => entity !== bot.entity && entity.name === mobType
+      );
+      if (foundMob) {
+        log(bot, `No player named "${mobType}" found, but found a mob with that name. Attacking the mob.`);
+        mob = foundMob; // Target the mob instead
+      }
+    }
   } else {
+    // Original logic: find a mob with the given name
     mob = visibleEntities.find(
       (entity) => entity !== bot.entity && entity.name === mobType
     );
   }
+
+  // Proceed with attack if a target (player or mob) was found
   if (mob) {
     return await attackEntity(bot, mob, kill);
   }
+
+  // Log failure if no target was found
   log(
     bot,
-    `Could not find any ${
-      isPlayer ? "player" : "mob"
-    } named ${mobType} to attack.`
+    `Could not find any ${isPlayer ? "player or mob" : "mob"} named ${mobType} to attack. `
   );
   return false;
 }
@@ -1018,12 +1032,26 @@ export async function defendSelf(bot, range = 9) {
   bot.modes.pause("self_defense");
   bot.modes.pause("cowardice");
   let attacked = false;
-  let enemy = world.getNearestEntityWhere(
-    bot,
-    (entity) => MCData.getInstance().isHostile(entity) && entity.name !== "item",
-    range
-  );
-  while (enemy) {
+  let enemy = null; // Initialize enemy to null
+
+  while (true) { // Loop until no visible, close hostile enemies are found
+    // Find visible hostile mobs within range
+    const visibleEntities = await world.getVisibleEntities(bot);
+    const hostileMobsInRange = visibleEntities.filter(entity =>
+      MCData.getInstance().isHostile(entity) &&
+      entity.name !== "item" && // Ensure it's not an item entity
+      bot.entity.position.distanceTo(entity.position) <= range
+    );
+
+    // Sort by distance to get the nearest
+    hostileMobsInRange.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+
+    enemy = hostileMobsInRange.length > 0 ? hostileMobsInRange[0] : null;
+
+    if (!enemy) {
+      break; // Exit loop if no suitable enemy found
+    }
+
     await equipHighestAttack(bot);
     if (
       bot.entity.position.distanceTo(enemy.position) > NEAR_DISTANCE &&
@@ -1039,17 +1067,14 @@ export async function defendSelf(bot, range = 9) {
     }
     bot.pvp.attack(enemy);
     attacked = true;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    enemy = world.getNearestEntityWhere(
-      bot,
-      (entity) => MCData.getInstance().isHostile(entity),
-      range
-    );
+    await new Promise((resolve) => setTimeout(resolve, 500)); // Wait a bit for combat to proceed
+
     if (bot.interrupt_code) {
       bot.pvp.stop();
       return false;
     }
   }
+
   bot.pvp.stop();
   if (attacked) log(bot, `Successfully defended self.`);
   else log(bot, `No enemies nearby to defend self from.`);
@@ -1143,11 +1168,16 @@ export async function collectBlock(
     let blocks = world.getNearestBlocks(bot, blocktypes, VERY_FAR_DISTANCE);
     console.log(`Found ${blocks.length} blocks of type ${blockType}`);
     if (blocks.length === 0) {
-      log(
-        bot,
-        `You collected ${collected} ${blockType}, and don't see more ${blockType} around`
-      );
-      return collected;
+      if (collected > 0) {
+        log(
+          bot,
+          `You collected ${collected} ${blockType}, and don't see more ${blockType} around`
+        );
+        return collected;
+      } else {
+        log(bot, `No ${blockType} found around.`);
+        return false;
+      }
     }
 
     if (exclude) {
@@ -1212,25 +1242,59 @@ export async function pickupNearbyItems(bot) {
    * await skills.pickupNearbyItems(bot);
    **/
   const distance = MID_DISTANCE;
-  const getNearestItem = (bot) =>
-    bot.nearestEntity(
-      (entity) =>
-        entity.name === "item" &&
-        bot.entity.position.distanceTo(entity.position) < distance
-    );
-  let nearestItem = getNearestItem(bot);
   let pickedUp = 0;
-  while (nearestItem) {
-    bot.pathfinder.setMovements(new pf.Movements(bot));
-    await bot.pathfinder.goto(new pf.goals.GoalFollow(nearestItem, 0.8), true);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    let prev = nearestItem;
-    nearestItem = getNearestItem(bot);
-    if (prev === nearestItem) {
-      break;
+
+  while (true) { // Loop until no more visible items are nearby or movement fails
+    const visibleEntities = await world.getVisibleEntities(bot);
+    const nearbyItems = visibleEntities.filter(entity =>
+      entity.name === "item" &&
+      bot.entity.position.distanceTo(entity.position) < distance
+    );
+
+    if (nearbyItems.length === 0) {
+      break; // No more items to pick up
     }
-    pickedUp++;
+
+    // Sort by distance to get the nearest
+    nearbyItems.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+    const nearestItem = nearbyItems[0];
+
+    try {
+      bot.pathfinder.setMovements(new pf.Movements(bot));
+      await bot.pathfinder.goto(new pf.goals.GoalFollow(nearestItem, 0.8), true);
+      await new Promise(resolve => setTimeout(resolve, 200)); // Wait for bot to potentially pick up item
+
+      // Check if the specific item entity still exists and is visible
+      // This is a simple check; more robust would involve tracking entity IDs
+      const stillVisibleItems = (await world.getVisibleEntities(bot)).filter(entity =>
+          entity.name === "item" &&
+          bot.entity.position.distanceTo(entity.position) < distance &&
+          entity.id === nearestItem.id // Check if the same entity ID is still around
+      );
+
+      if (stillVisibleItems.length === 0) {
+          pickedUp++; // Assume item was picked up if it's no longer visible/nearby
+      } else {
+          // Item might still be there, maybe pathfinding failed or pickup was slow.
+          // Could implement a retry mechanism or just break if stuck.
+          // For simplicity, let's check if we are stuck on the same item.
+          const currentNearestItem = stillVisibleItems.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position))[0];
+          if (currentNearestItem && currentNearestItem.id === nearestItem.id && bot.entity.position.distanceTo(currentNearestItem.position) < 1.5) {
+              log(bot, "Seems stuck trying to pick up an item, stopping pickup attempt.");
+              break; // Break if potentially stuck
+          }
+      }
+    } catch (err) {
+        log(bot, `Error during pathfinding/pickup for item ${nearestItem.id}: ${err.message}. Stopping.`);
+        break; // Stop if pathfinding throws an error
+    }
+
+    if (bot.interrupt_code) {
+        log(bot, "Pickup items interrupted.");
+        break;
+    }
   }
+
   log(bot, `Picked up ${pickedUp} items.`);
   return true;
 }
@@ -1734,12 +1798,15 @@ export async function teleportToPlayer(bot, username) {
    * @example
    * await skills.teleportToPlayer(bot, "player");
    **/
+  if (!username) {
+    log(bot, `No username provided.`);
+    return false;
+  }
   bot.chat("/tp @s " + username);
   await new Promise((resolve) => setTimeout(resolve, 500)); // wait for tp to complete
   let player = bot.players[username]?.entity;
   if (!player) {
-    log(bot, `username ${username} incorrect, player not found.`);
-    return false;
+    log(bot, `username ${username} not found, teleporting to owner.`);
   }
   if (
     bot.entity.position.distanceTo(player.position) <= NEAR_DISTANCE
@@ -1818,26 +1885,35 @@ export async function avoidEnemies(bot, distance = 16) {
    * await skills.avoidEnemies(bot, 8);
    **/
   bot.modes.pause("self_preservation"); // prevents damage-on-low-health from interrupting the bot
-  let enemy = world.getNearestEntityWhere(
-    bot,
-    (entity) => MCData.getInstance().isHostile(entity),
-    distance
-  );
-  while (enemy) {
+  let enemy = null;
+
+  while (true) { // Loop until no visible, close hostile enemies are found
+    const visibleEntities = await world.getVisibleEntities(bot);
+    const hostileMobsInRange = visibleEntities.filter(entity =>
+      MCData.getInstance().isHostile(entity) &&
+      bot.entity.position.distanceTo(entity.position) <= distance
+    );
+
+    // Sort by distance to get the nearest
+    hostileMobsInRange.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+
+    enemy = hostileMobsInRange.length > 0 ? hostileMobsInRange[0] : null;
+
+    if (!enemy) {
+      break; // Exit loop if no suitable enemy found
+    }
+
     const follow = new pf.goals.GoalFollow(enemy, distance + 1); // move a little further away
     const inverted_goal = new pf.goals.GoalInvert(follow);
     bot.pathfinder.setMovements(new pf.Movements(bot));
     bot.pathfinder.setGoal(inverted_goal, true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    enemy = world.getNearestEntityWhere(
-      bot,
-      (entity) => MCData.getInstance().isHostile(entity),
-      distance
-    );
+    await new Promise((resolve) => setTimeout(resolve, 500)); // Wait for movement
+
     if (bot.interrupt_code) {
       break;
     }
   }
+
   bot.pathfinder.stop();
   log(bot, `Moved ${distance} away from enemies.`);
   return true;
@@ -2182,15 +2258,18 @@ export async function activateNearestEntity(bot, entityType) {
    * @example
    * await skills.activateNearestEntity(bot, "villager");
    **/
-  let entity = world.getNearestEntityWhere(
-    bot,
-    (entity) => entity.name === entityType,
-    16
-  );
-  if (!entity) {
-    log(bot, `Could not find any ${entityType} to activate.`);
+  const visibleEntities = await world.getVisibleEntities(bot);
+  const targetEntities = visibleEntities.filter(entity => entity.name === entityType);
+
+  if (targetEntities.length === 0) {
+    log(bot, `Could not find any visible ${entityType} to activate.`);
     return false;
   }
+
+  // Sort by distance to find the nearest
+  targetEntities.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+  let entity = targetEntities[0];
+
   if (entity === bot.vehicle) {
     log(bot, `Already riding the nearest ${entityType}.`);
     return false;
@@ -2527,21 +2606,21 @@ async function _getAndValidateContainer(bot, containerIdentifier) {
   let positionVec = null;
 
   // 1. Parse Identifier
-  if (!containerIdentifier || !containerIdentifier.startsWith('[') || !containerIdentifier.endsWith(']')) {
-    errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Expected format '[block_name@(x,y,z)]'. Missing brackets.`;
+  if (!containerIdentifier) {
+      errorMsg = `Invalid containerIdentifier: it cannot be empty. Expected format 'block_name@(x,y,z)'.`;
   } else {
     const atIndex = containerIdentifier.indexOf('@');
-    const openParenIndex = containerIdentifier.indexOf('(');
+    const openParenIndex = containerIdentifier.indexOf('('); // Should be after @
     if (atIndex === -1 || openParenIndex === -1 || openParenIndex <= atIndex) {
-      errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Expected format '[block_name@(x,y,z)]'. Missing or misplaced '@' or '('.`;
+      errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Expected format 'block_name@(x,y,z)'. Missing or misplaced '@' or '('.`;
     } else {
-      blockName = containerIdentifier.slice(1, atIndex);
-      positionString = containerIdentifier.slice(atIndex + 1, -1);
+      blockName = containerIdentifier.slice(0, atIndex); // Get text before '@'
+      positionString = containerIdentifier.slice(atIndex + 1); // Get text from '@' onwards
       if (!blockName) {
         errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Block name is empty.`;
       }
       if (!positionString.startsWith('(') || !positionString.endsWith(')')) {
-        errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Position part is invalid: ${positionString}.`;
+        errorMsg = `Invalid containerIdentifier format: \"${containerIdentifier}\". Position part is invalid: ${positionString}. Expected (x,y,z).`;
       } else {
         // 1b. Parse Position String into Vec3
         try {
@@ -2603,7 +2682,7 @@ export async function lookInContainer(bot, containerIdentifier) {
   /**
    * Look in a specific container block and log its contents.
    * @param {MinecraftBot} bot - Reference to the minecraft bot.
-   * @param {string} containerIdentifier - The identifier string, e.g., '[chest@(x,y,z)]'.
+   * @param {string} containerIdentifier - The identifier string, e.g., 'chest@(x,y,z)'.
    * @returns {Promise<string>} A message summarizing the contents or an error.
    */
   const { targetBlock, errorMsg } = await _getAndValidateContainer(bot, containerIdentifier);
@@ -2624,6 +2703,7 @@ export async function lookInContainer(bot, containerIdentifier) {
     message = `Container ${containerIdentifier} is empty.`;
   } else {
     message = `Container ${containerIdentifier} contents:\n- ` + itemsInContainer.join('\n- ');
+    message += `\n if you wish to withdraw items, use withdrawFromContainer.`;
   }
   log(bot, message); 
 
@@ -2640,7 +2720,7 @@ export async function depositToContainer(bot, containerIdentifier, itemsString) 
   /**
    * Deposit specified items into a specific container block.
    * @param {MinecraftBot} bot - Reference to the minecraft bot.
-   * @param {string} containerIdentifier - The identifier string, e.g., '[chest@(x,y,z)]'.
+   * @param {string} containerIdentifier - The identifier string, e.g., 'chest@(x,y,z)'.
    * @param {string} itemsString - The items to deposit: 'item1:qty1,item2:qty2,...'.
    * @returns {Promise<string>} A message summarizing the deposit action or an error.
    */
@@ -2722,7 +2802,7 @@ export async function withdrawFromContainer(bot, containerIdentifier, itemsStrin
   /**
    * Withdraw specified items from a specific container block.
    * @param {MinecraftBot} bot - Reference to the minecraft bot.
-   * @param {string} containerIdentifier - The identifier string, e.g., '[chest@(x,y,z)]'.
+   * @param {string} containerIdentifier - The identifier string, e.g., 'chest@(x,y,z)'.
    * @param {string} itemsString - The items to withdraw: 'item1:qty1,item2:qty2,...'.
    * @returns {Promise<string>} A message summarizing the withdrawal action or an error.
    */

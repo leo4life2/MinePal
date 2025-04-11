@@ -2,16 +2,28 @@ import axios from 'axios';
 import { HTTPS_BACKEND_URL } from '../constants.js';
 import fs from 'fs';
 import path from 'path';
-import util from 'util';
 
 const minepal_response_schema = {
     type: "object",
     properties: {
-        thought: { type: "string" },
-        say_in_game: { type: "string" },
-        execute_command: { type: "string" }
+        thought: { 
+            type: "string",
+            description: "Internal reasoning explaining your planned action and next steps concisely."
+        },
+        say_in_game: { 
+            type: "string",
+            description: "Short, casual in-game message directed at players in owner's specified language."
+        },
+        execute_command: { 
+            type: "string",
+            description: "MinePal custom command (!command) or Minecraft slash-command to execute. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
+        },
+        continue_autonomously: {
+            type: "boolean",
+            description: "Set to true if you need to continue executing commands to complete your goal autonomously. False if your current goal is complete and you can halt."
+        }
     },
-    required: ["thought", "say_in_game", "execute_command"],
+    required: ["thought", "say_in_game", "execute_command", "continue_autonomously"],
     additionalProperties: false
 };
 
@@ -49,7 +61,6 @@ export class Proxy {
 
         try {
             const requestBody = {
-                model_name: this.model_name,
                 messages: messages,
                 stop_seq: stop_seq,
             };

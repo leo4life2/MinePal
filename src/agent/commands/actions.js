@@ -69,7 +69,7 @@ export const actionsList = [
   },
   {
     name: "!teleportToPlayer",
-    description: "Teleport to the given player. Argument is only player's name.",
+    description: "Teleport to the given player. Argument is only player's name. Using player's username in the chat message is enough. The user does NOT need to be around you to teleport to them.",
     params: {
         player_name: "(string) The name of the player to teleport to.",
     },
@@ -218,7 +218,7 @@ export const actionsList = [
     name: "!smeltWithFurnace",
     description: "Adds fuel and input items to a specific furnace to begin smelting.",
     params: {
-      furnaceIdentifier: "(string) The identifier of the furnace block in the format '[furnace@(x,y,z)]'.",
+      furnaceIdentifier: "(string) The identifier of the furnace block in the format 'furnace@(x,y,z)'.",
       item_name: "(string) The name of the input item to smelt.",
       fuelItemName: "(string) The name of the item to use as fuel (e.g., 'coal', 'oak_log').",
       fuelQuantity: "(number) The exact amount of fuel items to add.",
@@ -243,21 +243,21 @@ export const actionsList = [
     }),
   },
   {
-    name: "!attackPlayer",
-    description: "Attack and kill the specified player.",
+    name: "!attackHumanPlayer",
+    description: "Attack and kill the specified human player with a username.",
     params: {
-      player_name: "(string) The name of the player to attack.",
+      player_username: "(string) The username of the player to attack.",
     },
-    perform: wrapExecution(async (agent, player_name) => {
-      await skills.attackNearest(agent.bot, player_name, true, true);
+    perform: wrapExecution(async (agent, player_username) => {
+      await skills.attackNearest(agent.bot, player_username, true, true);
     }),
   },
   {
-    name: "!attackCreature",
-    description: "Attack and kill the nearest creature(s) of a given type.",
+    name: "!attackMob",
+    description: "Attack and kill the nearest mob(s) of a given type.",
     params: {
-      type: "(string) The type of creature to attack (e.g., 'zombie', 'skeleton').",
-      count: "(number, optional) How many creatures of this type to attack. Defaults to 1.",
+      type: "(string) The type of mob to attack (e.g., 'zombie', 'skeleton').",
+      count: "(number, optional) How many mobs of this type to attack. Defaults to 1.",
     },
     perform: wrapExecution(async (agent, type, count = 1) => {
       const numAttacks = parseInt(count) || 1;
@@ -335,7 +335,7 @@ export const actionsList = [
     name: "!depositToContainer",
     description: "Deposit items into a specific container block.",
     params: {
-      containerIdentifier: "(string) The identifier of the container block in the format '[block_name@(x,y,z)]'.",
+      containerIdentifier: "(string) The identifier of the container block in the format 'block_name@(x,y,z)'.",
       items: "(string) The items to deposit in the format 'item1:quantity1,item2:quantity2,...'.",
     },
     perform: wrapExecution(async (agent, containerIdentifier, items) => {
@@ -346,7 +346,7 @@ export const actionsList = [
     name: "!withdrawFromContainer",
     description: "Withdraw items from a specific container block.",
     params: {
-      containerIdentifier: "(string) The identifier of the container block in the format '[block_name@(x,y,z)]'.",
+      containerIdentifier: "(string) The identifier of the container block in the format 'block_name@(x,y,z)'.",
       items: "(string) The items to withdraw in the format 'item1:quantity1,item2:quantity2,...'.",
     },
     perform: wrapExecution(async (agent, containerIdentifier, items) => {
@@ -357,7 +357,7 @@ export const actionsList = [
     name: "!lookInContainer",
     description: "Look in a specific container block and log its contents.",
     params: {
-        containerIdentifier: "(string) The identifier of the container block in the format '[block_name@(x,y,z)]'."
+        containerIdentifier: "(string) The identifier of the container block in the format 'block_name@(x,y,z)'."
     },
     perform: wrapExecution(async (agent, containerIdentifier) => {
       return await skills.lookInContainer(agent.bot, containerIdentifier);
@@ -413,7 +413,7 @@ export const actionsList = [
     name: "!lookInFurnace",
     description: "Look in a specific furnace and log its contents.",
     params: {
-        furnaceIdentifier: "(string) The identifier of the furnace block in the format '[furnace@(x,y,z)]'."
+        furnaceIdentifier: "(string) The identifier of the furnace block in the format 'furnace@(x,y,z)'."
     },
     perform: wrapExecution(async (agent, furnaceIdentifier) => {
       return await skills.lookInFurnace(agent.bot, furnaceIdentifier);
@@ -423,7 +423,7 @@ export const actionsList = [
     name: "!takeFromFurnace",
     description: "Take items from a specific furnace.",
     params: {
-        furnaceIdentifier: "(string) The identifier of the furnace block in the format '[furnace@(x,y,z)]'.",
+        furnaceIdentifier: "(string) The identifier of the furnace block in the format 'furnace@(x,y,z)'.",
         itemType: "(string) The type of item to take (input, fuel, output)."
     },
     perform: wrapExecution(async (agent, furnaceIdentifier, itemType) => {
@@ -480,7 +480,7 @@ export const actionsList = [
     name: "!editSign",
     description: "Edits the text on a specific sign block identified by its ID string.",
     params: {
-        signIdentifier: "(string) The identifier of the sign block in the format '[block_name@(x,y,z)]'. Example: '[oak_sign@(10,64,-20)]'",
+        signIdentifier: "(string) The identifier of the sign block in the format 'block_name@(x,y,z)'. Example: 'oak_sign@(10,64,-20)'",
         frontText: "(string) The text to write on the front of the sign.",
         backText: "(string, optional) The text to write on the back of the sign. Defaults to empty."
     },
@@ -490,28 +490,28 @@ export const actionsList = [
         let positionString = '';
         let errorMsg = null;
 
-        if (!signIdentifier || !signIdentifier.startsWith('[') || !signIdentifier.endsWith(']')) {
-            errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Expected format '[block_name@(x,y,z)]'. Missing brackets.`;
+        if (!signIdentifier) {
+            errorMsg = `Invalid signIdentifier: it cannot be empty. Expected format 'block_name@(x,y,z)'.`;
         } else {
             const atIndex = signIdentifier.indexOf('@');
             const openParenIndex = signIdentifier.indexOf('('); // Should be after @
 
             if (atIndex === -1 || openParenIndex === -1 || openParenIndex <= atIndex) {
-                errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Expected format '[block_name@(x,y,z)]'. Missing or misplaced '@' or '('.`;
+                errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Expected format 'block_name@(x,y,z)'. Missing or misplaced '@' or '('.`;
             } else {
-                blockName = signIdentifier.slice(1, atIndex); // Get text between '[' and '@'
-                // Get text between '@' and ']', which should be the position like (x,y,z)
-                positionString = signIdentifier.slice(atIndex + 1, -1); 
+                blockName = signIdentifier.slice(0, atIndex); // Get text before '@'
+                // Get text from '@' onwards, which should be the position like (x,y,z)
+                positionString = signIdentifier.slice(atIndex + 1);
 
                 if (!blockName) {
                    errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Block name is empty.`;
                 }
                 if (!positionString.startsWith('(') || !positionString.endsWith(')')) {
-                   errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Position part is invalid: ${positionString}.`;
-                } 
+                   errorMsg = `Invalid signIdentifier format: \"${signIdentifier}\". Position part is invalid: ${positionString}. Expected (x,y,z).`;
+                }
             }
         }
-        
+
         if (errorMsg) {
             skills.log(agent.bot, errorMsg);
             return errorMsg; // Return error message to agent history
@@ -530,6 +530,23 @@ export const actionsList = [
     },
     perform: wrapExecution(async (agent, destination) => {
         return await skills.unequip(agent.bot, destination);
+    }),
+  },
+  {
+    name: "!confirmActionsCompleted",
+    description: "Double-check your HUD (inventory and environment) to verify explicitly that your intended actions are fully completed and correct. Only call this when you've confirmed your goal is completely achieved.",
+    params: {},
+    perform: wrapExecution(async (agent) => {
+      return "Your HUD has been updated. Now double-check your HUD to verify that your intended actions are fully completed and correct.";
+    }),
+  },
+  {
+    name: "!giveUp",
+    description: "Give up on the current task and go idle.",
+    params: {},
+    perform: wrapExecution(async (agent) => {
+      // This is a placebo for the LLM to know that the actions are complete.
+      return "Giving up on the current task and going idle.";
     }),
   },
   // {

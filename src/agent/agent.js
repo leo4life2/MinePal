@@ -703,18 +703,19 @@ export class Agent {
                     if (blockData.textBack) labels.push(`"${blockData.textBack}"`);
                 }
             }
-
+            let labelString = "";
+            const distancePartIndex = containerString.lastIndexOf(', Distance:');
             if (labels.length > 0) {
-                const distancePartIndex = containerString.lastIndexOf(', Distance:');
-                const labelString = ` | Label: ${labels.join(' ')}`;
-                if (distancePartIndex !== -1) {
-                    // Insert label before distance
-                    return containerString.substring(0, distancePartIndex) + labelString + containerString.substring(distancePartIndex);
-                } else {
-                    return containerString + labelString; // Fallback append
-                }
+                labelString = ` | Name: ${labels.join(' ')}`;
+            } else {
+                labelString = " | Unnamed";
             }
-            return containerString; // No labels found
+            if (distancePartIndex !== -1) {
+                // Insert label before distance
+                return containerString.substring(0, distancePartIndex) + labelString + containerString.substring(distancePartIndex);
+            } else {
+                return containerString + labelString; // Fallback append
+            }
         });
 
         // Format block display sections (using potentially modified containerBlocksDisplay)
@@ -917,7 +918,7 @@ export class Agent {
 
         // --- Final Assembly ---
         const finalHudString = hud.join('\n');
-        // console.log(`\n\n[DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
+        // console.log(`\n\n[HUD DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
         // if (diffText) {
         //      console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
         // }
@@ -949,10 +950,11 @@ export class Agent {
             this.silences = 0; // Reset silence count on non-silence message
         }
         // --- End Silence Timer Management ---
+        let continue_autonomously_count = 0;
 
         await this.history.add(source, message);
         // Process the message and generate responses
-        for (let i = 0; i < 5; i++) {
+        while (continue_autonomously_count < 10) {
             let history = this.history.getHistory();
 
             // Call the pruning function
@@ -973,7 +975,7 @@ export class Agent {
             history = this.history.getHistory(); // Get updated history
 
             // Get structured response from prompter
-            const { chatMessage, command, error } = await this.prompter.promptConvo(history);
+            const { chatMessage, command, error, continue_autonomously } = await this.prompter.promptConvo(history);
 
             // Handle errors first
             if (error) {
@@ -1001,7 +1003,7 @@ export class Agent {
                 const command_name = containsCommand(command); // Use containsCommand to extract !action_name
                 if (!command_name) { // Should ideally not happen if command starts with ! but good sanity check
                     console.error(`[ERROR] Command string "${command}" did not yield a valid command name.`);
-                    this.history.add('system', `[EXEC_FAIL] Could not parse command: ${command}`);
+                    this.history.add('system', `[ERROR] Invalid function call: ${command}`);
                     continue; // Try again
                 }
 
@@ -1016,10 +1018,16 @@ export class Agent {
 
                 if (execute_res) {
                     this.history.add('system', `[EXEC_RES] ${execute_res}`);
+                    continue; // A successful execution auto-reprompts the LLM.
                 } else {
-                    // If executeCommand returns nothing/falsy, assume it was successful 
-                    // or handled its own feedback, and break the loop.
-                    break;
+
+                    // If the LLM says to continue autonomously, increment the counter.
+                    // Otherwise, break the loop.
+                    if (continue_autonomously) {
+                        continue_autonomously_count++;
+                    } else {
+                        break;
+                    }
                 }
             } else {
                 // No command, just send the chat message if it exists
@@ -1029,8 +1037,19 @@ export class Agent {
                     // Handle case where LLM returns no chat and no command (maybe silence or just thinking)
                     console.log("[DEBUG] LLM returned no chat message and no command.");
                 }
-                break; // Exit the loop as there's no command to execute
+
+                // If the LLM says to continue autonomously, increment the counter.
+                // Otherwise, break the loop.   
+                if (continue_autonomously) {
+                    continue_autonomously_count++;
+                } else {
+                    break;
+                }
             }
+        }
+        if (continue_autonomously_count >= 10) {
+            this.history.add('system', `[NOTICE] Continue autonomously usage is limited to 10 times. Stopping execution.`);
+            await this.sendMessage(`/tell ${this.owner} [NOTICE] Autonomous execution is limited to 10 steps. Stopping execution.`, true);
         }
 
         this.history.save();

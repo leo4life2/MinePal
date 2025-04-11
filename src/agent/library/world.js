@@ -99,22 +99,6 @@ export function getNearestBlock(bot, block_type, distance=16) {
     return null;
 }
 
-
-export function getNearbyEntities(bot, maxDistance=16) {
-    let entities = [];
-    for (const entity of Object.values(bot.entities)) {
-        const distance = entity.position.distanceTo(bot.entity.position);
-        if (distance > maxDistance) continue;
-        entities.push({ entity: entity, distance: distance });
-    }
-    entities.sort((a, b) => a.distance - b.distance);
-    let res = [];
-    for (let i = 0; i < entities.length; i++) {
-        res.push(entities[i].entity);
-    }
-    return res;
-}
-
 // Helper function to group entities by type/name and format for logging
 function formatEntityCounts(entities) {
     const counts = {};
@@ -184,11 +168,6 @@ export async function getVisibleEntities(bot) {
     }
     return visibleEntities;
 }
-
-export function getNearestEntityWhere(bot, predicate, maxDistance=16) {
-    return bot.nearestEntity(entity => predicate(entity) && bot.entity.position.distanceTo(entity.position) < maxDistance);
-}
-
 
 export function getNearbyPlayers(bot, maxDistance) {
     if (maxDistance == null) maxDistance = 16;
@@ -264,7 +243,7 @@ export function getNearbyEntityTypes(bot) {
      * @example
      * let mobs = world.getNearbyEntityTypes(bot);
      **/
-    let mobs = getNearbyEntities(bot, 16);
+    let mobs = getVisibleEntities(bot);
     let found = [];
     for (let i = 0; i < mobs.length; i++) {
         if (!found.includes(mobs[i].name)) {
