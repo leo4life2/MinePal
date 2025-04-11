@@ -42,6 +42,18 @@ class Movements {
     this.blocksCantBreak = new Set()
     this.blocksCantBreak.add(registry.blocksByName.chest.id)
 
+    // Define the set of blocks that pathfinding is allowed to break opportunistically.
+    // This is primarily for clearing minor obstacles like grass, vines, etc.
+    this.allowedPathfindingBreaks = new Set([
+      "sand", "gravel", "dirt", "grass_block", "grass", "tall_grass",
+      "dead_bush", "fern", "large_fern", "leaves", "leaves2", "cobweb",
+      "snow_layer", "vine", "seagrass", "kelp", "poppy", "dandelion",
+      "red_mushroom", "brown_mushroom", "bamboo", "lily_pad", "sugar_cane",
+      "cactus"
+      // Note: 'leaves' and 'leaves2' might represent specific types or require checking names ending in '_leaves'.
+      // This implementation strictly uses the provided names.
+    ].map(name => registry.blocksByName[name]?.id).filter(id => id !== undefined)); // Map names to IDs
+
     registry.blocksArray.forEach(block => {
       if (block.diggable) return
       this.blocksCantBreak.add(block.id)
@@ -277,23 +289,6 @@ class Movements {
       }
     }
 
-    // Allow breaking only specific block types provided by the user
-    const allowedToBreak = new Set([
-      "sand", "gravel", "dirt", "grass_block", "grass", "tall_grass",
-      "dead_bush", "fern", "large_fern", "leaves", "leaves2", "cobweb",
-      "snow_layer", "vine", "seagrass", "kelp", "poppy", "dandelion",
-      "red_mushroom", "brown_mushroom", "bamboo", "lily_pad", "sugar_cane",
-      "cactus"
-      // Note: 'leaves' and 'leaves2' might represent specific types or require checking names ending in '_leaves'.
-      // This implementation strictly uses the provided names.
-    ]);
-
-    // Check if the block is NOT in the allowed list AND is NOT a door/gate/trapdoor
-    const isDoorGateOrTrapdoor = block.name.includes('gate') || block.name.includes('door') || block.name.includes('trapdoor');
-    if (block.type && !allowedToBreak.has(block.name) && !isDoorGateOrTrapdoor) {
-        return false; // Not in the allowed list and not a door/gate/trapdoor
-    }
-
     return block.type && !this.blocksCantBreak.has(block.type) && this.exclusionBreak(block) < 100
   }
 
@@ -308,22 +303,31 @@ class Movements {
     cost += this.exclusionStep(block) // Is excluded so can't move or break
     cost += this.getNumEntitiesAt(block.position, 0, 0, 0) * this.entityCost
     if (block.safe) return cost
+
+    // Check fundamental safety first (handles falling blocks, liquids, cantBreak, exclusion zones)
     if (!this.safeToBreak(block)) return 100 // Can't break, so can't move
+
+    // Add the block to be broken *before* calculating cost, as it's valid to break
     toBreak.push(block.position)
 
-    if (block.physical) cost += this.getNumEntitiesAt(block.position, 0, 1, 0) * this.entityCost // Add entity cost if there is an entity above (a breakable block) that will fall
+    // Add entity cost if there is an entity above a breakable block that will fall
+    if (block.physical) cost += this.getNumEntitiesAt(block.position, 0, 1, 0) * this.entityCost
 
-    const tool = this.bot.pathfinder.bestHarvestTool(block)
-    const enchants = (tool && tool.nbt) ? nbt.simplify(tool.nbt).Enchantments : []
-    const effects = this.bot.entity.effects
-    const digTime = block.digTime(tool ? tool.type : null, false, false, false, enchants, effects)
-    const laborCost = (1 + 3 * digTime / 1000) * this.digCost
-    cost += laborCost
-
-    // Prioritize gates and doors by reducing their cost
     const name = block.name.toLowerCase()
-    if (name.includes('gate') || name.includes('door') || name.includes('trapdoor')) {
-      cost = 0; // assume opening & moving thru is free
+    const isDoorGateOrTrapdoor = name.includes('gate') || name.includes('door') || name.includes('trapdoor');
+
+    // If the block is not specifically allowed for pathfinding breaks and isn't a door/gate/trapdoor,
+    // assign a very high cost to discourage breaking it during pathfinding.
+    // Otherwise, calculate the normal dig cost.
+    if (block.type && !this.allowedPathfindingBreaks.has(block.type) && !isDoorGateOrTrapdoor) {
+      cost += 10000; // High cost for non-allowed blocks
+    } else {
+      const tool = this.bot.pathfinder.bestHarvestTool(block)
+      const enchants = (tool && tool.nbt) ? nbt.simplify(tool.nbt).Enchantments : []
+      const effects = this.bot.entity.effects
+      const digTime = block.digTime(tool ? tool.type : null, false, false, false, enchants, effects)
+      const laborCost = (1 + 3 * digTime / 1000) * this.digCost
+      cost += laborCost
     }
 
     return cost
