@@ -67,20 +67,29 @@ export class History {
         console.log(`Process ${process.pid}: Memory updated to: `, this.memory);
     }
 
-    async add(name, content, thought=null) {
-        let role = 'minepal';
+    async add(name, content, thought = null, progressAcknowledgement = null) {
+        let role = 'user'; // Default to user
+        let turnObject = {};
+
         if (name === 'system') {
             role = 'system';
+            turnObject = { role, content };
+        } else if (name === this.name) {
+            role = 'assistant';
+            turnObject = {
+                role,
+                content: `<${this.name}>: ${content}`,
+                thought: thought, // Store thought separately
+                current_goal_status: progressAcknowledgement // Store progress acknowledgement separately
+            };
+            // Filter out null/undefined fields before pushing
+            turnObject = Object.fromEntries(Object.entries(turnObject).filter(([_, v]) => v != null));
+        } else {
+            // role remains 'user'
+            turnObject = { role, content: `<${name}>: ${content}` };
         }
-        else if (name !== this.name) {
-            role = 'user';
-            content = `<${name}>: ${content}`;
-        } else if (role === 'minepal') {
-            let thought_prefix = `[Inner Thought]: ${thought}`;
-            content = `<${this.name}>: ${content}`;
-            content = `${thought_prefix}\n${content}`;
-        }
-        this.turns.push({role, content});
+
+        this.turns.push(turnObject);
 
         // When we hit max messages, summarize all turns and store in vector DB
         if (this.turns.length >= this.max_messages) {

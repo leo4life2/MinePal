@@ -280,7 +280,7 @@ export class Agent {
     _pruneHistory() {
         let lastAssistantIndex = -1;
         for (let j = this.history.turns.length - 1; j >= 0; j--) {
-            if (this.history.turns[j].role === 'minepal') {
+            if (this.history.turns[j].role === 'assistant') {
                 lastAssistantIndex = j;
                 break;
             }
@@ -970,7 +970,21 @@ export class Agent {
             history = this.history.getHistory(); // Get updated history
 
             // Get structured response from prompter
-            const { chatMessage, command, error, continue_autonomously, thought } = await this.prompter.promptConvo(history);
+            const promptResult = await this.prompter.promptConvo(history);
+            const error = promptResult.error;
+            const responseData = promptResult.response; // Might be null if error occurred
+
+            // --- Logging --- 
+            console.log("--- LLM Response --- ");
+            // Log fields directly from responseData, handling potential undefined gracefullyough all keys in the responseData object and log them
+            for (const key in responseData) {
+                if (Object.hasOwnProperty.call(responseData, key)) {
+                    // Simple formatting for key name (e.g., snake_case -> Snake Case)
+                    const formattedKey = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                    console.log(`${formattedKey}:`, responseData[key]);
+                }
+            }
+            console.log("--- End LLM Response --- ");
 
             // Handle errors first
             if (error) {
@@ -980,10 +994,31 @@ export class Agent {
                 break; // Exit the loop on error
             }
 
+            // Ensure we have valid response data if no error occurred
+            if (!responseData) {
+                 console.error("promptConvo returned no error but also no response data.");
+                 await this.sendMessage("Oops! Something went wrong internally. Please try again.", true);
+                 break;
+            }
+
+            // Extract and clean up fields from responseData
+            let chatMessage = responseData.say_in_game || null;
+            let command = responseData.execute_command || null;
+            let continue_autonomously = responseData.continue_autonomously || false;
+            let thought = responseData.thought || null;
+            let current_goal_status = responseData.current_goal_status || null;
+            // Clean up extracted fields
+            if (chatMessage && chatMessage.trim() === '') chatMessage = null;
+            if (command && command.trim() === '') command = null;
+            // Add prefix to internal command if needed
+            if (command && !command.startsWith('!') && !command.startsWith('/')) {
+                 command = '!' + command;
+            }
+
             // Add the agent's response (chat and thought) to history *before* processing command/chat
-            // This ensures the 'minepal' turn is recorded even if only chat is returned.
-            if (chatMessage || command) { // Only add if there was some response
-                this.history.add(this.name, chatMessage || "", thought); // Use empty string if no chatMessage
+            // This ensures the 'assistant' turn is recorded even if only chat is returned.
+            if (chatMessage || command || thought || current_goal_status) { // Only add if there was some response element
+                this.history.add(this.name, chatMessage || "", thought, current_goal_status); // Pass current_goal_status
             }
 
             // Process and send chat message if it exists

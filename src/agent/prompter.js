@@ -97,72 +97,45 @@ export class Prompter {
         let systemPrompt = this.profile.conversing;
         systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
         
-        let responseData;
-        let chatMessage = null;
-        let command = null;
+        let responseData = null; // Initialize to null
         let error = null;
-        let continue_autonomously = false;
-        let thought = null;
 
         try {
             responseData = await this.proxy.sendRequest(messages, systemPrompt);
             
+            // --- Initial Error Handling & Validation --- 
             if (typeof responseData === 'string') {
                 if (responseData.includes('Error')) {
-                    error = responseData;
+                    error = responseData; // Keep error string
+                    responseData = null; // Nullify responseData on error string
                 } else {
-                    // Attempt to parse if it's not explicitly an error string
+                    // Attempt to parse if it's not explicitly an error string but might be JSON
                     try {
                         responseData = JSON.parse(responseData);
                     } catch (e) {
-                        error = "Oops! The LLM returned invalid data. Please try again.";
+                        error = "Oops! The LLM returned invalid string data that couldn't be parsed as JSON.";
+                        responseData = null; // Nullify responseData on parse error
                     }
                 }
             }
 
-            // If no error so far, process the response object
-            if (!error) {
-                if (typeof responseData !== 'object' || responseData === null) {
-                     error = "Oops! The LLM returned an unexpected data format. Please try again.";
-                     console.log('[Prompter] bad format:', responseData);
-                } else {
-                    const { say_in_game, execute_command } = responseData;
-
-                    // Validate required fields
-                    if (say_in_game === undefined || execute_command === undefined) {
-                         error = "Oops! The LLM response is missing required fields. Please try again.";
-                         console.log('[Prompter] bad response:', responseData);
-                    } else {
-                        chatMessage = say_in_game || null; // Use null if empty string
-                        command = execute_command || null; // Use null if empty string
-                        continue_autonomously = responseData.continue_autonomously || false;
-                        thought = responseData.thought || null;
-
-                        console.log("--- LLM Response ---");
-                        console.log('Chat Response:', chatMessage);
-                        console.log('Execute Command:', command);
-                        console.log('Continue Autonomously:', continue_autonomously);
-                        console.log('Thought:', thought);
-                        console.log("--- End LLM Response ---");
-                        // Add prefix to command if needed
-                        if (command && command.trim() !== '' && !command.startsWith('!') && !command.startsWith('/')) {
-                            command = '!' + command;
-                        }
-                        // Ensure empty/whitespace commands become null
-                        if (command && command.trim() === '') {
-                            command = null;
-                        }
-                    }
-                }
+            // Check if responseData is a valid object after potential parsing/error handling
+            if (!error && (typeof responseData !== 'object' || responseData === null)) {
+                 error = "Oops! The LLM returned an unexpected data format (not an object). Please try again.";
+                 console.log('[Prompter] bad format:', responseData); // Log the bad format
+                 responseData = null; // Nullify responseData
             }
         } catch (e) { 
              // Catch errors during the proxy request itself
              console.error("Error during LLM request:", e);
-             error = e.message;
+             error = e.message || "An unknown error occurred during the LLM request.";
+             responseData = null; // Ensure responseData is null on request error
         }
 
-        // Return the structured object
-        return { chatMessage, command, error, continue_autonomously, thought };
+        // --- Return --- 
+        // Return the raw responseData if successful, or null if error occurred
+        // Include the error separately
+        return { response: responseData, error: error };
     }
 
     async promptMemSaving(prev_mem, to_summarize) {
