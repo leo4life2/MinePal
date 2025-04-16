@@ -92,6 +92,7 @@ export class Coder {
         });
     }
 
+    // Not used by MinePal.
     async generateCode(agent_history) {
         // wrapper to prevent overlapping code generation loops
         console.log("[CODERSTOP] Generate code.");
@@ -103,6 +104,7 @@ export class Coder {
         return res.message;
     }
 
+    // Not used by MinePal.
     async generateCodeLoop(agent_history) {
         let messages = agent_history.getHistory();
         messages.push({role: 'system', content: 'Code generation started. Write code in codeblock in your response:'});

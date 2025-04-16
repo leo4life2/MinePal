@@ -12,15 +12,10 @@ import * as world from "./library/world.js";
 import { Vec3 } from 'vec3'; // Ensure Vec3 is imported if not already
 
 // --- Silence Timer Constants ---
-const MEAN_1 = 45; // Base mean silence duration in seconds for the first silence
+const MEAN_1 = 5; // Base mean silence duration in seconds for the first silence
 const STD_FACTOR = 10; // STD is MEAN_i / STD_FACTOR
 const R = 3.5;    // Exponential factor for increasing mean silence duration
 // --- End Silence Timer Constants ---
-
-// --- Weather Constants ---
-const WEATHER_LOW = 0.991;
-const WEATHER_HIGH = 1.0;   // Window to detect weather ending
-// --- End Weather Constants ---
 
 // Helper function to generate descriptive time difference string
 function timeAgo(pastDate) {
@@ -285,7 +280,7 @@ export class Agent {
     _pruneHistory() {
         let lastAssistantIndex = -1;
         for (let j = this.history.turns.length - 1; j >= 0; j--) {
-            if (this.history.turns[j].role === 'assistant') {
+            if (this.history.turns[j].role === 'minepal') {
                 lastAssistantIndex = j;
                 break;
             }
@@ -975,7 +970,7 @@ export class Agent {
             history = this.history.getHistory(); // Get updated history
 
             // Get structured response from prompter
-            const { chatMessage, command, error, continue_autonomously } = await this.prompter.promptConvo(history);
+            const { chatMessage, command, error, continue_autonomously, thought } = await this.prompter.promptConvo(history);
 
             // Handle errors first
             if (error) {
@@ -985,17 +980,26 @@ export class Agent {
                 break; // Exit the loop on error
             }
 
-            // add user message
+            // Add the agent's response (chat and thought) to history *before* processing command/chat
+            // This ensures the 'minepal' turn is recorded even if only chat is returned.
+            if (chatMessage || command) { // Only add if there was some response
+                this.history.add(this.name, chatMessage || "", thought); // Use empty string if no chatMessage
+            }
+
+            // Process and send chat message if it exists
+            if (chatMessage && chatMessage.trim() !== '') {
+                await this.sendMessage(chatMessage, true);
+            }
+
+            // Process command if it exists
             if (command) {                
-                // Send chat message first, if any
-                if (chatMessage && chatMessage.trim() !== '') {
-                     await this.sendMessage(chatMessage, true);
-                }
-                
                 // Check if it's a slash command (in-game command)
                 if (command.startsWith('/')) {
                     console.log(`Sending slash command: "${command}"`);
-                    await this.sendMessage(command, true); // Send directly to chat
+
+                    if (!chatMessage || chatMessage.trim() === '') { 
+                        await this.sendMessage(command, true); // Send slash command if no chat was sent
+                    }
                     break; // Treat as finished, don't try to execute internally
                 }
 
@@ -1017,24 +1021,22 @@ export class Agent {
                 console.log('Agent executed:', command_name, 'and got:', execute_res);
 
                 if (execute_res) {
-                    this.history.add('system', `[EXEC_RES] ${execute_res}`);
-                    continue; // A successful execution auto-reprompts the LLM.
-                } else {
+                    this.history.add('system', `[EXEC_RES] Output of action ${command_name}: ${execute_res}`);
+                }
 
-                    // If the LLM says to continue autonomously, increment the counter.
-                    // Otherwise, break the loop.
-                    if (continue_autonomously) {
-                        continue_autonomously_count++;
-                    } else {
-                        break;
-                    }
+                // If the LLM says to continue autonomously, increment the counter.
+                // Otherwise, break the loop.
+                if (continue_autonomously) {
+                    continue_autonomously_count++;
+                } else {
+                    break;
                 }
             } else {
-                // No command, just send the chat message if it exists
-                if (chatMessage && chatMessage.trim() !== '') {
-                    await this.sendMessage(chatMessage, true);
-                } else {
-                    // Handle case where LLM returns no chat and no command (maybe silence or just thinking)
+                // No command was generated. Chat message (if any) was already sent above.
+                // Bot's turn was already added to history if chatMessage existed.
+                
+                // Handle case where LLM returns no chat and no command (maybe silence or just thinking)
+                if (!chatMessage || chatMessage.trim() === '') {
                     console.log("[DEBUG] LLM returned no chat message and no command.");
                 }
 
@@ -1317,6 +1319,5 @@ export class Agent {
             message = this.cleanChat(message);
         }
         this.bot.chat(message);
-        await this.history.add(this.name, message);
     }
 }

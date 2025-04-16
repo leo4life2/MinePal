@@ -102,6 +102,7 @@ export class Prompter {
         let command = null;
         let error = null;
         let continue_autonomously = false;
+        let thought = null;
 
         try {
             responseData = await this.proxy.sendRequest(messages, systemPrompt);
@@ -135,9 +136,14 @@ export class Prompter {
                         chatMessage = say_in_game || null; // Use null if empty string
                         command = execute_command || null; // Use null if empty string
                         continue_autonomously = responseData.continue_autonomously || false;
+                        thought = responseData.thought || null;
+
+                        console.log("--- LLM Response ---");
                         console.log('Chat Response:', chatMessage);
                         console.log('Execute Command:', command);
                         console.log('Continue Autonomously:', continue_autonomously);
+                        console.log('Thought:', thought);
+                        console.log("--- End LLM Response ---");
                         // Add prefix to command if needed
                         if (command && command.trim() !== '' && !command.startsWith('!') && !command.startsWith('/')) {
                             command = '!' + command;
@@ -156,7 +162,7 @@ export class Prompter {
         }
 
         // Return the structured object
-        return { chatMessage, command, error, continue_autonomously };
+        return { chatMessage, command, error, continue_autonomously, thought };
     }
 
     async promptMemSaving(prev_mem, to_summarize) {

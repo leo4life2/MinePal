@@ -67,14 +67,18 @@ export class History {
         console.log(`Process ${process.pid}: Memory updated to: `, this.memory);
     }
 
-    async add(name, content) {
-        let role = 'assistant';
+    async add(name, content, thought=null) {
+        let role = 'minepal';
         if (name === 'system') {
             role = 'system';
         }
         else if (name !== this.name) {
             role = 'user';
-            content = `${name}: ${content}`;
+            content = `<${name}>: ${content}`;
+        } else if (role === 'minepal') {
+            let thought_prefix = `[Inner Thought]: ${thought}`;
+            content = `<${this.name}>: ${content}`;
+            content = `${thought_prefix}\n${content}`;
         }
         this.turns.push({role, content});
 

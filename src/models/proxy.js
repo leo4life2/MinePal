@@ -85,7 +85,6 @@ export class Proxy {
 
             const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, { headers });
             res = response.data;
-            console.log('[THOUGHT] thought was: ', res.thought);
         } catch (err) {
             res = "Error: ";
             if (err.response) {
