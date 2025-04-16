@@ -188,7 +188,7 @@ function startServer() {
                                     'Authorization': `Bearer ${token}`,
                                     'Content-Type': 'audio/ogg; codecs=opus'
                                 },
-                                timeout: 4000 // 4 second timeout
+                                timeout: 12000 // 12 second timeout
                             }
                         );
 
