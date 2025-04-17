@@ -53,7 +53,25 @@ export class Proxy {
     }
 
     async sendRequest(turns, systemMessage, stop_seq='***', memSaving=false) {
-        let messages = [{'role': 'system', 'content': systemMessage}].concat(turns);
+        let messages = [{'role': 'system', 'content': systemMessage}].concat(
+            turns.map(turn => {
+                // If assistant, format all fields into content
+                if (turn.role === 'assistant') {
+                    let formattedContent = '';
+                    if (turn.thought) {
+                        formattedContent += `[Inner Thought]: ${turn.thought}\n`;
+                    }
+                    if (turn.current_goal_status) {
+                        formattedContent += `[Goal Status]: ${turn.current_goal_status}\n`;
+                    }
+                    // Add any other fields you want to expose here
+                    formattedContent += turn.content || '';
+                    return { ...turn, content: formattedContent };
+                }
+                // For all other roles, just pass through
+                return turn;
+            })
+        );
         let res = null;
         // console.log("\n\n=== BEGIN MESSAGES === \n\n");
         // messages.forEach((msg, index) => {

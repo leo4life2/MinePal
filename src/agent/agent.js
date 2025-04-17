@@ -12,7 +12,7 @@ import * as world from "./library/world.js";
 import { Vec3 } from 'vec3'; // Ensure Vec3 is imported if not already
 
 // --- Silence Timer Constants ---
-const MEAN_1 = 5; // Base mean silence duration in seconds for the first silence
+const MEAN_1 = 12; // Base mean silence duration in seconds for the first silence
 const STD_FACTOR = 10; // STD is MEAN_i / STD_FACTOR
 const R = 3.5;    // Exponential factor for increasing mean silence duration
 // --- End Silence Timer Constants ---
@@ -957,6 +957,7 @@ export class Agent {
 
             // Add notice to prevent self gaslighting
             this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
+            this.history.add('system', `[GOAL_REMINDER] Remember to check goals that you've already completed, and don't re-do a goal if you've already completed it.`);
 
             // Check if latestHUD is empty
             const { diffText } = await this.headsUpDisplay();
@@ -975,16 +976,16 @@ export class Agent {
             const responseData = promptResult.response; // Might be null if error occurred
 
             // --- Logging --- 
-            console.log("--- LLM Response --- ");
-            // Log fields directly from responseData, handling potential undefined gracefullyough all keys in the responseData object and log them
-            for (const key in responseData) {
-                if (Object.hasOwnProperty.call(responseData, key)) {
-                    // Simple formatting for key name (e.g., snake_case -> Snake Case)
-                    const formattedKey = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-                    console.log(`${formattedKey}:`, responseData[key]);
-                }
-            }
-            console.log("--- End LLM Response --- ");
+            // console.log("--- LLM Response --- ");
+            // // Log fields directly from responseData, handling potential undefined gracefullyough all keys in the responseData object and log them
+            // for (const key in responseData) {
+            //     if (Object.hasOwnProperty.call(responseData, key)) {
+            //         // Simple formatting for key name (e.g., snake_case -> Snake Case)
+            //         const formattedKey = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            //         console.log(`${formattedKey}:`, responseData[key]);
+            //     }
+            // }
+            // console.log("--- End LLM Response --- ");
 
             // Handle errors first
             if (error) {

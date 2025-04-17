@@ -983,40 +983,54 @@ export async function attackNearest(
 }
 
 export async function attackEntity(bot, entity, kill = true) {
-  /**
-   * Attack mob of the given type.
-   * @param {MinecraftBot} bot, reference to the minecraft bot.
-   * @param {Entity} entity, the entity to attack.
-   * @returns {Promise<boolean>} true if the entity was attacked, false if interrupted
-   * @example
-   * await skills.attackEntity(bot, entity);
-   **/
-
   let pos = entity.position;
-  console.log(bot.entity.position.distanceTo(pos));
-
   await equipHighestAttack(bot);
 
-  if (!kill) {
-    if (bot.entity.position.distanceTo(pos) > NEAR_DISTANCE) {
-      console.log("moving to mob...");
-      await goToPosition(bot, pos.x, pos.y, pos.z);
+  // Move within attack range
+  if (bot.entity.position.distanceTo(pos) > NEAR_DISTANCE) {
+    try {
+      await goToPosition(bot, pos.x, pos.y, pos.z, 2);
+    } catch (err) {
+      log(bot, `Failed to reach ${entity.name}: ${err.message}`);
+      return false;
     }
-    console.log("attacking mob...");
-    await bot.attack(entity);
-  } else {
+  }
+
+  // Listen for entity death
+  let killed = false;
+  const onEntityDead = (deadEntity) => {
+    if (deadEntity.id === entity.id) killed = true;
+  };
+  bot.on('entityDead', onEntityDead);
+
+  try {
     bot.pvp.attack(entity);
-    // Need to await getVisibleEntities inside the loop condition
-    while ((await world.getVisibleEntities(bot)).includes(entity)) { 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Wait up to 15 seconds for the entity to die
+    const start = Date.now();
+    while (!killed && Date.now() - start < 15000) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
       if (bot.interrupt_code) {
         bot.pvp.stop();
+        bot.removeListener('entityDead', onEntityDead);
         return false;
       }
     }
-    log(bot, `Successfully killed ${entity.name}.`);
-    await pickupNearbyItems(bot);
-    return true;
+    bot.pvp.stop();
+    bot.removeListener('entityDead', onEntityDead);
+
+    if (killed) {
+      log(bot, `Successfully killed ${entity.name}.`);
+      await pickupNearbyItems(bot);
+      return true;
+    } else {
+      log(bot, `Failed to kill ${entity.name} (timeout or interrupted).`);
+      return false;
+    }
+  } catch (err) {
+    bot.pvp.stop();
+    bot.removeListener('entityDead', onEntityDead);
+    log(bot, `Error attacking ${entity.name}: ${err.message}`);
+    return false;
   }
 }
 
@@ -2005,7 +2019,7 @@ export async function goToBed(bot) {
    * await skills.goToBed(bot);
    **/
   const beds = bot.findBlocks({
-    matching: (block) => block.name.includes("bed"),
+    matching: (block) => block.name.includes("_bed") || block.name === "bed",
     maxDistance: 32,
     count: 10, // Find up to 10 nearby beds
   });
@@ -2015,6 +2029,8 @@ export async function goToBed(bot) {
     return false;
   }
 
+  console.log("beds:", beds);
+
   for (const loc of beds) {
     const bedPosition = loc; // findBlocks returns Vec3 positions directly
 
@@ -2023,7 +2039,6 @@ export async function goToBed(bot) {
       try {
         await goToPosition(bot, bedPosition.x, bedPosition.y, bedPosition.z, 1); // Aim close
       } catch (navErr) {
-        console.log(`Failed to navigate to bed at ${bedPosition}: ${navErr.message}, ${navErr.stack}. Trying next bed.`);
         continue; // Skip to the next bed if navigation fails
       }
     }
@@ -2052,8 +2067,7 @@ export async function goToBed(bot) {
       return true; // Successfully slept and woke up
 
     } catch (err) {
-      log(bot, `Could not use bed at ${bedPosition}: ${err.message}. Trying next bed...`);
-      // Optional: Check for specific errors like occupied, monsters nearby, daytime
+      // Do nothing
     }
     
     if (bot.interrupt_code) {

@@ -176,7 +176,7 @@ export const actionsList = [
     }),
   },
   {
-    name: "!collectBlocks",
+    name: "!digToGetBlocks",
     description: "Collect the nearest blocks of a given type.",
     params: {
       type: "(string) The block type to collect.",
@@ -186,22 +186,6 @@ export const actionsList = [
     perform: wrapExecution(async (agent, type, num, grownCropsOnly = false) => {
       await skills.collectBlock(agent.bot, type, num, null, grownCropsOnly);
     }, 10), // 10 minute timeout
-  },
-  {
-    name: "!collectAllBlocks",
-    description:
-      "Collect all the nearest blocks of a given type until told to stop.",
-    params: {
-      type: "(string) The block type to collect.",
-    },
-    perform: wrapExecution(
-      async (agent, type) => {
-        let success = await skills.collectBlock(agent.bot, type, 2368); // 2368 = total slots * 1 stack
-        if (!success) agent.coder.cancelResume();
-      },
-      10,
-      "collectAllBlocks"
-    ), // 10 minute timeout
   },
   {
     name: "!craftRecipe",
