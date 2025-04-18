@@ -68,6 +68,16 @@ h1 {
   margin-top: 0;
   width: 530px;
   white-space: nowrap;
+  position: relative;
+}
+
+h1 small {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 0.3em;
+  color: var(--text-color);
+  opacity: 0.6;
 }
 
 .error-message {

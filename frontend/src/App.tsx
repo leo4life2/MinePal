@@ -12,6 +12,7 @@ import settingNotes from './utils/settingsNotes';
 import Announcement from './components/Announcement';
 import ThemeProvider from './contexts/ThemeContext/ThemeProvider';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
+import pkg from '../../package.json';
 
 export default function App() {
   return (
@@ -22,7 +23,9 @@ export default function App() {
             <AgentProvider>
               <div className="container">
                 <ThemeToggle />
-                <h1>MinePal Controls</h1>
+                <h1>
+                  MinePal Controls <small>v{pkg.version}</small>
+                </h1>
                 <Announcement />
                 <label htmlFor="profiles" className="input-label">
                   Choose Your Pals
