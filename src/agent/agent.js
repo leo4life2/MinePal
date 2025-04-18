@@ -217,6 +217,14 @@ export class Agent {
         this.ownerHurtCooldownActive = false; // Cooldown flag for owner hurt event
         this.botHurtCooldownActive = false; // Cooldown flag for bot hurt event
         this.reportedRareBlocks = new Set(); // Cache for reported rare block locations (stores "x,y,z")
+
+        // --- Prompting State Management ---
+        this.promptingState = 'idle'; // 'idle', 'prompting'
+        this.promptQueued = false; // Flag to indicate if a prompt needs to be processed
+        this.processingLoopInterval = null; // To hold the interval ID
+        this.lastContinueAutonomously = false; // Track if the last cycle requested continuation
+        this.autonomousCycleCount = 0; // Counter for consecutive autonomous cycles
+        // --- End Prompting State Management ---
     }
 
     /**
@@ -428,6 +436,9 @@ export class Agent {
             if ((this.profile.triggerOnJoin || this.profile.triggerOnRespawn) && this.profile.autoMessage) {
                 await this.sendMessage(this.profile.autoMessage);
             }
+
+            // Start the core processing loop
+            this._startProcessingLoop();
 
             this.bot.emit('finished_executing');
             this.startEvents();
@@ -926,189 +937,319 @@ export class Agent {
     }
     
     /**
-     * Handles incoming messages and executes appropriate actions.
-     * @param {string} source - The source of the message.
+     * Handles incoming messages by adding them to history and queuing a prompt.
+     * @param {string} source - The source of the message ('system', username, etc.).
      * @param {string} message - The content of the message.
      */
     async handleMessage(source, message) {
         if (!this.bot) {
+            console.warn("[handleMessage] Attempted to handle message before bot was initialized.");
             return;
         }
 
         // --- Silence Timer Management ---
+        // Clear existing timer if a new message arrives (or if it's the silence message itself)
+        if (this.silenceTimer) {
+            clearTimeout(this.silenceTimer);
+            this.silenceTimer = null;
+            // console.log("[DEBUG] Cleared silence timer due to incoming message/event.");
+        }
+        const isSilenceMessage = source === 'system' && message?.startsWith('[SILENCE]');
+        if (!isSilenceMessage) {
+            this.silences = 0; // Reset silence count on non-silence activity
+        } else {
+            this.silences++; // Increment silence count if it IS the silence message
+            // console.log(`[DEBUG] Silence count incremented to ${this.silences}.`);
+        }
+        // --- End Silence Timer Management ---
+
+        // Add the message to history
+        await this.history.add(source, message);
+
+        // Queue a prompt processing cycle
+        this.promptQueued = true;
+        // console.log(`[DEBUG] Prompt queued by ${source}. State: ${this.promptingState}`);
+
+        // --- Restart Silence Timer ---
+        // Always reset the silence timer after any message handling (including the silence message itself)
+        // This ensures the next silence period starts now.
+        this._setNextSilenceTimer();
+        // --- End Restart Silence Timer ---
+
+        // Note: The actual LLM prompting and response handling is done in _processingLoop
+    }
+
+    /**
+     * Sets the timer for the next potential silence message.
+     */
+    _setNextSilenceTimer() {
+        // Clear any potentially existing timer first
         if (this.silenceTimer) {
             clearTimeout(this.silenceTimer);
             this.silenceTimer = null;
         }
-        const isSilenceMessage = source === 'system' && message?.startsWith('[SILENCE]');
-        if (!isSilenceMessage) {
-            this.silences = 0; // Reset silence count on non-silence message
-        }
-        // --- End Silence Timer Management ---
-        let continue_autonomously_count = 0;
 
-        await this.history.add(source, message);
-        // Process the message and generate responses
-        while (continue_autonomously_count < 10) {
-            let history = this.history.getHistory();
-
-            // Call the pruning function
-            this._pruneHistory();
-
-            // Add notice to prevent self gaslighting
-            this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
-            this.history.add('system', `[GOAL_REMINDER] Remember to check goals that you've already completed, and don't re-do a goal if you've already completed it.`);
-
-            // Check if latestHUD is empty
-            const { diffText } = await this.headsUpDisplay();
-            if (diffText) {
-                this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
-            }
-
-            // Call consolidation function before getting history for the prompt
-            this._consolidateTailSystemMessages();
-
-            history = this.history.getHistory(); // Get updated history
-
-            // Get structured response from prompter
-            const promptResult = await this.prompter.promptConvo(history);
-            const error = promptResult.error;
-            const responseData = promptResult.response; // Might be null if error occurred
-
-            // --- Logging --- 
-            // console.log("--- LLM Response --- ");
-            // // Log fields directly from responseData, handling potential undefined gracefullyough all keys in the responseData object and log them
-            // for (const key in responseData) {
-            //     if (Object.hasOwnProperty.call(responseData, key)) {
-            //         // Simple formatting for key name (e.g., snake_case -> Snake Case)
-            //         const formattedKey = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-            //         console.log(`${formattedKey}:`, responseData[key]);
-            //     }
-            // }
-            // console.log("--- End LLM Response --- ");
-
-            // Handle errors first
-            if (error) {
-                console.error("Error from promptConvo:", error);
-                // Decide how to handle the error, e.g., send a message to the user or retry
-                await this.sendMessage(`${error}`, true);
-                break; // Exit the loop on error
-            }
-
-            // Ensure we have valid response data if no error occurred
-            if (!responseData) {
-                 console.error("promptConvo returned no error but also no response data.");
-                 await this.sendMessage("Oops! Something went wrong internally. Please try again.", true);
-                 break;
-            }
-
-            // Extract and clean up fields from responseData
-            let chatMessage = responseData.say_in_game || null;
-            let command = responseData.execute_command || null;
-            let continue_autonomously = responseData.continue_autonomously || false;
-            let thought = responseData.thought || null;
-            let current_goal_status = responseData.current_goal_status || null;
-            // Clean up extracted fields
-            if (chatMessage && chatMessage.trim() === '') chatMessage = null;
-            if (command && command.trim() === '') command = null;
-            // Add prefix to internal command if needed
-            if (command && !command.startsWith('!') && !command.startsWith('/')) {
-                 command = '!' + command;
-            }
-
-            // Add the agent's response (chat and thought) to history *before* processing command/chat
-            // This ensures the 'assistant' turn is recorded even if only chat is returned.
-            if (chatMessage || command || thought || current_goal_status) { // Only add if there was some response element
-                this.history.add(this.name, chatMessage || "", thought, current_goal_status); // Pass current_goal_status
-            }
-
-            // Process and send chat message if it exists
-            if (chatMessage && chatMessage.trim() !== '') {
-                await this.sendMessage(chatMessage, true);
-            }
-
-            // Process command if it exists
-            if (command) {                
-                // Check if it's a slash command (in-game command)
-                if (command.startsWith('/')) {
-                    console.log(`Sending slash command: "${command}"`);
-
-                    if (!chatMessage || chatMessage.trim() === '') { 
-                        await this.sendMessage(command, true); // Send slash command if no chat was sent
-                    }
-                    break; // Treat as finished, don't try to execute internally
-                }
-
-                // --- It's an internal command (!) ---
-                const command_name = containsCommand(command); // Use containsCommand to extract !action_name
-                if (!command_name) { // Should ideally not happen if command starts with ! but good sanity check
-                    console.error(`[ERROR] Command string "${command}" did not yield a valid command name.`);
-                    this.history.add('system', `[ERROR] Invalid function call: ${command}`);
-                    continue; // Try again
-                }
-
-                if (!commandExists(command_name)) { // Check if internal command exists
-                    this.history.add('system', `[HALLUCINATION] Command ${command_name} does not exist.`);
-                    console.log('Agent hallucinated command:', command_name);
-                    continue; // Try generating again
-                }
-                
-                let execute_res = await executeCommand(this, command);
-                console.log('Agent executed:', command_name, 'and got:', execute_res);
-
-                if (execute_res) {
-                    this.history.add('system', `[EXEC_RES] Output of action ${command_name}: ${execute_res}`);
-                }
-
-                // If the LLM says to continue autonomously, increment the counter.
-                // Otherwise, break the loop.
-                if (continue_autonomously) {
-                    continue_autonomously_count++;
-                } else {
-                    break;
-                }
-            } else {
-                // No command was generated. Chat message (if any) was already sent above.
-                // Bot's turn was already added to history if chatMessage existed.
-                
-                // Handle case where LLM returns no chat and no command (maybe silence or just thinking)
-                if (!chatMessage || chatMessage.trim() === '') {
-                    console.log("[DEBUG] LLM returned no chat message and no command.");
-                }
-
-                // If the LLM says to continue autonomously, increment the counter.
-                // Otherwise, break the loop.   
-                if (continue_autonomously) {
-                    continue_autonomously_count++;
-                } else {
-                    break;
-                }
-            }
-        }
-        if (continue_autonomously_count >= 10) {
-            this.history.add('system', `[NOTICE] Continue autonomously usage is limited to 10 times. Stopping execution.`);
-            await this.sendMessage(`/tell ${this.owner} [NOTICE] Autonomous execution is limited to 10 steps. Stopping execution.`, true);
-        }
-
-        this.history.save();
-        this.bot.emit('finished_executing');
-
-        // --- Set the next silence timer ---
-        // Updated calculation for meanSeconds using exponential formula
+        // Calculate silence duration
         const meanSeconds = MEAN_1 * Math.pow(R, this.silences);
         const stdDevSeconds = meanSeconds / STD_FACTOR;
         let plannedSilenceSeconds = boxMullerRandomNormal(meanSeconds, stdDevSeconds);
-        // Ensure delay is at least 1 second
-        plannedSilenceSeconds = Math.max(1, plannedSilenceSeconds);
-
+        plannedSilenceSeconds = Math.max(1, plannedSilenceSeconds); // Ensure delay is at least 1 second
         const delayMilliseconds = plannedSilenceSeconds * 1000;
 
-        this.silenceTimer = setTimeout(() => {
-            this.silences++;
-            const formattedDuration = formatDuration(plannedSilenceSeconds); // Use planned duration for message
-            this.handleMessage('system', `[SILENCE] It's been ${formattedDuration} of silence.`);
+        // console.log(`[DEBUG] Setting next silence timer for ${formatDuration(plannedSilenceSeconds)} (${this.silences} consecutive silences).`);
+
+        this.silenceTimer = setTimeout(async () => {
+            // Check if bot is still connected before handling silence
+            if (!this.bot || !this.bot.entity) {
+                console.log("[DEBUG] Silence timer fired, but bot is no longer valid. Aborting.");
+                return;
+            }
+            const formattedDuration = formatDuration(plannedSilenceSeconds);
+            // console.log(`[DEBUG] Silence timer fired after ${formattedDuration}.`);
+            // Treat silence as a system event that needs processing
+            await this.handleMessage('system', `[SILENCE] It's been ${formattedDuration} of silence.`);
         }, delayMilliseconds);
-        // --- End Set Silence Timer ---
+    }
+
+    /**
+     * Starts the main processing loop for handling queued prompts.
+     */
+    _startProcessingLoop() {
+        if (this.processingLoopInterval) {
+            console.warn("[_startProcessingLoop] Processing loop already started.");
+            return;
+        }
+        const loopInterval = 1000; // Process every 1 second
+        console.log(`[Agent] Starting processing loop with interval ${loopInterval}ms.`);
+        this.processingLoopInterval = setInterval(async () => {
+            // --- Autonomous Cycle Management ---
+            // Check if the *last completed cycle* requested autonomous continuation
+            if (this.lastContinueAutonomously) {
+                this.autonomousCycleCount++;
+                // console.log(`[_processingLoop] Autonomous cycle requested. Count: ${this.autonomousCycleCount}`);
+            } else {
+                this.autonomousCycleCount = 0;
+            }
+            // Reset the flag *after* checking it for the current interval
+            this.lastContinueAutonomously = false;
+            // --- End Autonomous Cycle Management ---
+
+            // Core loop logic
+            if (this.promptQueued && this.promptingState === 'idle') {
+                // --- Autonomous Limit Check ---
+                if (this.autonomousCycleCount >= 10) {
+                    console.warn("[_processingLoop] Autonomous cycle limit reached. Stopping continuous prompting.");
+                    this.history.add('system', `[NOTICE] Autonomous cycle limit (10) reached. Stopping execution.`);
+                    await this.sendMessage(`/tell ${this.owner} [NOTICE] Autonomous execution limit reached. Stopping.`, true);
+                    this.promptQueued = false; // Prevent the prompt
+                    this.autonomousCycleCount = 0; // Reset counter
+                    this.lastContinueAutonomously = false; // Ensure flag is reset
+                    return; // Skip the rest of this interval's processing
+                }
+                // --- End Autonomous Limit Check ---
+
+                // console.log("[_processingLoop] Detected queued prompt and idle state. Starting processing.");
+                this.promptingState = 'prompting'; // Set state to busy
+                this.promptQueued = false; // Consume the queue flag
+
+                try {
+                    await this._processPromptCycle();
+                } catch (error) {
+                    console.error("[_processingLoop] Error during prompt cycle:", error);
+                    // Attempt to recover by resetting state, maybe send error message
+                    this.history.add('system', `[ERROR] An internal error occurred during processing: ${error.message}`);
+                    await this.sendMessage(`An internal error occurred. I'll try to recover.`, true);
+                } finally {
+                    // IMPORTANT: Reset state to idle *after* processing is done or if an error occurred
+                    // This allows the next loop iteration to pick up a new queued prompt if one arrived
+                    // during the LLM call/processing/action initiation.
+                    // console.log("[_processingLoop] Finished processing cycle. Resetting state to idle.");
+                    this.promptingState = 'idle';
+                    // We might have finished an action or just thought, reset the silence timer
+                    // But ensure handleMessage already reset it correctly
+                    if (!this.silenceTimer) {
+                         // console.log("[_processingLoop] Resetting silence timer after processing cycle.");
+                         this._setNextSilenceTimer(); // Reset silence timer if it wasn't already running
+                    }
+                }
+            } else {
+                // console.log(`[_processingLoop] Skipping cycle. Queued: ${this.promptQueued}, State: ${this.promptingState}`);
+            }
+        }, loopInterval);
+    }
+
+    /**
+     * Stops the main processing loop.
+     */
+    _stopProcessingLoop() {
+        if (this.processingLoopInterval) {
+            console.log("[Agent] Stopping processing loop.");
+            clearInterval(this.processingLoopInterval);
+            this.processingLoopInterval = null;
+        }
+         if (this.silenceTimer) {
+            clearTimeout(this.silenceTimer);
+            this.silenceTimer = null;
+        }
+    }
+
+    /**
+     * The core logic for a single LLM prompt cycle, moved from handleMessage.
+     * This function assumes it's called when state is 'prompting'.
+     */
+    async _processPromptCycle() {
+        // console.log("[_processPromptCycle] Starting prompt cycle.");
+        this._pruneHistory();
+
+        let history = this.history.getHistory(); // Get initial history for this cycle
+
+        // Add contextual reminders for this cycle
+        this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
+        this.history.add('system', `[GOAL_REMINDER] Remember to check goals that you've already completed, and don't re-do a goal if you've already completed it.`);
+
+        // Get HUD diff and add it if changes occurred
+        const { diffText } = await this.headsUpDisplay(); // headsUpDisplay also updates this.latestHUD
+        if (diffText) {
+            this.history.add('system', `[INV/STATUS] Your inventory and environment has updated. Here are the changes:\n${diffText}`);
+        }
+
+        // Consolidate tail system messages *after* adding HUD/reminders
+        this._consolidateTailSystemMessages();
+
+        // Get the final, prepared history for the LLM
+        history = this.history.getHistory();
+
+        // --- Call LLM ---
+        // console.log("[_processPromptCycle] Calling LLM...");
+        const promptResult = await this.prompter.promptConvo(history);
+        const error = promptResult.error;
+        const responseData = promptResult.response;
+        // console.log("[_processPromptCycle] LLM response received.");
+        // Log response data if needed (consider adding a debug flag)
+        // if (responseData) {
+        //     console.log("[DEBUG] LLM Response Data:", JSON.stringify(responseData, null, 2));
+        // }
+
+
+        // --- Process LLM Response ---
+
+        // Handle errors first
+        if (error) {
+            console.error("[_processPromptCycle] Error from promptConvo:", error);
+            this.history.add('system', `[ERROR] LLM generation failed: ${error}`);
+            await this.sendMessage(`${error}`, true);
+            // State reset happens in the finally block of the calling loop
+            return; // Stop processing this cycle
+        }
+
+        // Ensure we have valid response data
+        if (!responseData) {
+             console.error("[_processPromptCycle] promptConvo returned no error but also no response data.");
+             await this.sendMessage("Oops! Something went wrong internally (empty response). Please try again.", true);
+             return; // Stop processing this cycle
+        }
+
+        // Extract and clean up fields
+        let chatMessage = responseData.say_in_game || null;
+        let command = responseData.execute_command || null;
+        let continue_autonomously = responseData.continue_autonomously || false;
+        let thought = responseData.thought || null;
+        let current_goal_status = responseData.current_goal_status || null;
+
+        if (chatMessage && chatMessage.trim() === '') chatMessage = null;
+        if (command && command.trim() === '') command = null;
+        if (command && !command.startsWith('!') && !command.startsWith('/')) {
+             command = '!' + command; // Assume internal if not explicitly slash command
+        }
+
+        // Add the assistant's response (chat, thought, goal) to history *before* execution
+        // Only add turn if there's something to record
+        if (chatMessage || command || thought || current_goal_status) {
+            // console.log(`[_processPromptCycle] Adding assistant turn. Chat: ${!!chatMessage}, Cmd: ${!!command}, Thought: ${!!thought}, Goal: ${!!current_goal_status}`);
+            this.history.add(this.name, chatMessage || "", thought, current_goal_status);
+        } else {
+            // console.log("[_processPromptCycle] LLM returned no chat, command, thought, or goal status. No assistant turn added.");
+        }
+
+
+        // Process Chat
+        if (chatMessage) {
+            // console.log(`[_processPromptCycle] Sending chat message: "${chatMessage}"`);
+            await this.sendMessage(chatMessage, true);
+        }
+
+        // Process Command
+        if (command) {
+            // Handle Slash Commands (just send to chat)
+            if (command.startsWith('/')) {
+                // console.log(`[_processPromptCycle] Sending slash command: "${command}"`);
+                // Send the slash command itself as a chat message
+                await this.sendMessage(command, true);
+                // Don't execute internally, Minecraft handles it.
+                // State reset happens in the finally block.
+            }
+            // Handle Internal Commands (!)
+            else {
+                const command_name = containsCommand(command);
+                if (!command_name) {
+                    console.error(`[_processPromptCycle] Invalid internal command format: ${command}`);
+                    this.history.add('system', `[ERROR] Invalid internal command format: ${command}`);
+                    // State reset in finally block. Continue to next cycle potentially.
+                    return;
+                }
+
+                if (!commandExists(command_name)) {
+                    console.log(`[_processPromptCycle] Hallucinated command: ${command_name}`);
+                    this.history.add('system', `[HALLUCINATION] Command ${command_name} does not exist.`);
+                    // Don't execute. Let the state reset and potentially try again if prompted.
+                    return;
+                }
+
+                // Execute the valid internal command
+                // console.log(`[_processPromptCycle] Executing internal command: ${command_name}`);
+                let execute_res;
+                try {
+                    execute_res = await executeCommand(this, command);
+                    console.log(`[_processPromptCycle] Command ${command_name} finished. Result:`, execute_res);
+                    if (execute_res !== undefined && execute_res !== null) { // Add result only if it's meaningful
+                        this.history.add('system', `[EXEC_RES] Output of action ${command_name}: ${truncCommandMessage(String(execute_res))}`);
+                    }
+                    // Action initiated/completed. State reset will happen in the finally block.
+                    // The 'finished_executing' event might trigger if the command was long-running.
+                } catch (execError) {
+                     console.error(`[_processPromptCycle] Error executing command ${command_name}:`, execError);
+                     this.history.add('system', `[ERROR] Failed to execute action ${command_name}: ${execError.message}`);
+                     // State reset happens in the finally block.
+                }
+            }
+        } else {
+             // No command was generated. Chat (if any) was sent above.
+             // If no chat and no command, it was just a thought or status update.
+             // console.log("[_processPromptCycle] No command to execute.");
+             // State reset happens in the finally block.
+        }
+
+        // Save history after processing the response and potentially executing command
+        this.history.save();
+
+        // Emit finished_executing *after* the immediate processing of this cycle is done
+        // This signals other parts of the system (like coder resume) that the LLM response handling is complete for now.
+        // It doesn't necessarily mean a long-running command finished.
+        this.bot.emit('finished_executing');
+        // console.log("[_processPromptCycle] Emitted 'finished_executing'.");
+
+        // Note: The 'continue_autonomously' logic is removed. If an action result
+        // or subsequent event triggers handleMessage again, it will queue a new prompt
+        // which the loop will pick up once the state is 'idle'.
+
+        // State is reset in the finally block of the calling loop.
+        
+        // --- Queue next prompt if autonomous continuation is requested ---        
+        this.lastContinueAutonomously = continue_autonomously; // Store for the loop to check next interval
+        if (continue_autonomously) {
+            // console.log("[_processPromptCycle] LLM requested autonomous continuation. Queuing next prompt.");
+            this.promptQueued = true;
+        }
     }
 
     /**
@@ -1184,6 +1325,15 @@ export class Agent {
             this.coder.cancelResume();
             console.log("[CODERSTOP] Bot death.");
             this.coder.stop();
+            this.bot.pathfinder.stop(); // Clear any lingering pathfinder
+            this.bot.modes.unPauseAll();
+            this.coder.executeResume();
+            // When idle, explicitly check if a prompt is needed (e.g., after a command finished)
+            // This helps if the command completion didn't fire a specific event handled by handleMessage
+            // Or if we want responsiveness immediately after finishing an action.
+            // However, the processing loop already handles queued prompts, so this might be redundant
+            // unless coder.executeResume() needs to *force* a prompt cycle check sooner than the next interval.
+            // Let's rely on the loop for now. If needed, we can add: this.promptQueued = true;
         });
         this.bot.on('kicked', (reason) => {
             console.warn('Bot kicked!', reason);
@@ -1327,6 +1477,7 @@ export class Agent {
     cleanKill(msg='Killing agent process...', reason = null) {
         this.sendMessage('Goodbye world.')
         this.history.save();
+        this._stopProcessingLoop(); // Stop the loop on clean kill
 
         if (reason === 'KICK') {
             process.exit(128);
