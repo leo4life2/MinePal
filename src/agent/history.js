@@ -4,15 +4,14 @@ import { join } from 'path';
 import { readFileSync, existsSync, unlinkSync } from 'fs';
 import { LocalIndex } from 'vectra';
 
+const SHORT_ID_PREFIX = 'MEM-'; // Define prefix for short IDs
+
 export class History {
     constructor(agent) {
         this.agent = agent;
         this.name = agent.name;
         this.memory_fp = `${this.agent.userDataDir}/bots/${this.name}/memory.json`;
         this.turns = [];
-
-        // These define an agent's long term memory (deprecate soon)
-        this.memory = '';
 
         // New LTM
         this.index = new LocalIndex(join(this.agent.userDataDir, 'bots', this.name, 'index'));
@@ -24,23 +23,25 @@ export class History {
     async initDB() {
         // LowDB storage
         const file = join(this.agent.userDataDir, 'bots', this.name, 'lowdb.json');
-        const defaultData = { memory: '', turns: [], modes: {}, memory_bank: {} };
+        const defaultData = { turns: [], modes: {}, memory_bank: {} };
         const adapter = new JSONFile(file);
         this.db = new Low(adapter, defaultData);
         await this.db.read();
+
+        // Initialize short ID map and counter if they don't exist
+        this.db.data.shortIdMap = this.db.data.shortIdMap || {};
+        this.db.data.shortIdCounter = this.db.data.shortIdCounter || 0;
 
         // VectorDB
         if (!(await this.index.isIndexCreated())) {
             await this.index.createIndex();
         }
 
-        // This can probably get removed in a few versions, i don't think anyone will still be running the old memory.json anymore.
         // Check if memory.json exists and LowDB is empty
-        if (existsSync(this.memory_fp) && this.db.data.memory === '' && this.db.data.turns.length === 0) {
+        if (existsSync(this.memory_fp) && this.db.data.turns.length === 0) {
             try {
                 const data = readFileSync(this.memory_fp, 'utf8');
                 const obj = JSON.parse(data);
-                this.db.data.memory = obj.memory;
                 this.db.data.turns = obj.turns;
                 if (obj.modes) this.db.data.modes = obj.modes;
                 if (obj.memory_bank) this.db.data.memory_bank = obj.memory_bank;
@@ -51,20 +52,17 @@ export class History {
             }
         }
 
-        this.memory = this.db.data.memory;
         this.turns = this.db.data.turns;
         if (this.db.data.modes) this.agent.bot.modes.loadJson(this.db.data.modes);
         if (this.db.data.memory_bank) this.agent.memory_bank.loadJson(this.db.data.memory_bank);
+
+        // Assign map/counter to instance variables for easier access (optional but convenient)
+        this.shortIdMap = this.db.data.shortIdMap;
+        this.shortIdCounter = this.db.data.shortIdCounter;
     }
 
     getHistory() { // expects an Examples object
         return JSON.parse(JSON.stringify(this.turns));
-    }
-
-    async storeMemories(turns) {
-        console.log(`Process ${process.pid}: Storing memories...`);
-        this.memory = await this.agent.prompter.promptMemSaving(this.getHistory(), turns);
-        console.log(`Process ${process.pid}: Memory updated to: `, this.memory);
     }
 
     async add(name, content, thought = null, progressAcknowledgement = null) {
@@ -91,35 +89,22 @@ export class History {
 
         this.turns.push(turnObject);
 
-        // When we hit max messages, summarize all turns and store in vector DB
-        if (this.turns.length >= this.max_messages) {
-            // Copy all turns for summarization
-            const turnsToSummarize = [...this.turns];
-            await this.summarizeTurns(turnsToSummarize);
-            
-            // Remove oldest 2/3 of messages
-            const keepCount = Math.floor(this.turns.length / 3);
-            this.turns = this.turns.slice(-keepCount);
+        // Sliding window truncation
+        if (this.turns.length > this.max_messages) {
+            this.turns.shift(); // Remove the oldest message
         }
     }
 
-    async summarizeTurns(turns) {
-        console.log(`Process ${process.pid}: Summarizing conversation chunk...`);
-        const summary = await this.agent.prompter.promptMemSaving(this.getHistory(), turns);
-        console.log(`Process ${process.pid}: Chunk summarized as: `, summary);
-        
-        // Store the summary in vector DB
-        await this.insertMemory(summary);
-        return summary;
-    }
-
     async save() {
-        this.db.data.memory = this.memory;
         this.db.data.turns = this.turns;
         
         // Save agent.bot.modes and memory_bank
         this.db.data.modes = this.agent.bot.modes.getJson();
         this.db.data.memory_bank = this.agent.memory_bank.getJson();
+        
+        // Ensure short ID map and counter are saved
+        this.db.data.shortIdMap = this.shortIdMap;
+        this.db.data.shortIdCounter = this.shortIdCounter;
         
         await this.db.write();
     }
@@ -130,49 +115,177 @@ export class History {
 
     clear() {
         this.turns = [];
-        this.memory = '';
+        // Reset short ID map and counter
+        this.shortIdMap = {};
+        this.shortIdCounter = 0;
         this.save();
     }
 
     async insertMemory(text) {
         try {
+            // Increment counter and generate short ID
+            this.shortIdCounter++;
+            const shortId = `${SHORT_ID_PREFIX}${this.shortIdCounter}`;
+
             const vector = await this.agent.prompter.proxy.embed(text);
-            await this.index.insertItem({
+            // Insert into Vectra index
+            const insertResult = await this.index.insertItem({
                 vector: vector,
                 metadata: { text: text }
             });
+
+            // Get the full Vectra ID
+            const fullId = insertResult.id;
+
+            // Store the mapping
+            this.shortIdMap[fullId] = shortId;
+
+            // Save the updated map and counter immediately
+            await this.save();
+
+            console.log(`[History] Inserted memory with Short ID: ${shortId} (Full ID: ${fullId})`);
             return true;
         } catch (err) {
             console.error('Failed to insert memory:', err);
+            // Rollback counter if insert failed? Consider implications.
             return false;
         }
     }
 
-    async searchRelevant(text, k = 4) {
+    async searchRelevant(text, k = 10) {
         try {
             const vector = await this.agent.prompter.proxy.embed(text);
             const results = await this.index.queryItems(vector, k);
-            return results.map(result => ({
-                text: result.item.metadata.text,
-                score: result.score
-            }));
+
+            // Map results to include short and full IDs
+            const mappedResults = [];
+            let changesMade = false; // Flag to track if we need to save
+
+            for (const result of results) {
+                const fullId = result.item.id;
+                let shortId = this.shortIdMap[fullId];
+
+                // If shortId doesn't exist (legacy memory), assign one
+                if (!shortId) {
+                    this.shortIdCounter++;
+                    shortId = `${SHORT_ID_PREFIX}${this.shortIdCounter}`;
+                    this.shortIdMap[fullId] = shortId;
+                    changesMade = true; // Mark that we need to save
+                    console.log(`[History] Assigned Short ID ${shortId} to legacy memory (Full ID: ${fullId})`);
+                }
+
+                mappedResults.push({
+                    text: result.item.metadata.text,
+                    score: result.score,
+                    shortId: shortId,
+                    fullId: fullId
+                });
+            }
+
+            // Save map/counter if any legacy IDs were assigned
+            if (changesMade) {
+                await this.save();
+            }
+
+            return mappedResults;
         } catch (err) {
             console.error('Failed to search memories:', err);
             return [];
         }
     }
 
-    async deleteMemory(text) {
+    /**
+     * Deletes a memory item from the index and the ID map using its short ID.
+     * @param {string} shortId - The short ID (e.g., "MEM-123") of the memory to delete.
+     * @returns {Promise<boolean>} - True if deletion was successful, false otherwise.
+     */
+    async deleteMemoryByShortId(shortId) {
         try {
-            const vector = await this.agent.prompter.proxy.embed(text);
-            const results = await this.index.queryItems(vector, 1);
-            if (results.length > 0 && results[0].score > 0.95) {  // Only delete if very similar
-                await this.index.deleteItems([results[0].item.id]);
-                return true;
+            let fullIdToDelete = null;
+
+            // Find the full ID corresponding to the short ID
+            for (const [fullId, sId] of Object.entries(this.shortIdMap)) {
+                if (sId === shortId) {
+                    fullIdToDelete = fullId;
+                    break;
+                }
             }
-            return false;
+
+            if (fullIdToDelete) {
+                // Delete from Vectra index
+                await this.index.deleteItem(fullIdToDelete);
+
+                // Delete from the map
+                delete this.shortIdMap[fullIdToDelete];
+
+                // Save the updated map
+                await this.save();
+
+                console.log(`[History] Deleted memory with Short ID: ${shortId} (Full ID: ${fullIdToDelete})`);
+                return true;
+            } else {
+                console.warn(`[History] Could not find memory with Short ID: ${shortId} for deletion.`);
+                return false;
+            }
         } catch (err) {
-            console.error('Failed to delete memory:', err);
+            console.error(`[History] Failed to delete memory with Short ID ${shortId}:`, err);
+            return false;
+        }
+    }
+
+    /**
+     * Updates a memory item: Deletes the old entry and inserts a new one with the updated text,
+     * reusing the original short ID but associating it with the new full Vectra ID.
+     * @param {string} shortId - The short ID (e.g., "MEM-123") of the memory to update.
+     * @param {string} newText - The new text content for the memory.
+     * @returns {Promise<boolean>} - True if update was successful, false otherwise.
+     */
+    async updateMemoryByShortId(shortId, newText) {
+        let fullIdToDelete = null;
+        // Find the full ID corresponding to the short ID
+        for (const [fullId, sId] of Object.entries(this.shortIdMap)) {
+            if (sId === shortId) {
+                fullIdToDelete = fullId;
+                break;
+            }
+        }
+
+        if (!fullIdToDelete) {
+            console.warn(`[History] Could not find memory with Short ID: ${shortId} for update.`);
+            return false;
+        }
+
+        try {
+            // 1. Delete the old item from Vectra
+            await this.index.deleteItem(fullIdToDelete);
+
+            // 2. Remove the old mapping (fullId -> shortId)
+            delete this.shortIdMap[fullIdToDelete];
+
+            // 3. Embed the new text
+            const newVector = await this.agent.prompter.proxy.embed(newText);
+
+            // 4. Insert the new item into Vectra
+            const insertResult = await this.index.insertItem({
+                vector: newVector,
+                metadata: { text: newText }
+            });
+            const newFullId = insertResult.id; // Get the ID of the *newly* inserted item
+
+            // 5. Add the new mapping (newFullId -> original shortId)
+            this.shortIdMap[newFullId] = shortId;
+
+            // 6. Save the updated map
+            await this.save();
+
+            console.log(`[History] Updated memory for Short ID: ${shortId} (Old Full ID: ${fullIdToDelete}, New Full ID: ${newFullId})`);
+            return true;
+
+        } catch (err) {
+            console.error(`[History] Failed to update memory for Short ID ${shortId}:`, err);
+            // Attempt to rollback? This is tricky. If deletion worked but insertion failed,
+            // the mapping is already gone. If insertion worked but mapping update failed,
+            // the short ID points to nothing. Best to just log the error for now.
             return false;
         }
     }

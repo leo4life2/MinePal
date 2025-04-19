@@ -517,8 +517,14 @@ export class Agent {
         const positionStr = `(${botPos.x.toFixed(2)}, ${botPos.y.toFixed(2)}, ${botPos.z.toFixed(2)})`;
         hud.push(`- **Position:** ${positionStr}, Facing: ${facing}`);
         const dimensionStr = this.bot.game.dimension;
-        const biomeStr = world.getBiomeName(this.bot);
-        hud.push(`- **Dimension:** ${dimensionStr.charAt(0).toUpperCase() + dimensionStr.slice(1)} | **Biome:** ${biomeStr}`);
+        let biomeStr; // Declare biomeStr here
+        try {
+            biomeStr = world.getBiomeName(this.bot); // Get biome name
+        } catch (error) {
+            console.warn(`[headsUpDisplay] Error fetching biome name: ${error.message}`);
+            biomeStr = "Unknown"; // Default value on error
+        }
+        hud.push(`- **Dimension:** ${dimensionStr.charAt(0).toUpperCase() + dimensionStr.slice(1)} | **Biome:** ${biomeStr || "Unknown"}`); // Use || "Unknown" as fallback
         const timeStr = formatMinecraftTime(this.bot.time.timeOfDay);
         let weatherStr = "N/A";
         if (dimensionStr === 'overworld') {
@@ -1106,6 +1112,7 @@ export class Agent {
         // Add contextual reminders for this cycle
         this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
         this.history.add('system', `[GOAL_REMINDER] Remember to check goals that you've already completed, and don't re-do a goal if you've already completed it.`);
+        this.history.add('system', `[MEMORY_REMINDER] Remember to be proactive about saving owner related info, update obsolete memories, or delete duplicates or completely obsolete memories as needed.`);
 
         // Get HUD diff and add it if changes occurred
         const { diffText } = await this.headsUpDisplay(); // headsUpDisplay also updates this.latestHUD
@@ -1126,9 +1133,9 @@ export class Agent {
         const responseData = promptResult.response;
         // console.log("[_processPromptCycle] LLM response received.");
         // Log response data if needed (consider adding a debug flag)
-        // if (responseData) {
-        //     console.log("[DEBUG] LLM Response Data:", JSON.stringify(responseData, null, 2));
-        // }
+        if (responseData) {
+            console.log("[DEBUG] LLM Response Data:", JSON.stringify(responseData, null, 2));
+        }
 
 
         // --- Process LLM Response ---
@@ -1249,6 +1256,52 @@ export class Agent {
         if (continue_autonomously) {
             // console.log("[_processPromptCycle] LLM requested autonomous continuation. Queuing next prompt.");
             this.promptQueued = true;
+        }
+
+        // --- Process Memory Management Operations ---
+        const memoryOps = responseData.manage_memories || [];
+        if (Array.isArray(memoryOps)) {
+            for (const op of memoryOps) {
+                if (typeof op !== 'string') continue; // Skip non-string ops
+
+                try {
+                    if (op.startsWith('ADD:')) {
+                        const textToAdd = op.substring(4).trim();
+                        if (textToAdd) {
+                            // console.log(`[_processPromptCycle] Adding core memory: "${textToAdd}"`);
+                            await this.history.insertMemory(textToAdd);
+                        } else {
+                            console.warn('[_processPromptCycle] Received ADD command with empty text.');
+                        }
+                    } else if (op.startsWith('DELETE:')) {
+                        const shortIdToDelete = op.substring(7).trim();
+                        if (shortIdToDelete) {
+                            // console.log(`[_processPromptCycle] Deleting core memory with Short ID: ${shortIdToDelete}`);
+                            await this.history.deleteMemoryByShortId(shortIdToDelete);
+                        } else {
+                             console.warn('[_processPromptCycle] Received DELETE command with empty Short ID.');
+                        }
+                    } else if (op.startsWith('UPDATE:')) {
+                        const parts = op.substring(7).split(':');
+                        const shortIdToUpdate = parts[0]?.trim();
+                        const newText = parts.slice(1).join(':').trim(); // Re-join in case text had colons
+
+                        if (shortIdToUpdate && newText) {
+                            // console.log(`[_processPromptCycle] Updating core memory ${shortIdToUpdate} with text: \"${newText}\"`);
+                            await this.history.updateMemoryByShortId(shortIdToUpdate, newText);
+                        } else {
+                            console.warn(`[_processPromptCycle] Received invalid UPDATE command format: ${op}`);
+                        }
+                    } else {
+                        console.warn(`[_processPromptCycle] Unknown memory operation: ${op}`);
+                    }
+                } catch (memError) {
+                    console.error(`[_processPromptCycle] Error processing memory operation "${op}":`, memError);
+                    // Optionally inform user or add system message about memory failure
+                }
+            }
+        } else {
+            console.warn('[_processPromptCycle] manage_memories was not an array:', memoryOps);
         }
     }
 

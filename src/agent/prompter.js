@@ -83,16 +83,36 @@ export class Prompter {
     }
 
     async promptConvo(messages) {
-        const latestUserMessage = messages.findLast(msg => msg.role === 'user')?.content;
+        // Determine query text: Prioritize last assistant thought, fallback to last user message
+        const latestAssistantMessage = messages.findLast(msg => msg.role === 'assistant');
+        const latestAssistantThought = latestAssistantMessage?.thought;
+
+        let queryText = null;
+        if (latestAssistantThought && typeof latestAssistantThought === 'string' && latestAssistantThought.trim() !== '') {
+            queryText = latestAssistantThought;
+            console.log("[Prompter Memory Query] Using last assistant thought.");
+        } else {
+            const latestUserMessage = messages.findLast(msg => msg.role === 'user');
+            if (latestUserMessage?.content) {
+                queryText = latestUserMessage.content;
+                console.log("[Prompter Memory Query] Using last user message as fallback.");
+            } else {
+                console.log("[Prompter Memory Query] No suitable query text found.");
+            }
+        }
+
         let relevantMemories = '';
-        if (latestUserMessage) {
-            const memories = await this.agent.history.searchRelevant(latestUserMessage, 5);
+        if (queryText) { // Only search if we have a valid query text
+            const memories = await this.agent.history.searchRelevant(queryText);
             if (memories.length > 0) {
-                relevantMemories = 'Relevant memories:\n' + memories
-                    .map(m => `- ${m.text}`)
+                // Format results including the short ID
+                relevantMemories = 'Relevant Retrieved Memories:\n' + memories // Updated header
+                    .map(m => `[${m.shortId}] ${m.text}`) // Format: [MEM-123] Text
                     .join('\n');
             }
         }
+
+        // console.log('[Prompter] relevantMemories:', relevantMemories);
 
         let systemPrompt = this.profile.conversing;
         systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);

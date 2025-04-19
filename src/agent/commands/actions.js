@@ -227,8 +227,8 @@ export const actionsList = [
     }),
   },
   {
-    name: "!attackHumanPlayer",
-    description: "Attack and kill the specified human player with a username.",
+    name: "!attackPlayer",
+    description: "Attack and kill the specified player with a username.",
     params: {
       player_username: "(string) The username of the player to attack.",
     },

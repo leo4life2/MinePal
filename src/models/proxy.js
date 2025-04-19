@@ -20,15 +20,23 @@ const minepal_response_schema = {
         },
         execute_command: { 
             type: "string",
-            description: "A single MinePal custom command (!command) or Minecraft slash-command to execute. Do not make multiple commands calls. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
+            description: "A single MinePal non-memory command (!command) or Minecraft slash-command to execute. Do not make memory related actions here. Do not make multiple commands calls. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
         },
         continue_autonomously: {
             type: "boolean",
             description: "Set to true if you need to continue executing commands to complete your goal autonomously. False if your current goal is complete and you can halt."
         },
+        manage_memories: {
+            type: "array",
+            items: { 
+                type: "string",
+                description: "An operation string: 'ADD:<text>', 'DELETE:<shortId>' (e.g., 'DELETE:MEM-123'), or 'UPDATE:<shortId>:<newText>' (e.g., 'UPDATE:MEM-123:Updated memory text')."
+            },
+            description: "An array of memory operations. Use ADD:<text> to add new memories. Use DELETE:<shortId> to remove obsolete memories. Use UPDATE:<shortId>:<newText> to modify existing memories."
+        }
 
     },
-    required: ["thought", "say_in_game", "execute_command", "continue_autonomously", "current_goal_status"],
+    required: ["thought", "say_in_game", "execute_command", "continue_autonomously", "current_goal_status", "manage_memories"],
     additionalProperties: false
 };
 
@@ -84,7 +92,7 @@ export class Proxy {
         
         // Define base request body parts
         const baseRequestBody = {
-            messages: messages,
+            messages: messages
         };
         if (stop_seq && stop_seq !== '***') { // Only add stop if not default/empty
             baseRequestBody.stop = stop_seq; // OpenAI uses 'stop', backend uses 'stop_seq'
