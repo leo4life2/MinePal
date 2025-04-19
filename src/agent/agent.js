@@ -179,6 +179,15 @@ const formatDiff = (diff) => {
     return diff > 0 ? `(+${diff})` : `(${diff})`;
 };
 
+// Helper: Format Minecraft time ticks into HH:MM string
+const formatMinecraftTimeSimple = (ticks) => {
+    const adjustedTicks = (ticks + 6000) % 24000; // 06:00 = 0 ticks
+    const totalHours = adjustedTicks / 1000;
+    const hours = Math.floor(totalHours);
+    const minutes = Math.floor((totalHours - hours) * 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`; // Return only HH:MM
+};
+
 // Helper to convert ticks to MM:SS or just S if short
 const formatDurationDiff = (ticks) => { // Renamed for clarity
     if (ticks <= 0) return '';
@@ -325,18 +334,72 @@ export class Agent {
             const systemBlockLength = turns.length - firstTailSystemIndex;
             
             // Only consolidate if there are 2 or more consecutive system messages at the end
-            if (systemBlockLength > 1) {
+            if (firstTailSystemIndex !== -1 && (turns.length - firstTailSystemIndex) > 1) {
                 const systemMessagesToConsolidate = turns.slice(firstTailSystemIndex);
-                const combinedContent = systemMessagesToConsolidate.map(msg => msg.content).join('\n');
+                const systemBlockLength = systemMessagesToConsolidate.length;
                 
+                let reminderContents = [];
+                let invStatusContents = [];
+                let otherSystemMessages = [];
+
+                // Regex to match bracketed tags like [TAG] or [TAG | TIME]
+                const tagRegex = /^\s*(\[[^\n]+\])\s*/;
+
+                systemMessagesToConsolidate.forEach(msg => {
+                    const content = msg.content || '';
+                    const match = content.match(tagRegex);
+                    const tag = match ? match[1] : null;
+                    const textAfterTag = tag ? content.substring(match[0].length).trim() : content.trim();
+
+                    if (tag) {
+                        if (tag.includes('REMINDER')) {
+                            reminderContents.push(textAfterTag);
+                        } else if (tag.startsWith('[INV/STATUS]')) {
+                            invStatusContents.push(textAfterTag);
+                        } else {
+                            // Keep original message for other tagged messages
+                            otherSystemMessages.push(content);
+                        }
+                    } else {
+                        // Untagged system messages (should ideally not happen often)
+                        otherSystemMessages.push(content); 
+                    }
+                });
+
+                let finalConsolidatedContent = '';
+
+                // Format Reminders
+                if (reminderContents.length > 0) {
+                    finalConsolidatedContent += 'Reminders:\n' + reminderContents.map((r, i) => `${i + 1}. ${r}`).join('\n');
+                }
+
+                // Format Inventory/Status Updates
+                if (invStatusContents.length > 0) {
+                    if (finalConsolidatedContent) finalConsolidatedContent += '\n\n'; // Add separator if reminders exist
+                    finalConsolidatedContent += 'Inventory/Status updates:\n' + invStatusContents.join('\n');
+                }
+
+                // Format Other System Messages
+                if (otherSystemMessages.length > 0) {
+                    if (finalConsolidatedContent) finalConsolidatedContent += '\n\n'; // Add separator if reminders/inv updates exist
+                    finalConsolidatedContent += otherSystemMessages.join('\n');
+                }
+
                 // Create the new consolidated message
-                const consolidatedMessage = { role: 'system', content: combinedContent };
-                
-                // Replace the block with the single message
-                this.history.turns.splice(firstTailSystemIndex, systemBlockLength, consolidatedMessage);
-                // console.log(`[DEBUG] Consolidated ${systemBlockLength} tail system messages.`);
+                if (finalConsolidatedContent) { // Only create if there's actual content
+                    const consolidatedMessage = { role: 'system', content: finalConsolidatedContent.trim() };
+                    // Replace the original block with the single formatted message
+                    this.history.turns.splice(firstTailSystemIndex, systemBlockLength, consolidatedMessage);
+                    // console.log(`[DEBUG] Reformatted and consolidated ${systemBlockLength} tail system messages.`);
+                } else {
+                    // If somehow all messages were empty or unparseable, just remove the empty block
+                    this.history.turns.splice(firstTailSystemIndex, systemBlockLength);
+                    // console.log(`[DEBUG] Removed empty tail system message block.`);
+                }
             }
         }
+
+        // console.log('[DEBUG] tail of history:', this.history.turns.slice(-5));
     }
 
     /**
@@ -470,12 +533,7 @@ export class Agent {
         };
 
         const formatMinecraftTime = (ticks) => {
-            const adjustedTicks = (ticks + 6000) % 24000; // 06:00 = 0 ticks
-            const totalHours = adjustedTicks / 1000;
-            const hours = Math.floor(totalHours);
-            const minutes = Math.floor((totalHours - hours) * 60);
-            const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-
+            const timeStr = formatMinecraftTimeSimple(ticks); // Use simple helper for HH:MM
             let description = "Day";
             if (ticks >= 23000 || ticks < 500) description = "Sunrise"; // Approx range
             else if (ticks >= 11500 && ticks < 13000) description = "Sunset"; // Approx range
@@ -525,14 +583,15 @@ export class Agent {
             biomeStr = "Unknown"; // Default value on error
         }
         hud.push(`- **Dimension:** ${dimensionStr.charAt(0).toUpperCase() + dimensionStr.slice(1)} | **Biome:** ${biomeStr || "Unknown"}`); // Use || "Unknown" as fallback
-        const timeStr = formatMinecraftTime(this.bot.time.timeOfDay);
+        const timeStrFull = formatMinecraftTime(this.bot.time.timeOfDay); // Keep for full display
+        const timeStrSimple = formatMinecraftTimeSimple(this.bot.time.timeOfDay); // Use helper for simple HH:MM
         let weatherStr = "N/A";
         if (dimensionStr === 'overworld') {
              if (this.bot.thunderState > 0) weatherStr = `Thunderstorm (${(this.bot.thunderState * 100).toFixed(0)}%)`;
              else if (this.bot.rainState > 0) weatherStr = `Rain (${(this.bot.rainState * 100).toFixed(0)}%)`;
              else weatherStr = "Clear";
         }
-        hud.push(`- **Time:** ${timeStr} | **Weather:** ${weatherStr}`);
+        hud.push(`- **Time:** ${timeStrFull} | **Weather:** ${weatherStr}`); // Display full time with description
         hud.push(`- **Health:** ❤️ ${newHUD.health}/20 | **Hunger:** 🍖 ${newHUD.hunger}/20`);
 
         // Status Effects - Populate newHUD.effects and build display string
@@ -953,6 +1012,8 @@ export class Agent {
             return;
         }
 
+        console.log(`[handleMessage] Received message from ${source}: ${message}`);
+
         // --- Silence Timer Management ---
         // Clear existing timer if a new message arrives (or if it's the silence message itself)
         if (this.silenceTimer) {
@@ -960,7 +1021,7 @@ export class Agent {
             this.silenceTimer = null;
             // console.log("[DEBUG] Cleared silence timer due to incoming message/event.");
         }
-        const isSilenceMessage = source === 'system' && message?.startsWith('[SILENCE]');
+        const isSilenceMessage = source === 'system' && message?.startsWith('[SILENCE');
         if (!isSilenceMessage) {
             this.silences = 0; // Reset silence count on non-silence activity
         } else {
@@ -1012,8 +1073,8 @@ export class Agent {
             }
             const formattedDuration = formatDuration(plannedSilenceSeconds);
             // console.log(`[DEBUG] Silence timer fired after ${formattedDuration}.`);
-            // Treat silence as a system event that needs processing
-            await this.handleMessage('system', `[SILENCE] It's been ${formattedDuration} of silence.`);
+            const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+            await this.handleMessage('system', `[SILENCE | ${timeStr}] It's been ${formattedDuration} of silence.`);
         }, delayMilliseconds);
     }
 
@@ -1045,7 +1106,8 @@ export class Agent {
                 // --- Autonomous Limit Check ---
                 if (this.autonomousCycleCount >= 10) {
                     console.warn("[_processingLoop] Autonomous cycle limit reached. Stopping continuous prompting.");
-                    this.history.add('system', `[NOTICE] Autonomous cycle limit (10) reached. Stopping execution.`);
+                    const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                    this.history.add('system', `[NOTICE | ${timeStr}] Autonomous cycle limit (10) reached. Stopping execution.`);
                     await this.sendMessage(`/tell ${this.owner} [NOTICE] Autonomous execution limit reached. Stopping.`, true);
                     this.promptQueued = false; // Prevent the prompt
                     this.autonomousCycleCount = 0; // Reset counter
@@ -1062,17 +1124,11 @@ export class Agent {
                     await this._processPromptCycle();
                 } catch (error) {
                     console.error("[_processingLoop] Error during prompt cycle:", error);
+                    const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
                     // Attempt to recover by resetting state, maybe send error message
-                    this.history.add('system', `[ERROR] An internal error occurred during processing: ${error.message}`);
+                    this.history.add('system', `[ERROR | ${timeStr}] An internal error occurred during processing: ${error.message}`);
                     await this.sendMessage(`An internal error occurred. I'll try to recover.`, true);
                 } finally {
-                    // IMPORTANT: Reset state to idle *after* processing is done or if an error occurred
-                    // This allows the next loop iteration to pick up a new queued prompt if one arrived
-                    // during the LLM call/processing/action initiation.
-                    // console.log("[_processingLoop] Finished processing cycle. Resetting state to idle.");
-                    this.promptingState = 'idle';
-                    // We might have finished an action or just thought, reset the silence timer
-                    // But ensure handleMessage already reset it correctly
                     if (!this.silenceTimer) {
                          // console.log("[_processingLoop] Resetting silence timer after processing cycle.");
                          this._setNextSilenceTimer(); // Reset silence timer if it wasn't already running
@@ -1107,6 +1163,8 @@ export class Agent {
         // console.log("[_processPromptCycle] Starting prompt cycle.");
         this._pruneHistory();
 
+        const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay); // Get time once for this cycle
+
         let history = this.history.getHistory(); // Get initial history for this cycle
 
         // Add contextual reminders for this cycle
@@ -1136,14 +1194,15 @@ export class Agent {
         if (responseData) {
             console.log("[DEBUG] LLM Response Data:", JSON.stringify(responseData, null, 2));
         }
-
+        // Reset state *immediately* after LLM response, before action execution
+        this.promptingState = 'idle'; 
 
         // --- Process LLM Response ---
 
         // Handle errors first
         if (error) {
             console.error("[_processPromptCycle] Error from promptConvo:", error);
-            this.history.add('system', `[ERROR] LLM generation failed: ${error}`);
+            this.history.add('system', `[ERROR | ${timeStr}] LLM generation failed: ${error}`);
             await this.sendMessage(`${error}`, true);
             // State reset happens in the finally block of the calling loop
             return; // Stop processing this cycle
@@ -1200,14 +1259,14 @@ export class Agent {
                 const command_name = containsCommand(command);
                 if (!command_name) {
                     console.error(`[_processPromptCycle] Invalid internal command format: ${command}`);
-                    this.history.add('system', `[ERROR] Invalid internal command format: ${command}`);
+                    this.history.add('system', `[ERROR | ${timeStr}] Invalid internal command format: ${command}`);
                     // State reset in finally block. Continue to next cycle potentially.
                     return;
                 }
 
                 if (!commandExists(command_name)) {
                     console.log(`[_processPromptCycle] Hallucinated command: ${command_name}`);
-                    this.history.add('system', `[HALLUCINATION] Command ${command_name} does not exist.`);
+                    this.history.add('system', `[HALLUCINATION | ${timeStr}] Command ${command_name} does not exist.`);
                     // Don't execute. Let the state reset and potentially try again if prompted.
                     return;
                 }
@@ -1219,13 +1278,13 @@ export class Agent {
                     execute_res = await executeCommand(this, command);
                     console.log(`[_processPromptCycle] Command ${command_name} finished. Result:`, execute_res);
                     if (execute_res !== undefined && execute_res !== null) { // Add result only if it's meaningful
-                        this.history.add('system', `[EXEC_RES] Output of action ${command_name}: ${truncCommandMessage(String(execute_res))}`);
+                        this.history.add('system', `[EXEC_RES | ${timeStr}] Output of action ${command_name}: ${truncCommandMessage(String(execute_res))}`);
                     }
                     // Action initiated/completed. State reset will happen in the finally block.
                     // The 'finished_executing' event might trigger if the command was long-running.
                 } catch (execError) {
                      console.error(`[_processPromptCycle] Error executing command ${command_name}:`, execError);
-                     this.history.add('system', `[ERROR] Failed to execute action ${command_name}: ${execError.message}`);
+                     this.history.add('system', `[ERROR | ${timeStr}] Failed to execute action ${command_name}: ${execError.message}`);
                      // State reset happens in the finally block.
                 }
             }
@@ -1321,10 +1380,12 @@ export class Agent {
             if (this.bot.game.dimension === 'overworld' && isClearAbove(this.bot)) {
                 // Time 
                 if (this.bot.time.timeOfDay >= 23981 || this.bot.time.timeOfDay == 0) {
-                    this.handleMessage('system', 'It is now sunrise.');
+                    const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                    this.handleMessage('system', `[TIME | ${timeStr}] It is now sunrise.`);
                 }
                 else if (this.bot.time.timeOfDay >= 11981 && this.bot.time.timeOfDay <= 12000) {
-                    this.handleMessage('system', 'It is now sunset.');
+                    const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                    this.handleMessage('system', `[TIME | ${timeStr}] It is now sunset.`);
                 }
             }
         });
@@ -1347,7 +1408,8 @@ export class Agent {
             // Check if state has changed
             if (newWeatherState !== this.currentWeatherState) {
                 console.log(`[WEATHER DEBUG] State change: ${this.currentWeatherState} -> ${newWeatherState} (R:${currentRain.toFixed(3)}, T:${currentThunder.toFixed(3)})`);
-                this.handleMessage('system', `[WEATHER] Important: Weather changed from ${this.currentWeatherState} to ${newWeatherState}!`);
+                const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                this.handleMessage('system', `[WEATHER | ${timeStr}] Important: Weather changed from ${this.currentWeatherState} to ${newWeatherState}!`);
                 // Update the current state
                 this.currentWeatherState = newWeatherState;
             }
@@ -1396,7 +1458,8 @@ export class Agent {
         this.bot.on('messagestr', async (message, _, jsonMsg) => {
             if (jsonMsg.translate && jsonMsg.translate.startsWith('death') && message.startsWith(this.name)) {
                 console.log('Agent died: ', message);
-                this.handleMessage('system', `You died with the final message: '${message}'. Previous actions were stopped and you have respawned. Notify the user and perform any necessary actions.`);
+                const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                this.handleMessage('system', `[DEATH | ${timeStr}] You died with the final message: '${message}'. Previous actions were stopped and you have respawned. Notify the user and perform any necessary actions.`);
             }
         });
         this.bot.on('idle', () => {
@@ -1429,7 +1492,8 @@ export class Agent {
             const newDimension = this.bot.game.dimension;
             
             if (newDimension !== this.currentDimension) {
-                const message = `[WORLD CHANGE] You have respawned in a different dimension: ${newDimension}.`;
+                const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                const message = `[WORLD CHANGE | ${timeStr}] You have respawned in a different dimension: ${newDimension}.`;
                 // Update the current dimension state
                 this.currentDimension = newDimension;
                 // Send the message about the change
@@ -1440,7 +1504,8 @@ export class Agent {
         // Owner-specific entity event listeners
         this.bot.on('entityDead', async (entity) => {
             if (entity.type === 'player' && entity.username === this.owner) {
-                const message = `[OWNER DIED] (${this.owner}) has just died!!`;
+                const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                const message = `[OWNER DIED | ${timeStr}] (${this.owner}) has just died!!`;
                 await this.handleMessage('system', message);
             }
         });
@@ -1455,7 +1520,8 @@ export class Agent {
                         // Activate cooldown
                         this.ownerHurtCooldownActive = true;
                         
-                        const message = `[OWNER HURT] (${this.owner}) was just hurt!`;
+                        const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                        const message = `[OWNER HURT | ${timeStr}] (${this.owner}) was just hurt!`;
                         await this.handleMessage('system', message);
 
                         // Set timeout to deactivate cooldown (using user's 5s)
@@ -1473,10 +1539,11 @@ export class Agent {
 
                         const botHealth = Math.round(this.bot.health);
                         const damageTaken = Math.round(this.bot.lastDamageTaken);
+                        const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
                         // Identify damage source
                         const damageSource = this._identifyDamageSource(this.bot);
                         
-                        const message = `[SELF HURT] You were just hurt by ${damageSource}! (Damage: ${damageTaken}, Health: ${botHealth}/20)`;
+                        const message = `[SELF HURT | ${timeStr}] You were just hurt by ${damageSource}! (Damage: ${damageTaken}, Health: ${botHealth}/20)`;
                         await this.handleMessage('system', message);
 
                         // Set timeout to deactivate cooldown (using user's 5s)
@@ -1490,7 +1557,8 @@ export class Agent {
 
         this.bot.on('entitySleep', async (entity) => {
             if (entity.type === 'player' && entity.username === this.owner) {
-                const message = `[OWNER SLEEP] (${this.owner}) is sleeping. You should sleep too.`;
+                const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                const message = `[OWNER SLEEP | ${timeStr}] (${this.owner}) is sleeping. You should sleep too.`;
                 await this.handleMessage('system', message);
             }
         });
@@ -1510,7 +1578,8 @@ export class Agent {
                 .map(([name, count]) => `${count} ${name}`)
                 .join(', ');
             
-            const message = `[RARE FINDS] You spotted nearby: ${summary}.`;
+            const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+            const message = `[RARE FINDS | ${timeStr}] You spotted nearby: ${summary}.`;
             await this.handleMessage('system', message);
         });
     }
