@@ -1038,14 +1038,6 @@ export class Agent {
         this.queuedPromptReason = source;
         this.promptQueued = true;
         // console.log(`[DEBUG] Prompt queued by ${source}. Reason: ${this.queuedPromptReason}. State: ${this.promptingState}`);
-
-        // --- Restart Silence Timer ---
-        // Always reset the silence timer after any message handling (including the silence message itself)
-        // This ensures the next silence period starts now.
-        this._setNextSilenceTimer();
-        // --- End Restart Silence Timer ---
-
-        // Note: The actual LLM prompting and response handling is done in _processingLoop
     }
 
     /**
@@ -1145,7 +1137,6 @@ export class Agent {
                     // Start the prompt cycle
                     try {
                         await this._processPromptCycle(reasonForPrompt); // Pass reason here
-                        // Note: State is managed *within* _processPromptCycle now
                     } catch (error) {
                         console.error("[_processingLoop] Error during prompt cycle:", error);
                         const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
@@ -1154,7 +1145,8 @@ export class Agent {
                         this.promptingState = 'idle'; // Reset state to idle on error
                         this._ensureSilenceTimerRunning(); // Ensure timer restarts after error recovery
                     } 
-                    // Removed the outer finally block - state and timer are managed inside _processPromptCycle or catch block
+                    // --- Restart Silence Timer ---
+                    this._setNextSilenceTimer();
                 }
             } else {
                 // console.log(`[_processingLoop] Skipping cycle. Queued: ${this.promptQueued}, State: ${this.promptingState}, Reason: ${this.queuedPromptReason}`);
