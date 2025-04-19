@@ -228,8 +228,9 @@ export class Agent {
         this.reportedRareBlocks = new Set(); // Cache for reported rare block locations (stores "x,y,z")
 
         // --- Prompting State Management ---
-        this.promptingState = 'idle'; // 'idle', 'prompting'
+        this.promptingState = 'idle'; // 'idle', 'prompting', 'executing'
         this.promptQueued = false; // Flag to indicate if a prompt needs to be processed
+        this.queuedPromptReason = null; // Reason prompt was queued ('autonomous', source like 'system' or username)
         this.processingLoopInterval = null; // To hold the interval ID
         this.lastContinueAutonomously = false; // Track if the last cycle requested continuation
         this.autonomousCycleCount = 0; // Counter for consecutive autonomous cycles
@@ -1033,9 +1034,10 @@ export class Agent {
         // Add the message to history
         await this.history.add(source, message);
 
-        // Queue a prompt processing cycle
+        // Queue a prompt processing cycle, storing the reason
+        this.queuedPromptReason = source;
         this.promptQueued = true;
-        // console.log(`[DEBUG] Prompt queued by ${source}. State: ${this.promptingState}`);
+        // console.log(`[DEBUG] Prompt queued by ${source}. Reason: ${this.queuedPromptReason}. State: ${this.promptingState}`);
 
         // --- Restart Silence Timer ---
         // Always reset the silence timer after any message handling (including the silence message itself)
@@ -1101,41 +1103,61 @@ export class Agent {
             this.lastContinueAutonomously = false;
             // --- End Autonomous Cycle Management ---
 
-            // Core loop logic
-            if (this.promptQueued && this.promptingState === 'idle') {
-                // --- Autonomous Limit Check ---
-                if (this.autonomousCycleCount >= 10) {
-                    console.warn("[_processingLoop] Autonomous cycle limit reached. Stopping continuous prompting.");
-                    const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
-                    this.history.add('system', `[NOTICE | ${timeStr}] Autonomous cycle limit (10) reached. Stopping execution.`);
-                    await this.sendMessage(`/tell ${this.owner} [NOTICE] Autonomous execution limit reached. Stopping.`, true);
-                    this.promptQueued = false; // Prevent the prompt
-                    this.autonomousCycleCount = 0; // Reset counter
-                    this.lastContinueAutonomously = false; // Ensure flag is reset
-                    return; // Skip the rest of this interval's processing
+            // --- Core Loop Logic ---
+            if (this.promptQueued) {
+                let canProcess = false;
+                // Allow processing if idle, regardless of trigger
+                if (this.promptingState === 'idle') {
+                    canProcess = true;
                 }
-                // --- End Autonomous Limit Check ---
+                // Allow processing if executing, but ONLY if it's NOT an autonomous trigger
+                else if (this.promptingState === 'executing' && this.queuedPromptReason !== 'autonomous') {
+                    // console.log(`[DEBUG] Allowing preemption of 'executing' state by non-autonomous trigger (${this.queuedPromptReason}).`);
+                    canProcess = true;
+                }
 
-                // console.log("[_processingLoop] Detected queued prompt and idle state. Starting processing.");
-                this.promptingState = 'prompting'; // Set state to busy
-                this.promptQueued = false; // Consume the queue flag
-
-                try {
-                    await this._processPromptCycle();
-                } catch (error) {
-                    console.error("[_processingLoop] Error during prompt cycle:", error);
-                    const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
-                    // Attempt to recover by resetting state, maybe send error message
-                    this.history.add('system', `[ERROR | ${timeStr}] An internal error occurred during processing: ${error.message}`);
-                    await this.sendMessage(`An internal error occurred. I'll try to recover.`, true);
-                } finally {
-                    if (!this.silenceTimer) {
-                         // console.log("[_processingLoop] Resetting silence timer after processing cycle.");
-                         this._setNextSilenceTimer(); // Reset silence timer if it wasn't already running
+                if (canProcess) {
+                    // --- Autonomous Limit Check (Only if the trigger IS autonomous) ---
+                    // We check this *before* consuming the reason/queue flag, but base it on the *count*
+                    // which relies on `lastContinueAutonomously` from the *previous* cycle completion.
+                    if (this.queuedPromptReason === 'autonomous' && this.autonomousCycleCount >= 10) {
+                        console.warn("[_processingLoop] Autonomous cycle limit reached. Stopping continuous prompting.");
+                        const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                        this.history.add('system', `[NOTICE | ${timeStr}] Autonomous cycle limit (10) reached. Stopping execution.`);
+                        await this.sendMessage(`/tell ${this.owner} [NOTICE] Autonomous execution limit reached. Stopping.`, true);
+                        this.promptQueued = false; // Prevent the prompt
+                        this.queuedPromptReason = null; // Clear reason
+                        this.autonomousCycleCount = 0; // Reset counter
+                        this.lastContinueAutonomously = false; // Ensure flag is reset
+                        return; // Skip the rest of this interval's processing
                     }
+                    // --- End Autonomous Limit Check ---
+
+                    // Consume the queue flag and reason
+                    const reasonForPrompt = this.queuedPromptReason; // Capture reason before clearing
+                    // console.log(`[_processingLoop] Processing queued prompt. Reason: ${reasonForPrompt}, Current State: ${this.promptingState}`);
+                    this.promptQueued = false;
+                    this.queuedPromptReason = null;
+
+                    // Set state to busy for prompting
+                    this.promptingState = 'prompting'; 
+
+                    // Start the prompt cycle
+                    try {
+                        await this._processPromptCycle(reasonForPrompt); // Pass reason here
+                        // Note: State is managed *within* _processPromptCycle now
+                    } catch (error) {
+                        console.error("[_processingLoop] Error during prompt cycle:", error);
+                        const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
+                        this.history.add('system', `[ERROR | ${timeStr}] An internal error occurred during processing: ${error.message}`);
+                        await this.sendMessage(`An internal error occurred. I'll try to recover.`, true);
+                        this.promptingState = 'idle'; // Reset state to idle on error
+                        this._ensureSilenceTimerRunning(); // Ensure timer restarts after error recovery
+                    } 
+                    // Removed the outer finally block - state and timer are managed inside _processPromptCycle or catch block
                 }
             } else {
-                // console.log(`[_processingLoop] Skipping cycle. Queued: ${this.promptQueued}, State: ${this.promptingState}`);
+                // console.log(`[_processingLoop] Skipping cycle. Queued: ${this.promptQueued}, State: ${this.promptingState}, Reason: ${this.queuedPromptReason}`);
             }
         }, loopInterval);
     }
@@ -1156,11 +1178,22 @@ export class Agent {
     }
 
     /**
+     * Ensures the silence timer is running if it's not already.
+     */
+    _ensureSilenceTimerRunning() {
+        if (!this.silenceTimer) {
+            // console.log("[DEBUG] Silence timer was not running. Restarting.");
+            this._setNextSilenceTimer();
+        }
+    }
+
+    /**
      * The core logic for a single LLM prompt cycle, moved from handleMessage.
      * This function assumes it's called when state is 'prompting'.
+     * @param {string | null} reason - The reason this prompt cycle was triggered ('autonomous', source, etc.).
      */
-    async _processPromptCycle() {
-        // console.log("[_processPromptCycle] Starting prompt cycle.");
+    async _processPromptCycle(reason) {
+        // console.log(`[_processPromptCycle] Starting prompt cycle. Reason: ${reason || 'unknown'}`);
         this._pruneHistory();
 
         const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay); // Get time once for this cycle
@@ -1186,6 +1219,7 @@ export class Agent {
 
         // --- Call LLM ---
         // console.log("[_processPromptCycle] Calling LLM...");
+        console.log(`[_processPromptCycle] Calling LLM. Reason: ${reason || 'unknown'}`); // <<< ADDED LOG HERE
         const promptResult = await this.prompter.promptConvo(history);
         const error = promptResult.error;
         const responseData = promptResult.response;
@@ -1204,7 +1238,8 @@ export class Agent {
             console.error("[_processPromptCycle] Error from promptConvo:", error);
             this.history.add('system', `[ERROR | ${timeStr}] LLM generation failed: ${error}`);
             await this.sendMessage(`${error}`, true);
-            // State reset happens in the finally block of the calling loop
+            this.promptingState = 'idle'; // Reset state on LLM error
+            this._ensureSilenceTimerRunning(); // Ensure timer restarts
             return; // Stop processing this cycle
         }
 
@@ -1212,6 +1247,8 @@ export class Agent {
         if (!responseData) {
              console.error("[_processPromptCycle] promptConvo returned no error but also no response data.");
              await this.sendMessage("Oops! Something went wrong internally (empty response). Please try again.", true);
+             this.promptingState = 'idle'; // Reset state on empty response
+             this._ensureSilenceTimerRunning(); // Ensure timer restarts
              return; // Stop processing this cycle
         }
 
@@ -1246,53 +1283,51 @@ export class Agent {
 
         // Process Command
         if (command) {
-            // Handle Slash Commands (just send to chat)
-            if (command.startsWith('/')) {
-                // console.log(`[_processPromptCycle] Sending slash command: "${command}"`);
-                // Send the slash command itself as a chat message
-                await this.sendMessage(command, true);
-                // Don't execute internally, Minecraft handles it.
-                // State reset happens in the finally block.
-            }
-            // Handle Internal Commands (!)
-            else {
-                const command_name = containsCommand(command);
-                if (!command_name) {
-                    console.error(`[_processPromptCycle] Invalid internal command format: ${command}`);
-                    this.history.add('system', `[ERROR | ${timeStr}] Invalid internal command format: ${command}`);
-                    // State reset in finally block. Continue to next cycle potentially.
-                    return;
+            let commandExecuted = false;
+            try {
+                // Handle Slash Commands (just send to chat)
+                if (command.startsWith('/')) {
+                    // console.log(`[_processPromptCycle] Sending slash command: "${command}"`);
+                    await this.sendMessage(command, true);
+                    commandExecuted = true; // Considered executed for state purposes
                 }
-
-                if (!commandExists(command_name)) {
-                    console.log(`[_processPromptCycle] Hallucinated command: ${command_name}`);
-                    this.history.add('system', `[HALLUCINATION | ${timeStr}] Command ${command_name} does not exist.`);
-                    // Don't execute. Let the state reset and potentially try again if prompted.
-                    return;
-                }
-
-                // Execute the valid internal command
-                // console.log(`[_processPromptCycle] Executing internal command: ${command_name}`);
-                let execute_res;
-                try {
-                    execute_res = await executeCommand(this, command);
-                    console.log(`[_processPromptCycle] Command ${command_name} finished. Result:`, execute_res);
-                    if (execute_res !== undefined && execute_res !== null) { // Add result only if it's meaningful
-                        this.history.add('system', `[EXEC_RES | ${timeStr}] Output of action ${command_name}: ${truncCommandMessage(String(execute_res))}`);
+                // Handle Internal Commands (!)
+                else {
+                    const command_name = containsCommand(command);
+                    if (!command_name) {
+                        console.error(`[_processPromptCycle] Invalid internal command format: ${command}`);
+                        this.history.add('system', `[ERROR | ${timeStr}] Invalid internal command format: ${command}`);
+                    } else if (!commandExists(command_name)) {
+                        console.log(`[_processPromptCycle] Hallucinated command: ${command_name}`);
+                        this.history.add('system', `[HALLUCINATION | ${timeStr}] Command ${command_name} does not exist.`);
+                    } else {
+                        // Execute the valid internal command
+                        // console.log(`[_processPromptCycle] Executing internal command: ${command_name}`);
+                        let execute_res;
+                        try {
+                            execute_res = await executeCommand(this, command);
+                            commandExecuted = true; // Mark as executed
+                            console.log(`[_processPromptCycle] Command ${command_name} finished. Result:`, execute_res);
+                            if (execute_res !== undefined && execute_res !== null) {
+                                this.history.add('system', `[EXEC_RES | ${timeStr}] Output of action ${command_name}: ${truncCommandMessage(String(execute_res))}`);
+                            }
+                        } catch (execError) {
+                            console.error(`[_processPromptCycle] Error executing command ${command_name}:`, execError);
+                            this.history.add('system', `[ERROR | ${timeStr}] Failed to execute action ${command_name}: ${execError.message}`);
+                            // commandExecuted remains false, state will reset in finally
+                        }
                     }
-                    // Action initiated/completed. State reset will happen in the finally block.
-                    // The 'finished_executing' event might trigger if the command was long-running.
-                } catch (execError) {
-                     console.error(`[_processPromptCycle] Error executing command ${command_name}:`, execError);
-                     this.history.add('system', `[ERROR | ${timeStr}] Failed to execute action ${command_name}: ${execError.message}`);
-                     // State reset happens in the finally block.
                 }
+            } finally {
+                // console.log(`[_processPromptCycle] Command processing finished. Resetting state to 'idle'.`);
+                this.promptingState = 'idle';
+                this._ensureSilenceTimerRunning(); // Ensure timer restarts after execution attempt
             }
         } else {
              // No command was generated. Chat (if any) was sent above.
-             // If no chat and no command, it was just a thought or status update.
-             // console.log("[_processPromptCycle] No command to execute.");
-             // State reset happens in the finally block.
+             // console.log("[_processPromptCycle] No command to execute. Setting state to 'idle'.");
+             this.promptingState = 'idle';
+             this._ensureSilenceTimerRunning(); // Ensure timer restarts if no command was run
         }
 
         // Save history after processing the response and potentially executing command
@@ -1314,6 +1349,7 @@ export class Agent {
         this.lastContinueAutonomously = continue_autonomously; // Store for the loop to check next interval
         if (continue_autonomously) {
             // console.log("[_processPromptCycle] LLM requested autonomous continuation. Queuing next prompt.");
+            this.queuedPromptReason = 'autonomous'; // Set the reason
             this.promptQueued = true;
         }
 
