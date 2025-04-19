@@ -484,7 +484,7 @@ export class Agent {
             });
 
             // Construct the initial system message
-            const prefix = "Your owner booted you into a Minecraft world; glance at your HUD and greet naturally";
+            const prefix = "Your owner booted you into a Minecraft world; glance at your HUD and greet naturally. Consider finding them and following them.";
             let suffix = "";
             if (this.lastBootDatetime === null) {
                 suffix = ". This is your first ever boot as a MinePal!";
