@@ -104,7 +104,7 @@ export async function craftRecipe(bot, itemName, num = 1) {
           placedTable = true;
         }
       } else {
-        log(bot, `You do not have a crafting table to craft ${itemName}.`);
+        log(bot, `You do not have a crafting table to craft ${itemName}. Consider making one.`);
         return false;
       }
     } else {
@@ -1213,6 +1213,7 @@ export async function collectBlock(
     }
 
     const block = blocks[0];
+    console.log(`Selected block at ${block.position}, distance: ${bot.entity.position.distanceTo(block.position).toFixed(2)}`); // Log distance
     await bot.tool.equipForBlock(block);
     const itemId = bot.heldItem ? bot.heldItem.type : null;
     if (!block.canHarvest(itemId)) {
@@ -1838,22 +1839,27 @@ export async function followPlayer(bot, username, distance = 4) {
    * Follow the given player endlessly. Will not return until the code is manually stopped.
    * @param {MinecraftBot} bot, reference to the minecraft bot.
    * @param {string} username, the username of the player to follow.
-   * @returns {Promise<boolean>} true if the player was found, false otherwise.
+   * @param {number} distance, the distance to maintain while following.
+   * @returns {Promise<boolean>} true if the player was found and follow mode enabled, false otherwise.
    * @example
    * await skills.followPlayer(bot, "player");
    **/
-  let player = bot.players[username].entity;
-  if (!player) return false;
-
-  const move = new pf.Movements(bot);
-  bot.pathfinder.setMovements(move);
-  bot.pathfinder.setGoal(new pf.goals.GoalFollow(player, distance), true);
-  log(bot, `You are now actively following player ${username}.`);
-
-  while (!bot.interrupt_code) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  let player = bot.players[username]?.entity;
+  if (!player) {
+      log(bot, `Could not find player ${username} to follow.`);
+      return false;
   }
-  return true;
+
+  // Activate the follow_target mode
+  if (bot.modes && bot.modes.modes_map['follow_target']) {
+      const agent = bot;
+      bot.modes.modes_map['follow_target'].setTarget(agent, player, distance);
+      log(bot, `Now following ${username}.`);
+      return true;
+  } else {
+      log(bot, "Error: Follow mode is not available.");
+      return false;
+  }
 }
 
 export async function moveAway(bot, distance) {
@@ -1933,25 +1939,6 @@ export async function avoidEnemies(bot, distance = 16) {
   return true;
 }
 
-export async function stay(bot) {
-  /**
-   * Stay in the current position until interrupted. Disables all modes.
-   * @param {MinecraftBot} bot, reference to the minecraft bot.
-   * @returns {Promise<boolean>} true if the bot stayed, false otherwise.
-   * @example
-   * await skills.stay(bot);
-   **/
-  bot.modes.pause("self_preservation");
-  bot.modes.pause("cowardice");
-  bot.modes.pause("self_defense");
-  bot.modes.pause("hunting");
-  bot.modes.pause("torch_placing");
-  bot.modes.pause("item_collecting");
-  while (!bot.interrupt_code) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  return true;
-}
 
 export async function useDoor(bot, door_pos = null) {
   /**

@@ -1,5 +1,6 @@
 import * as skills from './library/skills.js';
 import * as world from './library/world.js';
+import pf from "mineflayer-pathfinder";
 import MCData from '../utils/mcdata.js';
 
 // a mode is a function that is called every tick to respond immediately to the world
@@ -281,6 +282,73 @@ const modes = [
         }
     },
     {
+        name: 'follow_target',
+        description: 'Continuously follow a specific target entity.',
+        interrupts: [], // Should not interrupt others, but can be interrupted by higher priority modes
+        on: false, // Off by default
+        active: false, // Doesn't use execute, so active is less relevant here, but keep for consistency
+        targetEntity: null, // Stores the entity object to follow
+        followDistance: 4, // Default follow distance
+        
+        /**
+         * Sets the target entity for the follow mode.
+         * @param {Object} agent - The agent object.
+         * @param {Entity | null} entity - The entity to follow, or null to stop following.
+         * @param {number} [distance=4] - The desired distance to maintain.
+         */
+        setTarget: function(agent, entity, distance = 4) {
+            this.targetEntity = entity;
+            this.followDistance = distance;
+            this.on = (entity !== null); // Turn on if entity is set, off if null
+            if (!this.on) {
+                // Explicitly stop pathfinder if target is cleared
+                agent.bot.pathfinder.stop();
+            }
+            console.log(`Follow mode ${this.on ? 'enabled' : 'disabled'}. Target: ${entity ? (entity.username || entity.name) : 'None'}`);
+        },
+
+        /**
+         * Update function for follow_target mode.
+         * If active and target exists, maintains the pathfinder goal.
+         * If target is lost, disables itself.
+         * @param {Object} agent - The agent object containing the bot.
+         */
+        update: async function (agent) {
+            // This mode runs continuously in the background if 'on', doesn't use 'execute'
+            if (!this.on || !this.targetEntity) {
+                return; // Do nothing if off or no target
+            }
+            
+            // Check if the target is still valid/visible (basic check)
+            const bot = agent.bot;
+            const currentTarget = bot.entities[this.targetEntity.id]; // Check if entity still exists by ID
+            
+            if (!currentTarget || currentTarget.position.distanceTo(bot.entity.position) > world.VERY_FAR_DISTANCE * 2) {
+                 // Target lost (too far or despawned)
+                 await agent.sendMessage(`Lost sight of ${this.targetEntity.username || this.targetEntity.name}. Stopping follow.`);
+                 this.setTarget(agent, null); // Disable the mode and clear target
+                 return;
+             }
+
+            // Update target reference in case the entity object changed (though ID check is primary)
+            this.targetEntity = currentTarget; 
+
+            // Ensure the goal is set or updated
+            // Note: No need to constantly call setMovements unless config changes
+            // The 'true' flag keeps the goal dynamic
+            const goal = new pf.goals.GoalFollow(this.targetEntity, this.followDistance);
+            if (!bot.pathfinder.isMoving() || JSON.stringify(bot.pathfinder.goal) !== JSON.stringify(goal)) {
+                // Set goal if not moving or if goal parameters changed (simple check)
+                // Avoid spamming setGoal if already correctly pathing
+                bot.pathfinder.setGoal(goal, true);
+            }
+        },
+         
+        // Override default pause behavior - this mode shouldn't be paused by standard actions
+        // It should only stop if explicitly told to via setTarget(null) or if interrupted by high-priority modes.
+        paused: false // Explicitly manage 'on' state instead of pausing
+    },
+    {
         name: 'cheat',
         description: 'Use cheats to instantly place blocks and teleport.',
         interrupts: [],
@@ -526,8 +594,13 @@ class ModeController {
 export function initModes(agent) {
     // the mode controller is added to the bot object so it is accessible from anywhere the bot is used
     agent.bot.modes = new ModeController(agent);
-    let modes = agent.prompter.getInitModes();
-    if (modes) {
-        agent.bot.modes.loadJson(modes);
+    // Add the new mode instance to the controller's list during initialization
+    const followMode = agent.bot.modes.modes_map['follow_target'];
+    if (followMode) {
+        followMode.setTarget = followMode.setTarget.bind(followMode); // Bind context for setTarget
+    }
+    let modes_json = agent.prompter.getInitModes();
+    if (modes_json) {
+        agent.bot.modes.loadJson(modes_json);
     }
 }

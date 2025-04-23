@@ -283,16 +283,6 @@ export const actionsList = [
     }),
   },
   {
-    name: "!stay",
-    description:
-      "Stay in the current location no matter what. Pauses all modes.",
-    perform: wrapExecution(async (agent) => {
-      agent.followPlayerName = null;
-      await agent.coder.stop();
-      await skills.stay(agent.bot);
-    }),
-  },
-  {
     name: "!equip",
     description: "Equip an item to a specific body part.",
     params: {

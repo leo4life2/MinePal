@@ -12,7 +12,7 @@ import * as world from "./library/world.js";
 import { Vec3 } from 'vec3'; // Ensure Vec3 is imported if not already
 
 // --- Silence Timer Constants ---
-const MEAN_1 = 12; // Base mean silence duration in seconds for the first silence
+const MEAN_1 = 20; // Base mean silence duration in seconds for the first silence
 const STD_FACTOR = 10; // STD is MEAN_i / STD_FACTOR
 const R = 3.5;    // Exponential factor for increasing mean silence duration
 // --- End Silence Timer Constants ---
@@ -691,7 +691,7 @@ export class Agent {
 
 
         // == NEARBY BLOCKS == (Populate newHUD.trackedBlocks)
-        hud.push("\n## 🌳 NEARBY BLOCKS");
+        hud.push("\n## 🌳 VISIBLE BLOCKS");
         const uniquelyTrackedBlockTypes = ["sign", "chest", "barrel", "shulker_box", "lectern", "furnace", "jukebox"];
         let signBlocksDisplay = [];
         let containerBlocksDisplay = [];
@@ -809,7 +809,7 @@ export class Agent {
 
 
         // == NEARBY MOBS == (Populate newHUD.mobs)
-        hud.push("\n## 🐾 NEARBY MOBS");
+        hud.push("\n## 🐾 VISIBLE MOBS");
         let passiveMobsDisplayMap = {}; // Temp map for display aggregation
         let hostileMobsDisplayMap = {};
         newHUD.mobs.clear(); // Ensure empty
@@ -856,7 +856,7 @@ export class Agent {
 
 
         // == NEARBY PLAYERS == (Populate newHUD.players)
-        hud.push("\n## 👥 NEARBY PLAYERS");
+        hud.push("\n## 👥 VISIBLE PLAYERS");
         newHUD.players.clear(); // Ensure empty
         if (nearbyPlayers.length > 0) {
             nearbyPlayers.forEach(player => {
@@ -1035,7 +1035,7 @@ export class Agent {
         await this.history.add(source, message);
 
         // Queue a prompt processing cycle, storing the reason
-        this.queuedPromptReason = source;
+        this.queuedPromptReason = `[${source}] ${message}`;
         this.promptQueued = true;
         // console.log(`[DEBUG] Prompt queued by ${source}. Reason: ${this.queuedPromptReason}. State: ${this.promptingState}`);
     }
@@ -1098,20 +1098,23 @@ export class Agent {
             // --- Core Loop Logic ---
             if (this.promptQueued) {
                 let canProcess = false;
+                let commandToInterrupt = null;
                 // Allow processing if idle, regardless of trigger
                 if (this.promptingState === 'idle') {
                     canProcess = true;
+                    console.log(`[DEBUG] Allowing processing of idle state.`);
                 }
                 // Allow processing if executing, but ONLY if it's NOT an autonomous trigger
-                else if (this.promptingState === 'executing' && this.queuedPromptReason !== 'autonomous') {
-                    // console.log(`[DEBUG] Allowing preemption of 'executing' state by non-autonomous trigger (${this.queuedPromptReason}).`);
+                else if (this.promptingState.startsWith('executing') && this.queuedPromptReason !== 'autonomous') {
+                    console.log(`[DEBUG] Allowing preemption of 'executing' state by non-autonomous trigger (${this.queuedPromptReason}).`);
                     canProcess = true;
+                    commandToInterrupt = this.promptingState.split(' ')[1];
+                    this.history.add('system', `[NOTICE] Previous command ${commandToInterrupt} is still executing. If you execute a new command, it will interrupt the previous one.`);
                 }
 
                 if (canProcess) {
-                    // --- Autonomous Limit Check (Only if the trigger IS autonomous) ---
-                    // We check this *before* consuming the reason/queue flag, but base it on the *count*
-                    // which relies on `lastContinueAutonomously` from the *previous* cycle completion.
+                    console.log(`[DEBUG] Will call LLM. promptingState: ${this.promptingState}, queuedPromptReason: ${this.queuedPromptReason}`);
+
                     if (this.queuedPromptReason === 'autonomous' && this.autonomousCycleCount >= 10) {
                         console.warn("[_processingLoop] Autonomous cycle limit reached. Stopping continuous prompting.");
                         const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
@@ -1142,6 +1145,7 @@ export class Agent {
                         const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
                         this.history.add('system', `[ERROR | ${timeStr}] An internal error occurred during processing: ${error.message}`);
                         await this.sendMessage(`An internal error occurred. I'll try to recover.`, true);
+                        console.log('[idle state] promptingState set to idle due to _processPromptCycle error');
                         this.promptingState = 'idle'; // Reset state to idle on error
                         this._ensureSilenceTimerRunning(); // Ensure timer restarts after error recovery
                     } 
@@ -1194,7 +1198,7 @@ export class Agent {
 
         // Add contextual reminders for this cycle
         this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
-        this.history.add('system', `[GOAL_REMINDER] Remember to check goals that you've already completed, and don't re-do a goal if you've already completed it.`);
+        this.history.add('system', `[GOAL_REMINDER] Remember to check goals that you've already completed. Don't recomplete or reexecute a completed goal.`);
         this.history.add('system', `[MEMORY_REMINDER] Remember to be proactive about saving owner related info, update obsolete memories, or delete duplicates or completely obsolete memories as needed.`);
 
         // Get HUD diff and add it if changes occurred
@@ -1211,7 +1215,7 @@ export class Agent {
 
         // --- Call LLM ---
         // console.log("[_processPromptCycle] Calling LLM...");
-        console.log(`[_processPromptCycle] Calling LLM. Reason: ${reason || 'unknown'}`); // <<< ADDED LOG HERE
+        console.log(`[_processPromptCycle] Calling LLM. Reason: ${reason || 'unknown'}`);
         const promptResult = await this.prompter.promptConvo(history);
         const error = promptResult.error;
         const responseData = promptResult.response;
@@ -1220,8 +1224,6 @@ export class Agent {
         if (responseData) {
             console.log("[DEBUG] LLM Response Data:", JSON.stringify(responseData, null, 2));
         }
-        // Reset state *immediately* after LLM response, before action execution
-        this.promptingState = 'idle'; 
 
         // --- Process LLM Response ---
 
@@ -1230,6 +1232,7 @@ export class Agent {
             console.error("[_processPromptCycle] Error from promptConvo:", error);
             this.history.add('system', `[ERROR | ${timeStr}] LLM generation failed: ${error}`);
             await this.sendMessage(`${error}`, true);
+            console.log('[idle state] Initializing promptingState to idle due to LLM response error');
             this.promptingState = 'idle'; // Reset state on LLM error
             this._ensureSilenceTimerRunning(); // Ensure timer restarts
             return; // Stop processing this cycle
@@ -1239,7 +1242,8 @@ export class Agent {
         if (!responseData) {
              console.error("[_processPromptCycle] promptConvo returned no error but also no response data.");
              await this.sendMessage("Oops! Something went wrong internally (empty response). Please try again.", true);
-             this.promptingState = 'idle'; // Reset state on empty response
+             console.log('[idle state] Initializing promptingState to idle due to LLM error (no response data)');
+             this.promptingState = 'idle'; // Reset state on LLM error
              this._ensureSilenceTimerRunning(); // Ensure timer restarts
              return; // Stop processing this cycle
         }
@@ -1247,7 +1251,7 @@ export class Agent {
         // Extract and clean up fields
         let chatMessage = responseData.say_in_game || null;
         let command = responseData.execute_command || null;
-        let continue_autonomously = responseData.continue_autonomously || false;
+        let requires_more_actions = responseData.requires_more_actions || false;
         let thought = responseData.thought || null;
         let current_goal_status = responseData.current_goal_status || null;
 
@@ -1273,15 +1277,15 @@ export class Agent {
             await this.sendMessage(chatMessage, true);
         }
 
+        this.promptingState = `executing ${command}`; // indicates executing a command
+
         // Process Command
         if (command) {
-            let commandExecuted = false;
             try {
                 // Handle Slash Commands (just send to chat)
                 if (command.startsWith('/')) {
                     // console.log(`[_processPromptCycle] Sending slash command: "${command}"`);
                     await this.sendMessage(command, true);
-                    commandExecuted = true; // Considered executed for state purposes
                 }
                 // Handle Internal Commands (!)
                 else {
@@ -1298,7 +1302,6 @@ export class Agent {
                         let execute_res;
                         try {
                             execute_res = await executeCommand(this, command);
-                            commandExecuted = true; // Mark as executed
                             console.log(`[_processPromptCycle] Command ${command_name} finished. Result:`, execute_res);
                             if (execute_res !== undefined && execute_res !== null) {
                                 this.history.add('system', `[EXEC_RES | ${timeStr}] Output of action ${command_name}: ${truncCommandMessage(String(execute_res))}`);
@@ -1311,14 +1314,11 @@ export class Agent {
                     }
                 }
             } finally {
-                // console.log(`[_processPromptCycle] Command processing finished. Resetting state to 'idle'.`);
+                console.log(`[idle state] Command processing finished. Resetting state to 'idle'.`);
                 this.promptingState = 'idle';
                 this._ensureSilenceTimerRunning(); // Ensure timer restarts after execution attempt
             }
         } else {
-             // No command was generated. Chat (if any) was sent above.
-             // console.log("[_processPromptCycle] No command to execute. Setting state to 'idle'.");
-             this.promptingState = 'idle';
              this._ensureSilenceTimerRunning(); // Ensure timer restarts if no command was run
         }
 
@@ -1330,16 +1330,10 @@ export class Agent {
         // It doesn't necessarily mean a long-running command finished.
         this.bot.emit('finished_executing');
         // console.log("[_processPromptCycle] Emitted 'finished_executing'.");
-
-        // Note: The 'continue_autonomously' logic is removed. If an action result
-        // or subsequent event triggers handleMessage again, it will queue a new prompt
-        // which the loop will pick up once the state is 'idle'.
-
-        // State is reset in the finally block of the calling loop.
         
         // --- Queue next prompt if autonomous continuation is requested ---        
-        this.lastContinueAutonomously = continue_autonomously; // Store for the loop to check next interval
-        if (continue_autonomously) {
+        this.lastContinueAutonomously = requires_more_actions; // Store for the loop to check next interval
+        if (requires_more_actions) {
             // console.log("[_processPromptCycle] LLM requested autonomous continuation. Queuing next prompt.");
             this.queuedPromptReason = 'autonomous'; // Set the reason
             this.promptQueued = true;
@@ -1384,7 +1378,6 @@ export class Agent {
                     }
                 } catch (memError) {
                     console.error(`[_processPromptCycle] Error processing memory operation "${op}":`, memError);
-                    // Optionally inform user or add system message about memory failure
                 }
             }
         } else {
@@ -1471,12 +1464,6 @@ export class Agent {
             this.bot.pathfinder.stop(); // Clear any lingering pathfinder
             this.bot.modes.unPauseAll();
             this.coder.executeResume();
-            // When idle, explicitly check if a prompt is needed (e.g., after a command finished)
-            // This helps if the command completion didn't fire a specific event handled by handleMessage
-            // Or if we want responsiveness immediately after finishing an action.
-            // However, the processing loop already handles queued prompts, so this might be redundant
-            // unless coder.executeResume() needs to *force* a prompt cycle check sooner than the next interval.
-            // Let's rely on the loop for now. If needed, we can add: this.promptQueued = true;
         });
         this.bot.on('kicked', (reason) => {
             console.warn('Bot kicked!', reason);

@@ -22,9 +22,9 @@ const minepal_response_schema = {
             type: "string",
             description: "A single MinePal non-memory command (!command) or Minecraft slash-command to execute. Do not make memory related actions here. Do not make multiple commands calls. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
         },
-        continue_autonomously: {
+        requires_more_actions: {
             type: "boolean",
-            description: "Set to true if you need to continue executing commands to complete your goal autonomously. False if your current goal is complete and you can halt."
+            description: "Set to true if you need to continue executing commands to complete your goal. False if your current goal is complete and you can halt."
         },
         manage_memories: {
             type: "array",
@@ -36,7 +36,7 @@ const minepal_response_schema = {
         }
 
     },
-    required: ["thought", "say_in_game", "execute_command", "continue_autonomously", "current_goal_status", "manage_memories"],
+    required: ["thought", "say_in_game", "execute_command", "requires_more_actions", "current_goal_status", "manage_memories"],
     additionalProperties: false
 };
 
