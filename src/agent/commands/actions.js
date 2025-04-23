@@ -32,6 +32,8 @@ export const actionsList = [
     perform: async function (agent) {
       console.log("[CODERSTOP] Stop command.");
       await agent.coder.stop();
+      // Disable the follow_target mode if it exists
+      agent.bot.modes.modes_map['follow_target'].setTarget(agent, null);
       agent.followPlayerName = null;
       agent.coder.clear();
       agent.coder.cancelResume();
