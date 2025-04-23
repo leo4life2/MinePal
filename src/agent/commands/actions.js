@@ -167,8 +167,8 @@ export const actionsList = [
     }),
   },
   {
-    name: "!givePlayer",
-    description: "Give the specified items to the given player.",
+    name: "!tossToPlayer",
+    description: "Toss the specified items to the given player.",
     params: {
       player_name: "(string) The name of the player to give the items to.",
       items: "(string) The items to give in the format 'item1:quantity1,item2:quantity2,...'.",

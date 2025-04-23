@@ -57,12 +57,6 @@ const modes = [
                     }
                 });
             }
-            else if (Date.now() - bot.lastDamageTime < 3000 && (bot.health < 5 || bot.lastDamageTaken >= bot.health)) {
-                await agent.sendMessage('I\'m dying!');
-                execute(this, agent, async () => {
-                    await skills.moveAway(bot, 20);
-                });
-            }
             else if (agent.isIdle()) {
                 bot.clearControlStates(); // clear jump if not in danger or doing anything else
             }
