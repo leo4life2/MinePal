@@ -42,7 +42,6 @@ export class History {
             try {
                 const data = readFileSync(this.memory_fp, 'utf8');
                 const obj = JSON.parse(data);
-                this.db.data.turns = obj.turns;
                 if (obj.modes) this.db.data.modes = obj.modes;
                 if (obj.memory_bank) this.db.data.memory_bank = obj.memory_bank;
                 await this.db.write();
@@ -52,7 +51,6 @@ export class History {
             }
         }
 
-        this.turns = this.db.data.turns;
         if (this.db.data.modes) this.agent.bot.modes.loadJson(this.db.data.modes);
         if (this.db.data.memory_bank) this.agent.memory_bank.loadJson(this.db.data.memory_bank);
 
@@ -96,8 +94,6 @@ export class History {
     }
 
     async save() {
-        this.db.data.turns = this.turns;
-        
         // Save agent.bot.modes and memory_bank
         this.db.data.modes = this.agent.bot.modes.getJson();
         this.db.data.memory_bank = this.agent.memory_bank.getJson();
@@ -111,14 +107,6 @@ export class History {
 
     async load() {
         await this.initDB();
-    }
-
-    clear() {
-        this.turns = [];
-        // Reset short ID map and counter
-        this.shortIdMap = {};
-        this.shortIdCounter = 0;
-        this.save();
     }
 
     async insertMemory(text) {

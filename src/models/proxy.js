@@ -11,8 +11,39 @@ const minepal_response_schema = {
             description: "Internal reasoning explaining your planned action and next steps concisely."
         },
         current_goal_status: {
-            type: "string",
-            description: "Your current goal and its status (In Progress, Completed, Failed, etc.). Formatted as 'Goal: <goal_description> (Status: <status>)'"
+            type: "object",
+            description: "An object detailing your current goal, overall status, and subtasks. The goal is complete only when all subtasks are marked complete.",
+            properties: {
+                title: {
+                    type: "string",
+                    description: "Brief description of the overall goal."
+                },
+                status: {
+                    type: "string",
+                    description: "Overall goal status (In Progress, Completed, Failed). Set to Completed only when all subtasks are complete."
+                },
+                subtasks: {
+                    type: "array",
+                    description: "List of specific subtasks required to achieve the goal. Each subtask should be achievable with a single action.",
+                    items: {
+                        type: "object",
+                        properties: {
+                            description: {
+                                type: "string",
+                                description: "Concise description of a single-action subtask."
+                            },
+                            status: {
+                                type: "string",
+                                description: "Status of the subtask (In Progress, Completed, Failed). Be diligent in updating status after each action."
+                            }
+                        },
+                        required: ["description", "status"],
+                        additionalProperties: false
+                    }
+                }
+            },
+            required: ["title", "status", "subtasks"],
+            additionalProperties: false
         },
         say_in_game: { 
             type: "string",
@@ -70,7 +101,15 @@ export class Proxy {
                         formattedContent += `[Inner Thought]: ${turn.thought}\n`;
                     }
                     if (turn.current_goal_status) {
-                        formattedContent += `[Goal Status]: ${turn.current_goal_status}\n`;
+                        // Format the goal status object into a readable string
+                        let goalStatusString = `[Goal Status]: Title: ${turn.current_goal_status.title} (Status: ${turn.current_goal_status.status})\n`;
+                        if (turn.current_goal_status.subtasks && turn.current_goal_status.subtasks.length > 0) {
+                            goalStatusString += "  Subtasks:\n";
+                            turn.current_goal_status.subtasks.forEach((subtask, index) => {
+                                goalStatusString += `    ${index + 1}. ${subtask.description} (Status: ${subtask.status})\n`;
+                            });
+                        }
+                        formattedContent += goalStatusString;
                     }
                     // Add any other fields you want to expose here
                     formattedContent += turn.content || '';

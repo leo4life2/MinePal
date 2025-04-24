@@ -1201,7 +1201,7 @@ export class Agent {
 
         // Add contextual reminders for this cycle
         this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
-        this.history.add('system', `[GOAL_REMINDER] Remember to check goals that you've already completed. Don't recomplete or reexecute a completed goal.`);
+        this.history.add('system', `[GOAL_REMINDER] If your history says a goal is completed, *it's completed.* Don't re-attempt or re-execute a completed goal.`);
         this.history.add('system', `[CHAT_REMINDER] Don't say the same thing twice in a row.`);
         this.history.add('system', `[MEMORY_REMINDER] Remember to be proactive about saving owner related info, update obsolete memories, or delete duplicates or completely obsolete memories as needed.`);
 

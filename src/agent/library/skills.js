@@ -819,7 +819,7 @@ export async function attackMultipleCreatures(bot, mobType, count) {
       // Keep final log for no more targets
       const message = killedCount > 0
         ? `Successfully killed ${killedCount} ${mobType}(s). Could not find any more visible nearby.` // Updated log
-        : `Could not find any ${mobType} visible nearby to attack.`; // Updated log
+        : `Action failed: Could not find any ${mobType} visible nearby to attack.`; // Updated log
       log(bot, message);
       return message;
     }
