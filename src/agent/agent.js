@@ -762,26 +762,30 @@ export class Agent {
             const containerY = parseInt(yStr);
             const containerZ = parseInt(zStr);
 
-            let labels = [];
             // Iterate through the collected sign data in newHUD.trackedBlocks
+            let adjacentSignTexts = [];
             for (const blockData of newHUD.trackedBlocks.values()) {
-                // Check if it's a sign adjacent on X axis at same Y/Z
-                if (blockData.isSign &&
-                    blockData.y === containerY &&
-                    blockData.z === containerZ &&
-                    (blockData.x === containerX + 1 || blockData.x === containerX - 1))
-                {
-                    if (blockData.textFront) labels.push(`"${blockData.textFront}"`);
-                    if (blockData.textBack) labels.push(`"${blockData.textBack}"`);
+                // Check if it's a sign and adjacent horizontally (same Y, adjacent X or Z)
+                if (blockData.isSign && blockData.y === containerY) {
+                    const isAdjacentX = blockData.z === containerZ && (blockData.x === containerX + 1 || blockData.x === containerX - 1);
+                    const isAdjacentZ = blockData.x === containerX && (blockData.z === containerZ + 1 || blockData.z === containerZ - 1);
+
+                    if (isAdjacentX || isAdjacentZ) {
+                        if (blockData.textFront) adjacentSignTexts.push(blockData.textFront);
+                        if (blockData.textBack) adjacentSignTexts.push(blockData.textBack);
+                    }
                 }
             }
+
             let labelString = "";
             const distancePartIndex = containerString.lastIndexOf(', Distance:');
-            if (labels.length > 0) {
-                labelString = ` | Name: ${labels.join(' ')}`;
+            if (adjacentSignTexts.length > 0) {
+                // Join all collected texts with '|'
+                labelString = ` | Name: ${adjacentSignTexts.join('|')}`;
             } else {
                 labelString = " | Unnamed";
             }
+
             if (distancePartIndex !== -1) {
                 // Insert label before distance
                 return containerString.substring(0, distancePartIndex) + labelString + containerString.substring(distancePartIndex);
@@ -806,7 +810,6 @@ export class Agent {
         if (!signBlocksDisplay.length && !containerBlocksDisplay.length && !otherTrackedBlocksDisplay.length && !sortedOtherNamesDisplay.length) {
             hud.push("- none detected");
         }
-
 
         // == NEARBY MOBS == (Populate newHUD.mobs)
         hud.push("\n## 🐾 VISIBLE MOBS");
@@ -1199,6 +1202,7 @@ export class Agent {
         // Add contextual reminders for this cycle
         this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
         this.history.add('system', `[GOAL_REMINDER] Remember to check goals that you've already completed. Don't recomplete or reexecute a completed goal.`);
+        this.history.add('system', `[CHAT_REMINDER] Don't say the same thing twice in a row.`);
         this.history.add('system', `[MEMORY_REMINDER] Remember to be proactive about saving owner related info, update obsolete memories, or delete duplicates or completely obsolete memories as needed.`);
 
         // Get HUD diff and add it if changes occurred

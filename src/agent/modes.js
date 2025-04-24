@@ -384,7 +384,7 @@ const modes = [
             const reportedCache = agent.reportedRareBlocks; // Reference to the agent's cache
 
             // Find nearby blocks of the rare types
-            const nearbyRareBlocks = world.getNearestBlocks(bot, this.rareBlockNames, world.FAR_DISTANCE);
+            const nearbyRareBlocks = world.getNearestBlocks(bot, this.rareBlockNames, world.FAR_DISTANCE, 1000);
 
             if (nearbyRareBlocks.length === 0) {
                 return; // No rare blocks found nearby
