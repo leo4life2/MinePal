@@ -11,8 +11,31 @@ import { uIOhook } from 'uiohook-napi';
 import { LocalIndex } from 'vectra';
 import { WebSocketServer, WebSocket } from 'ws';
 import axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, ACTION_SAMPLING_RATE } from './src/constants.js';
+
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+const appVersion = electronApp.getVersion();
+
+// --- Supabase Client Management ---
+let supabase = null;
+function createSupabaseClientFromJWT(token) {
+    if (!token) return null;
+    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            persistSession: false
+        },
+        global: {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        }
+    });
+}
+// --- End Supabase Client Management ---
 
 let isKeyDown = false; // Track push-to-talk key state
 let keyCode = null; // Store the key code for push-to-talk
@@ -51,6 +74,18 @@ async function getJWT(userDataDir) {
     }
     return null;
 }
+
+// --- Supabase Helper Function ---
+function setSupabaseClientFromJWT(token) {
+    if (token) {
+        supabase = createSupabaseClientFromJWT(token);
+        logToFile('Supabase client set with new JWT.');
+    } else {
+        supabase = null;
+        logToFile('Supabase client cleared (no JWT).');
+    }
+}
+// --- End Supabase Helper Function ---
 
 function setupVoice(settings, userDataDir, agentProcesses) {
     const { key_binding } = settings;
@@ -430,10 +465,12 @@ function startServer() {
     });
 
     // Add JWT save endpoint
-    app.post('/save-jwt', express.json(), (req, res) => {
+    app.post('/save-jwt', express.json(), async (req, res) => {
         try {
             const { token } = req.body;
             const tokenPath = path.join(userDataDir, 'supa-jwt.json');
+
+            setSupabaseClientFromJWT(token);
             
             // Save token to file (empty string if not provided)
             fs.writeFileSync(tokenPath, JSON.stringify({ 
@@ -536,6 +573,99 @@ function startServer() {
 
         res.json({ message: "Profiles saved successfully." });
     });
+
+    // --- Supabase Logging Endpoints ---
+    app.post('/log-action-event', express.json(), async (req, res) => {
+        logToFile('API: POST /log-action-event called');
+        const { action, is_success, fail_reason, props } = req.body;
+
+        try {
+            if (!supabase) {
+                logToFile('Supabase client not initialized.');
+                return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
+            }
+            // --- Sampling Logic ---
+            if (is_success === true && Math.random() >= ACTION_SAMPLING_RATE) {
+                return res.status(200).json({ message: "Action event sampled out." });
+            }
+            // --- End Sampling Logic ---
+
+            // Get user ID
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
+                logToFile(`Supabase user error: ${userError?.message || 'User not found'}`);
+                return res.status(401).json({ error: "Could not retrieve authenticated user." });
+            }
+
+            const eventData = {
+                user_id: user.id,
+                action,
+                is_success: is_success !== undefined ? is_success : null,
+                fail_reason: fail_reason || null,
+                props: props || null
+            };
+
+            const { error: insertError } = await supabase
+                .from('action_events')
+                .insert(eventData);
+
+            if (insertError) {
+                logToFile(`Supabase insert error (action_events): ${insertError.message}`);
+                return res.status(500).json({ error: `Failed to log action event: ${insertError.message}` });
+            }
+
+            res.status(201).json({ message: "Action event logged successfully." });
+        } catch (error) {
+            logToFile(`Error in /log-action-event: ${error.message}`);
+            res.status(500).json({ error: "Internal server error while logging action event." });
+        }
+    });
+
+    app.post('/log-agent-session', express.json(), async (req, res) => {
+        logToFile('API: POST /log-agent-session called');
+        const { play_time_sec, stop_reason, crash_reason, metadata } = req.body;
+
+        if (play_time_sec === undefined || !stop_reason) {
+            return res.status(400).json({ error: "'play_time_sec' and 'stop_reason' fields are required." });
+        }
+
+        try {
+            if (!supabase) {
+                logToFile('Supabase client not initialized.');
+                return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
+            }
+            // Get user ID
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
+                logToFile(`Supabase user error: ${userError?.message || 'User not found'}`);
+                return res.status(401).json({ error: "Could not retrieve authenticated user." });
+            }
+
+            const sessionData = {
+                user_id: user.id,
+                agent_version: appVersion,
+                play_time_sec,
+                stop_reason,
+                crash_reason: crash_reason || null,
+                metadata: metadata || null
+            };
+
+            const { error: insertError } = await supabase
+                .from('agent_sessions')
+                .insert(sessionData);
+
+            if (insertError) {
+                logToFile(`Supabase insert error (agent_sessions): ${insertError.message}`);
+                return res.status(500).json({ error: `Failed to log agent session: ${insertError.message}` });
+            }
+
+            res.status(201).json({ message: "Agent session logged successfully." });
+        } catch (error) {
+            logToFile(`Error in /log-agent-session: ${error.message}`);
+            res.status(500).json({ error: "Internal server error while logging agent session." });
+        }
+    });
+    // --- End Supabase Logging Endpoints ---
 
     const shutdown = () => {
         logToFile('Shutting down gracefully...');

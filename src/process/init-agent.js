@@ -2,6 +2,7 @@ import { Agent } from '../agent/agent.js';
 import yargs from 'yargs';
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios'; // Add axios for HTTP requests
 
 const args = process.argv.slice(2);
 if (args.length < 1) {
@@ -35,6 +36,28 @@ const settingsPath = path.join(argv.userDataDir, 'settings.json');
 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
 
 const agent = new Agent();
+
+// --- Play time tracking ---
+const startTime = Date.now();
+function getPlayTimeSec() {
+    return Math.floor((Date.now() - startTime) / 1000);
+}
+
+async function logAgentSession({ play_time_sec, stop_reason, crash_reason = null, metadata = null }) {
+    try {
+        await axios.post('http://localhost:10101/log-agent-session', {
+            play_time_sec,
+            stop_reason,
+            crash_reason,
+            metadata
+        });
+    } catch (err) {
+        // Don't throw, just log
+        console.error('[LOG_AGENT_SESSION] Failed to log agent session:', err?.response?.data || err.message);
+    }
+}
+// --- End play time tracking ---
+
 try {
     agent.start(argv.profile, argv.userDataDir, argv.appPath, argv.load_memory).then(() => {
         agent.bot._client.on('error', (error) => {
@@ -68,15 +91,44 @@ process.on('message', (e) => {
 
 // Add logging for process exit
 process.on('exit', (code) => {
-    console.log(`Process exited with code: ${code}`);
+    console.log(`[EXIT] Process exited with code: ${code}`);
 });
 
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
+process.on('uncaughtException', async (err) => {
+    console.error('[CRASH] Uncaught Exception:', err);
+    await logAgentSession({
+        play_time_sec: getPlayTimeSec(),
+        stop_reason: 'crash',
+        crash_reason: err && err.stack ? `${err.toString()}\n${err.stack}` : JSON.stringify(err, Object.getOwnPropertyNames(err), 2)
+    });
     process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+process.on('unhandledRejection', async (reason, promise) => {
+    console.error('[CRASH] Unhandled Rejection at:', promise, 'reason:', reason);
+    await logAgentSession({
+        play_time_sec: getPlayTimeSec(),
+        stop_reason: 'crash',
+        crash_reason: `Reason: ${JSON.stringify(reason, Object.getOwnPropertyNames(reason), 2)}\nPromise: ${JSON.stringify(promise, Object.getOwnPropertyNames(promise), 2)}`
+    });
     process.exit(1);
+});
+
+// Add signal handlers for graceful shutdown requests
+process.on('SIGINT', async () => {
+    console.log('[SIGINT] Received SIGINT. Exiting...');
+    await logAgentSession({
+        play_time_sec: getPlayTimeSec(),
+        stop_reason: 'graceful'
+    });
+    process.exit(0); // Use 0 for graceful exit request
+});
+
+process.on('SIGTERM', async () => {
+    console.log('[SIGTERM] Received SIGTERM. Exiting...');
+    await logAgentSession({
+        play_time_sec: getPlayTimeSec(),
+        stop_reason: 'graceful'
+    });
+    process.exit(0); // Use 0 for graceful exit request
 });
