@@ -219,14 +219,11 @@ export class Coder {
             return {success:true, message: output, interrupted, timedout};
         } catch (err) {
             this.executing = false;
-            console.log('Executing set to false in catch');
             clearTimeout(TIMEOUT);
             this.cancelResume();
-            console.error(`Process ${process.pid}: Code execution triggered catch: ${err}`);
-            console.log("[CODERSTOP] Execute catch.");
             await this.stop();
 
-            let message = this.formatOutput(this.agent.bot) + '!!Code threw exception!!  Error: ' + err + '\nStack trace:\n' + err.stack;
+            let message = this.formatOutput(this.agent.bot) + '[ACTION_CRASH] Error: ' + err + '\nStack trace:\n' + err.stack;
             let interrupted = this.agent.bot.interrupt_code;
             this.clear();
             if (!interrupted && !this.generating) this.agent.bot.emit('idle');

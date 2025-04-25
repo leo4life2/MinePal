@@ -1,5 +1,6 @@
 import { actionsList } from './actions.js';
 import { queryList } from './queries.js';
+import axios from 'axios'; // Add axios for logging
 
 
 const commandList = queryList.concat(actionsList);
@@ -88,14 +89,37 @@ export async function executeCommand(agent, message) {
         console.log('Agent:', agent.name);
         console.log('Arguments:', JSON.stringify(parsed.args, null, 2));
 
+        let result;
+        let isSuccess = true;
+        let failReason = null;
         try {
             // Use spread syntax; JS handles default parameters
-            return await command.perform(agent, ...parsed.args);
+            result = await command.perform(agent, ...parsed.args);
+            // Check for [ACTION_CRASH] in result string
+            if (typeof result === 'string' && result.includes('[ACTION_CRASH]')) {
+                isSuccess = false;
+                // Extract error message after [ACTION_CRASH]
+                const match = result.match(/\[ACTION_CRASH\](.*)/s);
+                failReason = match ? match[1].trim() : 'Unknown error';
+            }
         } catch (error) {
             console.error(`Error executing command ${command.name}:`, error);
-            // Return a generic error message to the agent history
-            return `Error executing command ${command.name}: ${error.message}. Please check arguments.`;
+            result = `Error executing command ${command.name}: ${error.message}. Please check arguments.`;
+            isSuccess = false;
+            failReason = error.message;
         }
+        // Log the action event
+        try {
+            await axios.post('http://localhost:10101/log-action-event', {
+                action: message,
+                is_success: isSuccess,
+                fail_reason: failReason,
+                props: null
+            });
+        } catch (logErr) {
+            console.error('[ACTION_EVENT_LOG] Failed to log action event:', logErr?.response?.data || logErr.message);
+        }
+        return result;
     } else
         return `Command is incorrectly formatted`;
 }
