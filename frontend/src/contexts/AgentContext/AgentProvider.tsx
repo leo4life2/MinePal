@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSupabase } from "../SupabaseContext/useSupabase";
+import pkg from "../../../../package.json";
 
 import { isValidMinecraftUsername, validateUserSettings } from "../../utils/validation";
 import { useUserSettings } from "../UserSettingsContext/UserSettingsContext";
@@ -22,6 +24,7 @@ const fieldDisplayNames: Record<string, string> = {
 export default function AgentProvider({ children }: React.PropsWithChildren) {
   const { userSettings } = useUserSettings();
   const { declareError, clearError } = useErrorReport();
+  const { isPaying } = useSupabase();
   const [active, setActive] = useState<boolean>(false);
   const [selectedProfiles, setSelectedProfiles] = useState<Profile[]>([]);
 
@@ -64,7 +67,12 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
       setActive(true);
       clearError()
 
-      startTrackingSession(userSettings.player_username, selectedProfiles.length);
+      startTrackingSession(
+        userSettings.player_username, 
+        selectedProfiles.length, 
+        isPaying, 
+        pkg.version 
+      );
     } catch (error) {
       if (error instanceof Error) {
         declareError("AgentProvider", error);
@@ -72,7 +80,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
         declareError("AgentProvider", "An unknown error occurred while stopping the agent.");
       }
     }
-  }, [userSettings, selectedProfiles, declareError, clearError]);
+  }, [userSettings, selectedProfiles, declareError, clearError, isPaying]);
 
   const stop = useCallback(async () => {
     try {
@@ -80,7 +88,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
       console.log("Agent stopped successfully:", success);
       setActive(false);
       clearError();
-      stopTrackingSession(userSettings.player_username);
+      stopTrackingSession(userSettings.player_username, isPaying, pkg.version);
     } catch (error) {
       if (error instanceof Error) {
         declareError("AgentProvider", error);
@@ -88,7 +96,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
         declareError("AgentProvider", "An unknown error occurred while stopping the agent.");
       }
     }
-  }, [declareError, clearError, userSettings])
+  }, [declareError, clearError, userSettings, isPaying]);
 
   const toggleProfile = useCallback((profile: Profile) => {
     setSelectedProfiles((currentProfiles) => {
@@ -103,7 +111,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
     if (active) {
       const handleBeforeUnload = () => {
         // This might not work lol, because we're an Electron app, but just gonna have this here first.
-        stopTrackingSession(userSettings.player_username);
+        stopTrackingSession(userSettings.player_username, isPaying, pkg.version);
       };
 
       window.addEventListener('beforeunload', handleBeforeUnload);
@@ -111,7 +119,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
         window.removeEventListener('beforeunload', handleBeforeUnload);
       };
     }
-  }, [active, userSettings.player_username]);
+  }, [active, userSettings.player_username, isPaying]);
 
   return (
     <AgentContext.Provider
