@@ -79,13 +79,20 @@ try {
     console.error('[Agent Start Error]', error);
 }
 
-process.on('message', (e) => {
-    console.log("message", e);
+process.on('message', async (e) => {
+    console.log("message received:", e);
     if (e.type === 'transcription') {
         // Handle the transcription message
         agent.handleMessage(settings.player_username, e.data);
     } else if (e.type === 'manual_chat') {
         agent.sendMessage(e.data);
+    } else if (e.type === 'shutdown') {
+        console.log('[IPC] Received shutdown message. Exiting gracefully...');
+        await logAgentSession({
+            play_time_sec: getPlayTimeSec(),
+            stop_reason: 'graceful'
+        });
+        process.exit(0);
     }
 });
 

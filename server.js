@@ -431,14 +431,29 @@ function startServer() {
         }
 
         agentProcesses.forEach(agentProcess => {
-            agentProcess.agentProcess.kill();
+            if (agentProcess.agentProcess && !agentProcess.agentProcess.killed) {
+                logToFile(`Sending shutdown message to agent process PID: ${agentProcess.agentProcess.pid}`);
+                agentProcess.agentProcess.send({ type: 'shutdown' });
+
+                // Optional: Add a timeout to forcefully kill if it doesn't exit
+                const killTimeout = setTimeout(() => {
+                    logToFile(`Agent process PID ${agentProcess.agentProcess.pid} did not exit gracefully during shutdown, forcefully killing.`);
+                    // Force kill if it doesn't respond in time
+                    agentProcess.agentProcess.kill('SIGKILL');
+                }, 5000); // 5 seconds timeout
+
+                agentProcess.agentProcess.on('exit', (code, signal) => {
+                    clearTimeout(killTimeout); // Clear the timeout if it exits normally
+                    logToFile(`Agent process PID ${agentProcess.agentProcess.pid} exited during shutdown with code ${code} and signal ${signal}.`);
+                });
+            }
         });
 
-        agentProcesses = [];
+        agentProcesses = []; // Clear the array after initiating shutdown
         agentProcessStarted = false;
 
-        logToFile('API: All agent processes stopped');
-        res.send('All agent processes have been stopped.');
+        logToFile('API: All agent processes shutdown initiated');
+        res.send('All agent processes shutdown initiated.');
     });
 
     app.post('/manual-chat', express.json(), (req, res) => {
@@ -687,9 +702,24 @@ function startServer() {
         
         if (agentProcessStarted) {
             agentProcesses.forEach(agentProcess => {
-                agentProcess.agentProcess.kill('SIGTERM');
+                if (agentProcess.agentProcess && !agentProcess.agentProcess.killed) {
+                    logToFile(`Sending shutdown message to agent process PID: ${agentProcess.agentProcess.pid}`);
+                    agentProcess.agentProcess.send({ type: 'shutdown' });
+
+                    // Optional: Add a timeout to forcefully kill if it doesn't exit
+                    const killTimeout = setTimeout(() => {
+                        logToFile(`Agent process PID ${agentProcess.agentProcess.pid} did not exit gracefully during shutdown, forcefully killing.`);
+                        // Force kill if it doesn't respond in time
+                        agentProcess.agentProcess.kill('SIGKILL');
+                    }, 5000); // 5 seconds timeout
+
+                    agentProcess.agentProcess.on('exit', (code, signal) => {
+                        clearTimeout(killTimeout); // Clear the timeout if it exits normally
+                        logToFile(`Agent process PID ${agentProcess.agentProcess.pid} exited during shutdown with code ${code} and signal ${signal}.`);
+                    });
+                }
             });
-            agentProcesses = [];
+            agentProcesses = []; // Clear the array after initiating shutdown
             agentProcessStarted = false;
         }
         server.close(() => {
