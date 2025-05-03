@@ -6,6 +6,7 @@ const defaultUserSettings: UserSettings = {
   player_username: "",
   profiles: [],
   whisper_to_player: false,
+  voice_mode: true,
   key_binding: '',
   language: 'en',
   openai_api_key: '',
