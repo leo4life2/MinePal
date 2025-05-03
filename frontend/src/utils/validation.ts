@@ -5,12 +5,16 @@ export function isValidMinecraftUsername(username: string) {
   return regex.test(username);
 }
 
+export function isValidEmail(email: string) {
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return regex.test(email);
+}
+
 export function validateUserSettings({
   useOwnApiKey,
   openai_api_key,
   model,
   profiles,
-  key_binding,
   host,
   port,
 }: UserSettings) {
@@ -22,7 +26,6 @@ export function validateUserSettings({
   }
 
   if (!profiles.length) invalidFields.push("profiles");
-  if (!key_binding) invalidFields.push("key_binding");
   if (!host) invalidFields.push("host");
   if (!port) invalidFields.push("port");
 

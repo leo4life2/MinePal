@@ -434,7 +434,7 @@ export class Agent {
 
         console.log('Logging in...');
         this.mcdata = MCData.getInstance(this.settings); // Use singleton with settings
-        this.bot = this.mcdata.initBot(this.name); // Initialize bot with agent's name
+        this.bot = this.mcdata.initBot(this.name, this.profile); // Initialize bot with agent's name
 
         this.bot.whisper_to_player = this.settings.whisper_to_player;
         this.bot.owner = this.owner;
@@ -459,7 +459,7 @@ export class Agent {
                 console.warn(`Owner username "${this.owner}" not found in settings or player list.`);
             }
 
-            console.log(`${this.name} spawned.`);
+            console.log(`${this.bot.username} spawned.`);
             this.coder.clear();
             
             // Set the initial dimension after spawning
@@ -478,7 +478,7 @@ export class Agent {
             
             // Set up listener for owner messages
             this.bot.on(eventname, (username, message) => {
-                if (username === this.name) return;
+                if (username === this.bot.username) return;
                 if (ignore_messages.some((m) => message.startsWith(m))) return;
                 this.handleMessage(username, message);
             });
@@ -1270,7 +1270,7 @@ export class Agent {
         // Only add turn if there's something to record
         if (chatMessage || command || thought || current_goal_status) {
             // console.log(`[_processPromptCycle] Adding assistant turn. Chat: ${!!chatMessage}, Cmd: ${!!command}, Thought: ${!!thought}, Goal: ${!!current_goal_status}`);
-            this.history.add(this.name, chatMessage || "", thought, current_goal_status);
+            this.history.add(this.bot.username, chatMessage || "", thought, current_goal_status);
         } else {
             // console.log("[_processPromptCycle] LLM returned no chat, command, thought, or goal status. No assistant turn added.");
         }
@@ -1490,7 +1490,7 @@ export class Agent {
             this.cleanKill('Bot kicked! Killing agent process.', reason="KICK");
         });
         this.bot.on('messagestr', async (message, _, jsonMsg) => {
-            if (jsonMsg.translate && jsonMsg.translate.startsWith('death') && message.startsWith(this.name)) {
+            if (jsonMsg.translate && jsonMsg.translate.startsWith('death') && message.startsWith(this.bot.username)) {
                 console.log('Agent died: ', message);
                 const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
                 this.handleMessage('system', `[DEATH | ${timeStr}] You died with the final message: '${message}'. Previous actions were stopped and you have respawned. Notify the user and perform any necessary actions.`);

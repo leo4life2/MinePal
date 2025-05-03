@@ -25,6 +25,7 @@ let mainWindow;
 
 const DEV = false;
 const DEBUG = false;
+const DEVTOOLS = true;
 
 const logDirectory = app.getPath('userData');
 const logStream = createStream('app.log', {
@@ -58,14 +59,20 @@ async function checkAndCopyProfile() {
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 615,
+        width: 650,
         height: 750,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'preload.js'),
+            devTools: DEVTOOLS
         },
+        autoHideMenuBar: !DEVTOOLS,
+        menuBarVisible: DEVTOOLS
     });
+
+    mainWindow.setMenuBarVisibility(DEVTOOLS);
+    if (!DEVTOOLS) mainWindow.removeMenu();
 
     if (DEV) {
         mainWindow.loadURL('http://localhost:5173');
@@ -76,7 +83,7 @@ function createWindow() {
         });
     }
 
-    if (DEBUG) {
+    if (DEBUG && DEVTOOLS) {
         mainWindow.webContents.openDevTools(); // Open Electron DevTools
     }
 

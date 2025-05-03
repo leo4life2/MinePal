@@ -244,6 +244,24 @@ function Settings() {
 
           <SettingsSection title="Voice Input" isExpanded={false}>
             <div className="setting-item">
+              <label htmlFor="voice_mode" className="input-label">
+              Voice Mode
+              </label>
+              <div className="switch-container">
+                <label className="switch">
+                  <input
+                    id="voice_mode"
+                    type="checkbox"
+                    checked={userSettings.voice_mode}
+                    onChange={(e) => updateField('voice_mode', e.target.checked)}
+                    disabled={agentActive}
+                  />
+                  <span className="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            {userSettings.voice_mode && (<div className="setting-item">
               <label htmlFor="language" className="input-label">Language/Accent</label>
               <div className="select-wrapper">
                 <select
@@ -259,9 +277,9 @@ function Settings() {
                 </select>
                 <ChevronDown className="select-arrow" size={16} strokeWidth={2} />
               </div>
-            </div>
+            </div>)}
 
-            <div className="setting-item">
+            {userSettings.voice_mode && (<div className="setting-item">
               <label htmlFor="key_binding" className="input-label">Push-to-Talk Key</label>
               <div 
                 className={`key-binding-input ${listeningForKey ? 'listening' : ''}`}
@@ -282,9 +300,9 @@ function Settings() {
                   <span className="key-binding-placeholder">Click to set key</span>
                 )}
               </div>
-            </div>
+            </div>)}
 
-            <div className="setting-item">
+            {userSettings.voice_mode && (<div className="setting-item">
               <label htmlFor="input-device" className="input-label">Input Device</label>
               <div className="select-wrapper">
                 <select
@@ -302,7 +320,7 @@ function Settings() {
                 </select>
                 <ChevronDown className="select-arrow" size={16} strokeWidth={2} />
               </div>
-            </div>
+            </div>)}
           </SettingsSection>
         </div>
       )}
