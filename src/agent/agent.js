@@ -9,7 +9,7 @@ import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
 import * as world from "./library/world.js";
-import { Vec3 } from 'vec3'; // Ensure Vec3 is imported if not already
+import { emote } from './library/skills.js';
 
 // --- Silence Timer Constants ---
 const MEAN_1 = 20; // Base mean silence duration in seconds for the first silence
@@ -1255,6 +1255,7 @@ export class Agent {
         // Extract and clean up fields
         let chatMessage = responseData.say_in_game || null;
         let command = responseData.execute_command || null;
+        let emoteToPerform = responseData.emote || null; // Extract emote
         let requires_more_actions = responseData.requires_more_actions || false;
         let thought = responseData.thought || null;
         let current_goal_status = responseData.current_goal_status || null;
@@ -1274,6 +1275,20 @@ export class Agent {
             // console.log("[_processPromptCycle] LLM returned no chat, command, thought, or goal status. No assistant turn added.");
         }
 
+        // Process Emote (BEFORE command execution)
+        if (emoteToPerform && typeof emoteToPerform === 'string' && emoteToPerform.trim() !== '') {
+            console.log(`[_processPromptCycle] Performing emote: ${emoteToPerform}`);
+            try {
+                // We don't necessarily need to wait for the emote to finish
+                // before starting the command, but doing so might look more natural.
+                // Let's await it for now.
+                await emote(this.bot, emoteToPerform);
+            } catch (emoteError) {
+                console.error(`[_processPromptCycle] Error performing emote ${emoteToPerform}:`, emoteError);
+                // Log to history, but don't necessarily stop command execution
+                this.history.add('system', `[ERROR | ${timeStr}] Failed to perform emote ${emoteToPerform}: ${emoteError.message}`);
+            }
+        }
 
         // Process Chat
         if (chatMessage) {

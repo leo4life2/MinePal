@@ -49,6 +49,11 @@ const minepal_response_schema = {
             type: "string",
             description: "Short, casual in-game message directed at players in owner's specified language."
         },
+        emote: {
+            type: "string",
+            description: "Optional: Trigger a specific visual emote. Valid values: hello, wave, bow, yes, no, twerk, spin, pogo, cheer. Leave empty if no emote is needed.",
+            enum: ["", "hello", "wave", "bow", "yes", "no", "twerk", "spin", "pogo", "cheer"]
+        },
         execute_command: { 
             type: "string",
             description: "A single MinePal non-memory command (!command) or Minecraft slash-command to execute. Do not make memory related actions here. Do not make multiple commands calls. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
@@ -67,7 +72,7 @@ const minepal_response_schema = {
         }
 
     },
-    required: ["thought", "say_in_game", "execute_command", "requires_more_actions", "current_goal_status", "manage_memories"],
+    required: ["thought", "say_in_game", "emote", "execute_command", "requires_more_actions", "current_goal_status", "manage_memories"],
     additionalProperties: false
 };
 

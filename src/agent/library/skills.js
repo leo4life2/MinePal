@@ -661,15 +661,17 @@ export async function tameMob(bot, mobType) {
    * @example
    * await skills.tameMob(bot, "cat");
    * await skills.tameMob(bot, "wolf");
+   * await skills.tameMob(bot, "parrot"); // Added parrot example
    **/
   
   const tamingItems = {
-    cat: ["cod", "salmon"],
-    wolf: ["bone"]
+    cat: ["cod", "salmon", "raw_cod", "raw_salmon"], // Added raw fish
+    wolf: ["bone"],
+    parrot: ["wheat_seeds", "melon_seeds", "pumpkin_seeds", "beetroot_seeds", "torchflower_seeds"] // Added parrot taming items
   };
 
   if (!tamingItems[mobType]) {
-    log(bot, `Can only tame cats or wolves, not ${mobType}.`);
+    log(bot, `Cannot tame ${mobType}. Can only tame: ${Object.keys(tamingItems).join(', ')}.`); // Updated message
     return false;
   }
 
@@ -760,10 +762,12 @@ export async function tameMob(bot, mobType) {
         }
         log(bot, `Successfully tamed ${mobType}!`);
 
-        // make pet stand if it's sitting
-        await bot.unequip('hand');  // Unequip food/bone first
-        await bot.lookAt(targetMob.position.offset(0, 0.5, 0));
-        await bot.useOn(targetMob);
+        // make pet stand if it's sitting (only for cats/wolves)
+        if (mobType === 'cat' || mobType === 'wolf') {
+            await bot.unequip('hand');  // Unequip food/bone first
+            await bot.lookAt(targetMob.position.offset(0, 0.5, 0));
+            await bot.useOn(targetMob);
+        }
         return true;
       }
       
@@ -2921,3 +2925,160 @@ export async function unequip(bot, destination) {
 }
 
 // --- End Container Interaction Skills ---
+
+// --- Emote Skills ---
+
+// Helper Functions
+const delay = ms => new Promise(res => setTimeout(res, ms));
+const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const randFloat = (min, max) => Math.random() * (max - min) + min;
+const randDur = (base = 75, range = 25) => base + randInt(-range, range); // Random duration around a base
+
+async function tap(bot, state, times, dur = 75) {
+  for (let i = 0; i < times; i++) {
+    bot.setControlState(state, true);
+    await delay(dur);
+    bot.setControlState(state, false);
+    await delay(dur);
+  }
+}
+
+async function hold(bot, state, ms) {
+  bot.setControlState(state, true);
+  await delay(ms);
+  bot.setControlState(state, false);
+}
+
+async function look(bot, yawDeg, pitchDeg, ms = 0) {
+  const rad = x => (x * Math.PI) / 180;
+  // Ensure yaw stays within [-180, 180) for consistency if needed, though bot.look handles wrapping
+  // yawDeg = ((yawDeg + 180) % 360) - 180;
+  bot.look(rad(yawDeg), rad(pitchDeg), true);
+  if (ms) await delay(ms);
+}
+
+async function wave(bot, times = 3, hand = 'right') {
+  // Add randomness to wave helper
+  const numWaves = randInt(2, 4); // Wave 2-4 times
+  for (let i = 0; i < times; i++) {
+    // Check if hand is empty before swinging? Maybe too complex for now.
+    bot.swingArm(hand);
+    await delay(randDur(200, 50)); // Random delay between waves
+  }
+}
+
+const emotes = {
+  hello: async (bot) => {
+    await tap(bot, 'sneak', randInt(3, 5), randDur(75, 15)); // 3-5 taps, 60-90ms duration
+  },
+  bow: async (bot) => {
+    await tap(bot, 'sneak', randInt(2, 4), randDur(80, 20)); // 2-4 taps first
+    await delay(randDur(180, 40)); // 140-220ms delay
+    await tap(bot, 'sneak', 1, randDur(100, 20)); // Single tap last, slightly longer duration
+  },
+  twerk: async (bot) => {
+    await tap(bot, 'sneak', randInt(10, 15), randDur(40, 10)); // 10-15 taps, 30-50ms duration (fast)
+  },
+  yes: async (bot) => {
+    // This emote controls head movement directly, so it ignores targetPosition.
+    // Increased range of motion
+    const currentYaw = bot.entity.yaw * 180 / Math.PI;
+    const repetitions = randInt(2, 4); // 2-4 nods
+    for (let i = 0; i < repetitions; i++) {
+        await look(bot, currentYaw, randFloat(25, 40), randDur(120, 30)); // Look down 25-40 deg
+        await delay(randDur(100, 40));
+        await look(bot, currentYaw, randFloat(-25, -40), randDur(120, 30)); // Look up 25-40 deg
+        await delay(100);
+    }
+  },
+  no: async (bot) => {
+    // This emote controls head movement directly, so it ignores targetPosition.
+    // Increased range of motion
+    const currentYaw = bot.entity.yaw * 180 / Math.PI;
+    const currentPitch = bot.entity.pitch * 180 / Math.PI;
+    const repetitions = randInt(2, 4); // 2-4 shakes
+    for (let i = 0; i < repetitions; i++) {
+        await look(bot, currentYaw - randFloat(25, 40), currentPitch, randDur(100, 30)); // Look left 25-40 deg
+        await delay(randDur(100, 40));
+        await look(bot, currentYaw + randFloat(25, 40), currentPitch, randDur(150, 40)); // Look right 25-40 deg
+        await delay(100);
+    }
+  },
+  spin: async (bot) => {
+    // This emote controls head movement directly, so it ignores targetPosition.
+    const turns = randInt(10, 16); // Random number of turns for smoothness variation
+    // Increased speed
+    const currentYaw = bot.entity.yaw * 180 / Math.PI;
+    for(let i = 1; i <= turns; i++){
+        await look(bot, currentYaw + (360 / turns) * i, 0, randDur(20, 5)); // Randomize step speed slightly (15-25ms)
+        await delay(randDur(30, 10)); // Randomize delay between steps slightly (20-40ms)
+    }
+    await look(bot, currentYaw, 0, randDur(25, 10)); // Faster random return look
+  },
+  wave: async (bot) => {
+      await wave(bot); // Call helper which now has randomness
+  },
+  pogo: async (bot) => {
+      // Refined actions to only jump/sneak for pogo feel
+      const actions = ['jump', 'sneak'];
+      const randomAction = () => actions[Math.floor(Math.random() * actions.length)];
+      const randomCount = () => Math.floor(Math.random() * 3) + 1; // 1-3 times
+      const randomDelay = () => Math.floor(Math.random() * 100) + 50; // 50-150ms
+      const numLoops = randInt(6, 10); // Random number of loops
+      for (let i = 0; i < numLoops; i++) {
+          await tap(bot, randomAction(), randomCount(), randomDelay());
+          await delay(randomDelay());
+      }
+  },
+  cheer: async (bot) => {
+      await tap(bot, 'jump', randInt(1, 3), randDur(100, 20));
+      await tap(bot, 'sneak', randInt(1, 3), randDur(80, 20));
+      await tap(bot, 'jump', randInt(1, 3), randDur(100, 20));
+      await tap(bot, 'sneak', randInt(1, 3), randDur(80, 20));
+      await tap(bot, 'jump', randInt(1, 2), randDur(120, 20)); // Fewer jumps at the end
+  },
+};
+
+export async function emote(bot, emoteType) {
+  /**
+   * Perform a visual emote.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} emoteType - The type of emote (e.g., 'hello', 'nod', 'spin').
+   * Attempts to look at the nearest entity during non-look-based emotes.
+   * @returns {Promise<string>} A message indicating success or failure.
+   */
+  if (emotes[emoteType]) {
+    log(bot, `Performing emote: ${emoteType}...`);
+    try {
+      // Find nearest entity to look at (similar to idle_staring)
+      const entity = bot.nearestEntity((e) => e.type !== 'object' && e.type !== 'orb' && e.name !== 'enderman' && e.name !== 'item'); // Filter out objects/items/endermen
+      if (entity && entity.position.distanceTo(bot.entity.position) < 10) {
+          // Find nearest PLAYER entity to look at
+          const entity = bot.nearestEntity((e) => e.type === 'player');
+          // Players don't have a 'baby' state affecting height this way, use standard player height
+          const height = 1.62; // Standard player eye height
+
+          // Perform the lookAt here, once, before calling the specific emote.
+          const targetPosition = entity.position.offset(0, height, 0);
+          await bot.lookAt(targetPosition);
+      }
+      // No need to pass targetPosition to the emote function
+      await emotes[emoteType](bot);
+      const message = `Successfully performed emote: ${emoteType}.`;
+      log(bot, message);
+      return message;
+    } catch (error) {
+      const message = `Failed to perform emote ${emoteType}: ${error.message}`;
+      log(bot, message);
+      console.error(error); // Log full error for debugging
+      return message;
+    }
+  } else {
+    const validEmotes = Object.keys(emotes).join(', ');
+    const message = `Invalid emote type "${emoteType}". Valid emotes are: ${validEmotes}.`;
+    log(bot, message);
+    return message;
+  }
+}
+
+// --- End Emote Skills ---

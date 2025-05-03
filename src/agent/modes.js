@@ -249,29 +249,98 @@ const modes = [
          * @param {Object} agent - The agent object containing the bot.
          */
         update: function (agent) {
-            const entity = agent.bot.nearestEntity();
-            let entity_in_view = entity && entity.position.distanceTo(agent.bot.entity.position) < 10 && entity.name !== 'enderman';
-            if (entity_in_view && entity !== this.last_entity) {
+            const bot = agent.bot;
+            const ownerName = agent.owner; // Get owner name
+
+            // Find nearest suitable entity (player or mob, excluding endermen/items/objects)
+            const nearestEntity = bot.nearestEntity((e) =>
+                e.type !== 'object' && e.type !== 'orb' && e.name !== 'enderman' && e.name !== 'item'
+            );
+
+            let targetEntity = null;
+            let isOwnerNearby = false;
+            let isEntityNearby = false;
+
+            if (nearestEntity && nearestEntity.position.distanceTo(bot.entity.position) < 10) {
+                isEntityNearby = true;
+                targetEntity = nearestEntity;
+                if (targetEntity.type === 'player' && targetEntity.username === ownerName) {
+                    isOwnerNearby = true;
+                }
+            }
+
+            // Define durations based on who is nearby
+            let stareDuration, lookAwayDuration, lookAwayProbability;
+            if (isOwnerNearby) {
+                stareDuration = 15000 + Math.random() * 15000; // 15-30 seconds
+                lookAwayDuration = 500 + Math.random() * 1000; // 0.5-1.5 seconds
+                lookAwayProbability = 0.1; // 10% chance to look away briefly
+            } else if (isEntityNearby) {
+                stareDuration = 4000 + Math.random() * 1000; // 4-5 seconds (original)
+                lookAwayDuration = 2000 + Math.random() * 10000; // 2-12 seconds (original)
+                lookAwayProbability = 0.7; // 70% chance to look away (original)
+            } else { // No one nearby
+                stareDuration = 0;
+                lookAwayDuration = 2000 + Math.random() * 10000; // 2-12 seconds
+                lookAwayProbability = 1.0; // Always look randomly if timer expires
+            }
+
+            // State logic
+            if (targetEntity && (!this.staring || this.last_entity?.id !== targetEntity.id)) {
+                // Start staring at a new entity
                 this.staring = true;
-                this.last_entity = entity;
-                this.next_change = Date.now() + Math.random() * 1000 + 4000;
-            }
-            if (entity_in_view && this.staring) {
-                let isbaby = entity.type !== 'player' && entity.metadata[16];
-                let height = isbaby ? entity.height/2 : entity.height;
-                agent.bot.lookAt(entity.position.offset(0, height, 0));
-            }
-            if (!entity_in_view)
-                this.last_entity = null;
-            if (Date.now() > this.next_change) {
-                // look in random direction
-                this.staring = Math.random() < 0.3;
-                if (!this.staring) {
+                this.last_entity = targetEntity;
+                this.next_change = Date.now() + stareDuration;
+            } else if (targetEntity && this.staring && Date.now() > this.next_change) {
+                // Stare duration expired, decide whether to look away
+                const shouldLookAway = Math.random() < lookAwayProbability;
+                if (shouldLookAway) {
+                    this.staring = false;
+                    this.last_entity = null;
+                    this.next_change = Date.now() + lookAwayDuration;
+                    // Look away randomly immediately
                     const yaw = Math.random() * Math.PI * 2;
                     const pitch = (Math.random() * Math.PI/2) - Math.PI/4;
-                    agent.bot.look(yaw, pitch, false);
+                    bot.look(yaw, pitch, false);
+                } else {
+                    // Continue staring at the same entity
+                    this.next_change = Date.now() + stareDuration;
                 }
-                this.next_change = Date.now() + Math.random() * 10000 + 2000;
+            } else if (!targetEntity) {
+                // No entity nearby
+                if (this.staring) {
+                    // Stop staring if entity disappeared
+                    this.staring = false;
+                    this.last_entity = null;
+                    this.next_change = Date.now(); // Check immediately if should look random
+                }
+                if (Date.now() > this.next_change) {
+                    // Look randomly
+                    const yaw = Math.random() * Math.PI * 2;
+                    const pitch = (Math.random() * Math.PI / 2) - Math.PI / 4;
+                    bot.look(yaw, pitch, false);
+                    this.next_change = Date.now() + lookAwayDuration;
+                }
+            }
+
+            // Action: Perform lookAt if staring
+            if (this.staring && this.last_entity) {
+                // Calculate target height (handle players vs mobs, potential babies)
+                let height = this.last_entity.height || 1.6; // Default height
+                try { // Safer metadata access
+                    // Simplified baby check (may need adjustment per MC version)
+                    const babyMetadataIndex = 15; // Common index for baby status in mobs
+                    if (this.last_entity.type !== 'player' && this.last_entity.metadata[babyMetadataIndex]) {
+                        height /= 2;
+                    }
+                } catch (e) {/* Ignore metadata access errors */} // Ignore errors if metadata is missing/malformed
+                const targetPos = this.last_entity.position.offset(0, height, 0);
+                bot.lookAt(targetPos);
+            } else if (!this.staring && !targetEntity && Date.now() > this.next_change - 50) {
+                 // If not staring, no target nearby, and about to look randomly, maybe look straight ahead briefly?
+                 // This prevents being stuck looking randomly if no entity appears.
+                 // Optional: look slightly down/level instead of purely random every time.
+                 // Example: bot.look(bot.entity.yaw, 0, false);
             }
         }
     },
