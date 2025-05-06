@@ -1277,16 +1277,14 @@ export class Agent {
 
         // Process Emote (BEFORE command execution)
         if (emoteToPerform && typeof emoteToPerform === 'string' && emoteToPerform.trim() !== '') {
-            console.log(`[_processPromptCycle] Performing emote: ${emoteToPerform}`);
-            try {
-                // We don't necessarily need to wait for the emote to finish
-                // before starting the command, but doing so might look more natural.
-                // Let's await it for now.
-                await emote(this.bot, emoteToPerform);
-            } catch (emoteError) {
-                console.error(`[_processPromptCycle] Error performing emote ${emoteToPerform}:`, emoteError);
-                // Log to history, but don't necessarily stop command execution
-                this.history.add('system', `[ERROR | ${timeStr}] Failed to perform emote ${emoteToPerform}: ${emoteError.message}`);
+            const nearbyPlayer = this.bot.nearestEntity((e) => e.type === 'player' && e.position.distanceTo(this.bot.entity.position) < 10);
+            if (nearbyPlayer) {
+                try {
+                    await emote(this.bot, emoteToPerform);
+                } catch (emoteError) {
+                    console.error(`[_processPromptCycle] Error performing emote ${emoteToPerform}:`, emoteError);
+                    this.history.add('system', `[ERROR | ${timeStr}] Failed to perform emote ${emoteToPerform}: ${emoteError.message}`);
+                }
             }
         }
 
