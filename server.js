@@ -67,6 +67,7 @@ async function getJWT(userDataDir) {
         const tokenPath = path.join(userDataDir, 'supa-jwt.json');
         if (fs.existsSync(tokenPath)) {
             const data = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+            logToFile(`Retrieved JWT from file, updated at: ${data.updated_at || 'unknown'}`);
             return data.token;
         }
     } catch (err) {
@@ -485,11 +486,14 @@ function startServer() {
             const { token } = req.body;
             const tokenPath = path.join(userDataDir, 'supa-jwt.json');
 
+            logToFile(`Saving JWT: ${token ? 'token provided' : 'empty token'}`);
+            
             setSupabaseClientFromJWT(token);
             
             // Save token to file (empty string if not provided)
             fs.writeFileSync(tokenPath, JSON.stringify({ 
-                token: token || ''
+                token: token || '',
+                updated_at: new Date().toISOString() // Add timestamp for debugging
             }));
             
             res.json({ success: true });

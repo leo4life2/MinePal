@@ -173,7 +173,7 @@ export class Proxy {
             } else {
                 // --- Custom Backend Request ---                
                 const headers = {};
-                const token = await this.getJWT(); // Use JWT for custom backend
+                let token = await this.getJWT(); // Use JWT for custom backend
                 if (token) {
                     headers.Authorization = `Bearer ${token}`;
                 }
@@ -184,8 +184,29 @@ export class Proxy {
                      delete requestBody.stop;
                 }
 
-                response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, { headers });
-                res = response.data; // Custom backend returns data directly
+                try {
+                    response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, { headers });
+                    res = response.data; // Custom backend returns data directly
+                } catch (err) {
+                    if (err.response && err.response.status === 403 && 
+                        (err.response.data?.error?.includes('JWT expired') || 
+                         err.response.data?.error?.includes('expired token'))) {
+                        token = await this.getJWT(); // Try to get a fresh token that might have been refreshed
+                        if (token) {
+                            headers.Authorization = `Bearer ${token}`;
+                            try {
+                                response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, { headers });
+                                res = response.data;
+                            } catch (retryErr) {
+                                throw retryErr; // If retry fails, propagate the error
+                            }
+                        } else {
+                            throw err; // No fresh token available, propagate original error
+                        }
+                    } else {
+                        throw err; // Not a JWT expiration issue, propagate the error
+                    }
+                }
             }
 
         } catch (err) {
@@ -242,7 +263,7 @@ export class Proxy {
                 } else {
                     // --- Custom Backend Embeddings Request ---
                     const headers = {};
-                    const token = await this.getJWT(); // Use JWT for custom backend
+                    let token = await this.getJWT(); // Use JWT for custom backend
                     if (token) {
                         headers.Authorization = `Bearer ${token}`;
                     }
@@ -250,8 +271,26 @@ export class Proxy {
                         model_name: modelName, // Backend uses 'model_name'
                         text: text,          // Backend uses 'text'
                     };
-                    response = await axios.post(`${HTTPS_BACKEND_URL}/openai/embed`, requestBody, { headers });
-                    return response.data; // Custom backend returns data directly
+                    try {
+                        response = await axios.post(`${HTTPS_BACKEND_URL}/openai/embed`, requestBody, { headers });
+                        return response.data; // Custom backend returns data directly
+                    } catch (err) {
+                        if (err.response && err.response.status === 403 && 
+                            (err.response.data?.error?.includes('JWT expired') || 
+                             err.response.data?.error?.includes('expired token'))) {
+                            token = await this.getJWT(); // Try to get a fresh token that might have been refreshed
+                            if (token) {
+                                headers.Authorization = `Bearer ${token}`;
+                                try {
+                                    response = await axios.post(`${HTTPS_BACKEND_URL}/openai/embed`, requestBody, { headers });
+                                    return response.data;
+                                } catch (retryErr) {
+                                    throw retryErr; // If retry fails, propagate the error
+                                }
+                            }
+                        }
+                        throw err;
+                    }
                 }
             } catch (err) {
                  // Specific handling for OpenAI 401/403 errors
