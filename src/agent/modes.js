@@ -296,7 +296,7 @@ const modes = [
                 const shouldLookAway = Math.random() < lookAwayProbability;
                 if (shouldLookAway) {
                     this.staring = false;
-                    this.last_entity = null;
+                this.last_entity = null;
                     this.next_change = Date.now() + lookAwayDuration;
                     // Look away randomly immediately
                     const yaw = Math.random() * Math.PI * 2;

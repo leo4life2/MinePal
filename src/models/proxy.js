@@ -154,7 +154,6 @@ export class Proxy {
         }
 
         try {
-            let response;
             if (this.openai_api_key) {
                 // --- Direct OpenAI Request --- 
                 const headers = {
@@ -167,8 +166,14 @@ export class Proxy {
                     model: "gpt-4o-mini" // Hardcoding model for now, could be made configurable
                 };
                 
-                response = await axios.post('https://api.openai.com/v1/chat/completions', requestBody, { headers });
-                res = response.data.choices[0].message.content; // Extract content for OpenAI response
+                const response = await axios.post('https://api.openai.com/v1/chat/completions', requestBody, { headers });
+                try {
+                    const jsonContent = JSON.parse(response.data.choices[0].message.content);
+                    return { json: jsonContent };
+                } catch (e) {
+                    console.error("OpenAI response JSON parsing error:", e, response.data.choices[0].message.content);
+                    return { json: { error: "Failed to parse OpenAI JSON response: " + e.message } };
+                }
 
             } else {
                 // --- Custom Backend Request ---                
@@ -184,40 +189,164 @@ export class Proxy {
                      delete requestBody.stop;
                 }
 
-                response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, { headers });
-                res = response.data; // Custom backend returns data directly
+                // Request arraybuffer to handle potential multipart responses
+                const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, {
+                    headers,
+                    responseType: 'arraybuffer' // Crucial for handling binary/multipart
+                });
+
+                const contentType = response.headers['content-type'];
+                const responseBuffer = Buffer.from(response.data);
+
+                console.log("[Proxy] Response content type:", contentType);
+
+                if (contentType && contentType.startsWith('multipart/mixed')) {
+                    const boundaryMatch = contentType.match(/boundary=(.+)$/);
+                    if (!boundaryMatch) return { json: { error: "Multipart response missing boundary string."}};
+                    
+                    const boundary = boundaryMatch[1];
+                    let parsedJson = null;
+                    let audioWavData = null;
+
+                    try {
+                        const parts = this._parseMultipart(responseBuffer, boundary);
+                        for (const part of parts) {
+                            if (part.headers.includes('application/json')) {
+                                parsedJson = JSON.parse(part.body.toString('utf-8'));
+                            } else if (part.headers.includes('audio/wav')) {
+                                audioWavData = part.body;
+                            }
+                        }
+
+                        if (!parsedJson) throw new Error("No JSON part in multipart response");
+                        return { json: parsedJson, audio: audioWavData }; // audioWavData will be null if not present
+                    } catch (e) {
+                        console.error("Multipart processing error:", e);
+                        return { json: { error: "Multipart processing error: " + e.message } };
+                    }
+                } else if (contentType && contentType.startsWith('application/json')) {
+                    // Standard JSON response
+                    try {
+                        const jsonString = responseBuffer.toString('utf-8');
+                        return { json: JSON.parse(jsonString) };
+                    } catch (e) {
+                        console.error("Failed to parse application/json response:", e);
+                        return { json: { error: "Failed to parse backend JSON response: " + e.message } };
+                    }
+                } else {
+                    const errorMsg = `Unexpected content type: ${contentType}. Expected application/json or multipart/mixed.`;
+                    console.error(errorMsg);
+                    return { json: { error: errorMsg } };
+                }
             }
 
         } catch (err) {
-            // Initialize res within catch to avoid issues from prior attempts
-            res = "Error: "; 
+            let errorResponseMessage = "Request failed: ";
             if (err.response) {
-                // Try to get a meaningful message from the response data
-                let errorDetail = "Unknown server error";
+                let errorDetailText = "Unknown server error.";
                 if (err.response.data) {
-                    // OpenAI errors often have a structured message
-                    if (typeof err.response.data.error === 'string') {
-                        errorDetail = err.response.data.error;
-                    } else if (typeof err.response.data.error?.message === 'string') {
-                        errorDetail = err.response.data.error.message;
-                    } else if (typeof err.response.data === 'string') {
-                        errorDetail = err.response.data;
+                    let responseDataText;
+                    if (err.response.data instanceof ArrayBuffer) {
+                        responseDataText = Buffer.from(err.response.data).toString();
                     } else {
-                        // Fallback if structure is unexpected, but still stringify
-                        errorDetail = `Received complex error object: ${JSON.stringify(err.response.data)}`;
+                        responseDataText = err.response.data; // Could be string or object already
+                    }
+
+                    try {
+                        const parsedErrorData = (typeof responseDataText === 'string' && responseDataText.startsWith('{')) ? JSON.parse(responseDataText) : responseDataText;
+                        if (typeof parsedErrorData === 'object' && parsedErrorData !== null && parsedErrorData.error) {
+                            if (typeof parsedErrorData.error === 'string') {
+                                errorDetailText = parsedErrorData.error;
+                            } else if (typeof parsedErrorData.error.message === 'string') {
+                                errorDetailText = parsedErrorData.error.message; // Common for OpenAI
+                            }
+                        } else if (typeof parsedErrorData === 'string') {
+                            errorDetailText = parsedErrorData;
+                        } else {
+                            // Keep it simple if no clear error string is found in a known structure
+                            errorDetailText = (typeof responseDataText === 'string') ? responseDataText.substring(0, 200) : "Complex error object received.";
+                        }
+                    } catch (parseError) {
+                        errorDetailText = (typeof responseDataText === 'string') ? responseDataText.substring(0, 200) : "Could not parse error data string.";
                     }
                 }
-                res += `Status ${err.response.status}: ${errorDetail}`;
+                errorResponseMessage += `Status ${err.response.status}: ${errorDetailText}`;
 
             } else if (err.request) {
-                 res += "Cannot reach the service. Check internet connection or API endpoint.";
+                 errorResponseMessage += "Cannot reach the service. Check internet connection or API endpoint.";
             } else {
-                 res += err.message || "An unexpected error occurred.";
+                 errorResponseMessage += err.message || "An unexpected error occurred.";
             }
-            // Log the actual error data from the response if available
-            console.error("[Proxy Send Error] Status:", err.response?.status, "Response Data:", JSON.stringify(err.response?.data, null, 2), "Generated Error Msg:", res, "Raw Error:", err.message);
+            // Log the more detailed error for server-side debugging
+            console.error("[Proxy Send Error] Original Error:", err.message, "Formatted Response:", errorResponseMessage);
+            return { json: { error: errorResponseMessage } }; // Wrap error in the standard structure
         }
-        return res;
+    }
+
+    _parseMultipart(buffer, boundary) {
+        const parts = [];
+        const boundaryLine = Buffer.from(`--${boundary}`);
+        const crlf = Buffer.from('\r\n');
+        const doubleCrlf = Buffer.from('\r\n\r\n');
+        let currentPos = 0;
+
+        while (currentPos < buffer.length) {
+            const boundaryStart = buffer.indexOf(boundaryLine, currentPos);
+            if (boundaryStart === -1) break; // No more boundaries
+
+            // Check for final boundary: --boundary--
+            if (buffer.indexOf(Buffer.from('--'), boundaryStart + boundaryLine.length) === boundaryStart + boundaryLine.length) {
+                break; // End of multipart content
+            }
+
+            const headersEnd = buffer.indexOf(doubleCrlf, boundaryStart);
+            if (headersEnd === -1) {
+                console.error("Multipart part missing headers end (\r\n\r\n).");
+                break; // Malformed part
+            }
+
+            const headersStart = boundaryStart + boundaryLine.length + crlf.length;
+            const headersString = buffer.toString('utf-8', headersStart, headersEnd);
+            const bodyStart = headersEnd + doubleCrlf.length;
+
+            // Find the start of the next boundary to delimit current part's body
+            const nextBoundaryStart = buffer.indexOf(boundaryLine, bodyStart);
+            let bodyEnd;
+
+            if (nextBoundaryStart !== -1) {
+                bodyEnd = nextBoundaryStart - crlf.length; // Body ends before the CRLF of the next boundary line
+            } else {
+                // This case should not be reached if the multipart message is correctly terminated with --boundary--
+                // It implies a malformed message or this is the last part without a final boundary properly detected above.
+                console.warn("Could not find next boundary, assuming rest of buffer is last part body. Check multipart termination.");
+                // Attempt to find final boundary to avoid including it in the body
+                const finalBoundaryOverall = Buffer.from(`--${boundary}--`);
+                const finalBoundaryPos = buffer.indexOf(finalBoundaryOverall, bodyStart);
+                if (finalBoundaryPos !== -1) {
+                    bodyEnd = finalBoundaryPos - crlf.length;
+                } else {
+                    bodyEnd = buffer.length; // Fallback, but likely problematic
+                }
+            }
+            
+            if (bodyEnd < bodyStart) { // Check for invalid body range
+                console.error("Invalid body range calculated for multipart part. Skipping.");
+                if(nextBoundaryStart !== -1) currentPos = nextBoundaryStart;
+                else break;
+                continue;
+            }
+
+            const bodyBuffer = buffer.subarray(bodyStart, bodyEnd);
+            parts.push({ headers: headersString, body: bodyBuffer });
+
+            currentPos = nextBoundaryStart;
+            if (currentPos === -1 && buffer.indexOf(Buffer.from(`--${boundary}--`), bodyStart) === -1 ) {
+                // If no next boundary found, and it's not because we are at the end, something is wrong.
+                console.error("Malformed multipart: No next boundary and not at final boundary.")
+                break;
+            }
+        }
+        return parts;
     }
 
     async embed(text, maxRetries = 3, initialDelay = 10) {

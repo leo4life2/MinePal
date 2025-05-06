@@ -118,49 +118,38 @@ export class Prompter {
         systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
         
         let responseData = null; // Initialize to null
+        let audioData = null; // Initialize audioData to null
         let error = null;
 
         try {
-            responseData = await this.proxy.sendRequest(messages, systemPrompt);
-            
-            // --- Initial Error Handling & Validation --- 
-            if (typeof responseData === 'string') {
-                if (responseData.includes('Error')) {
-                    error = responseData; // Keep error string
-                    responseData = null; // Nullify responseData on error string
-                } else {
-                    // Attempt to parse if it's not explicitly an error string but might be JSON
-                    try {
-                        responseData = JSON.parse(responseData);
-                    } catch (e) {
-                        error = "Oops! The LLM returned invalid string data that couldn't be parsed as JSON.";
-                        responseData = null; // Nullify responseData on parse error
-                    }
-                }
-            }
+            const proxyResponse = await this.proxy.sendRequest(messages, systemPrompt);
 
-            // Check if responseData is a valid object after potential parsing/error handling
-            if (!error && (typeof responseData !== 'object' || responseData === null)) {
-                 error = "Oops! The LLM returned an unexpected data format (not an object). Please try again.";
-                 console.log('[Prompter] bad format:', responseData); // Log the bad format
-                 responseData = null; // Nullify responseData
+            // proxy.sendRequest now reliably returns { json: object, audio?: buffer }
+            // The json object itself might contain an error field.
+            if (proxyResponse && proxyResponse.json) {
+                responseData = proxyResponse.json;
+                audioData = proxyResponse.audio || null; // audio will be undefined if not present, defaulting to null
+
+                // Check if the returned JSON payload has an error property
+                if (typeof responseData.error === 'string') {
+                    error = responseData.error;
+                }
+            } else {
+                // This case should ideally not be reached if proxy.sendRequest is robust
+                error = "Proxy did not return the expected { json: ... } structure.";
+                responseData = null; // Ensure responseData is null
             }
         } catch (e) { 
              // Catch errors during the proxy request itself
              console.error("Error during LLM request:", e);
              error = e.message || "An unknown error occurred during the LLM request.";
              responseData = null; // Ensure responseData is null on request error
+             audioData = null;
         }
 
         // --- Return --- 
         // Return the raw responseData if successful, or null if error occurred
         // Include the error separately
-        return { response: responseData, error: error };
-    }
-
-    async promptMemSaving(prev_mem, to_summarize) {
-        let prompt = this.profile.saving_memory;
-        prompt = await this.replaceStrings(prompt, null, null, prev_mem, to_summarize);
-        return await this.proxy.sendRequest([], prompt, '***', true);
+        return { response: responseData, audio: audioData, error: error };
     }
 }

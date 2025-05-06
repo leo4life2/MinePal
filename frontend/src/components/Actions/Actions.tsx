@@ -5,7 +5,7 @@ import { useSupabase } from "../../contexts/SupabaseContext/useSupabase";
 import RefreshIcon from '../../assets/refresh.svg';
 import { PricingModal, AuthModal } from "../Modal";
 import { HTTPS_BACKEND_URL } from "../../constants";
-import usePushToTalk from "../../hooks/usePushToTalk";
+import useWebSockets from "../../hooks/useWebSockets";
 // import AudioActions from "./AudioActions";
 
 // Get electron shell
@@ -15,7 +15,7 @@ const shell = electron?.shell;
 
 function Actions() {
   const { agentActive, start, stop } = useAgent();
-  const { connect, disconnect } = usePushToTalk();
+  const { connect, disconnect } = useWebSockets();
   const { 
     user, 
     loading, 

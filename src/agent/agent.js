@@ -1220,9 +1220,7 @@ export class Agent {
         // --- Call LLM ---
         // console.log("[_processPromptCycle] Calling LLM...");
         console.log(`[_processPromptCycle] Calling LLM. Reason: ${reason || 'unknown'}`);
-        const promptResult = await this.prompter.promptConvo(history);
-        const error = promptResult.error;
-        const responseData = promptResult.response;
+        const { response: responseData, audio: audioBuffer, error } = await this.prompter.promptConvo(history);
         // console.log("[_processPromptCycle] LLM response received.");
         // Log response data if needed (consider adding a debug flag)
         if (responseData) {
@@ -1273,6 +1271,32 @@ export class Agent {
             this.history.add(this.name, chatMessage || "", thought, current_goal_status);
         } else {
             // console.log("[_processPromptCycle] LLM returned no chat, command, thought, or goal status. No assistant turn added.");
+        }
+
+        // Play Audio if present
+        if (audioBuffer) {
+            console.log("[_processPromptCycle] Received audio data. Attempting to play...");
+            // Convert buffer to base64 string
+            const audioBase64 = audioBuffer.toString('base64');
+            try {
+                const response = await fetch('http://localhost:10101/play-audio', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ audioData: audioBase64 }),
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to send audio to server: ${response.status} ${errorText}`);
+                }
+            } catch (audioError) {
+                let errorMessage = "Unknown error";
+                if (audioError instanceof Error) {
+                    errorMessage = audioError.message;
+                }
+                console.error("[_processPromptCycle] Error sending audio for playback:", errorMessage);
+            }
         }
 
         // Process Emote (BEFORE command execution)

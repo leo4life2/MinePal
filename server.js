@@ -557,6 +557,32 @@ function startServer() {
         res.send('Settings updated and AgentProcess started for all profiles');
     });
 
+    // Endpoint for Agent to send audio to be played by Frontend
+    app.post('/play-audio', express.json({ limit: '10mb' }), async (req, res) => {
+        const { audioData } = req.body; // Expecting base64 encoded WAV data
+
+        if (!audioData || typeof audioData !== 'string') {
+            logToFile('API: /play-audio error - missing or invalid audioData');
+            return res.status(400).json({ error: "Missing or invalid 'audioData' field in request body. Expected base64 string." });
+        }
+
+        if (wss) {
+            logToFile('API: /play-audio - broadcasting audioData to WebSocket clients.');
+            wss.clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify({
+                        type: 'play-audio-frontend',
+                        audioData: audioData // Send base64 string directly
+                    }));
+                }
+            });
+            res.json({ message: "Audio broadcasted to frontend clients." });
+        } else {
+            logToFile('API: /play-audio error - WebSocket server not available.');
+            res.status(500).json({ error: "WebSocket server not available to broadcast audio." });
+        }
+    });
+
     // Only batch save supported rn.
     app.post('/save-profiles', express.json(), (req, res) => {
         const profilesDir = path.join(userDataDir, 'profiles');
