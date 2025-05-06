@@ -12,8 +12,8 @@ const shell = electron?.shell;
 
 // --- START HACK: Throttle Supabase token refresh ---
 let lastRefreshAttemptTimestamp = 0;
-// Set a reasonable minimum interval, e.g., 15 seconds instead of 60 seconds
-const MIN_REFRESH_INTERVAL_MS = 15 * 1000; 
+// Set a reasonable minimum interval, e.g., 60 seconds, 
+const MIN_REFRESH_INTERVAL_MS = 60 * 1000; 
 // --- END HACK ---
 
 interface SupabaseProviderProps {
@@ -336,4 +336,4 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
       {children}
     </SupabaseContext.Provider>
   );
-}  
+}    
