@@ -53,8 +53,7 @@ export async function fetchSettings() {
       personality: profile.personality,
       autoMessage: profile.autoMessage || '',
       triggerOnJoin: !!profile.triggerOnJoin,
-      triggerOnRespawn: !!profile.triggerOnRespawn,
-      auth: profile.auth || 'offline'
+      triggerOnRespawn: !!profile.triggerOnRespawn
     }));
   }
   return filteredSettings;

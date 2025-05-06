@@ -39,13 +39,11 @@
     "clean": "rm -rf dist",
     "buildLocal": "npm run clean && electron-builder",
     "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux",
-    "build:win": "electron-builder --win",
-    "build:all": "npm run build:mac && npm run build:linux && npm run build:win"
+    "build:win": "electron-builder --win"
   },
   "devDependencies": {
     "@electron/notarize": "^2.3.2",
-    "electron": "^36.1.0",
+    "electron": "^31.7.7",
     "electron-builder": "^24.13.3",
     "electron-rebuild": "^3.2.9"
   },

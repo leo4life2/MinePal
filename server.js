@@ -97,27 +97,6 @@ function setupVoice(settings, userDataDir, agentProcesses) {
         logToFile(`Error stopping previous uIOhook: ${error.message}`);
     }
 
-    if (!settings.voice_mode) {
-        let interval;
-        interval = setInterval(() => {
-            if (wss) {
-            wss.clients.forEach((client) => {
-                if (interval) {
-                clearInterval(interval);
-                interval = null;
-                }
-                if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({ type: "keyup2" }));
-                }
-            });
-            }
-        }, 50);
-
-        logToFile("Voice mode not set. Skipping push-to-talk setup");
-        console.log("Voice mode not set. Skipping push-to-talk setup");
-        return;
-    }
-
     // Only set up push-to-talk if key binding is available
     if (key_binding) {
         // Try to set up push-to-talk with the key code
@@ -163,26 +142,8 @@ function setupVoice(settings, userDataDir, agentProcesses) {
             console.error('Error setting up push-to-talk:', error);
         }
     } else {
-        // Try to set up always-on voice mode
-        try {
-            let interval;
-            interval = setInterval(() => {
-                if (wss) {
-                    wss.clients.forEach((client) => {
-                    if (interval) {
-                        clearInterval(interval);
-                        interval = null;
-                    }
-                    if (client.readyState === WebSocket.OPEN) {
-                        client.send(JSON.stringify({ type: "keydown2" }));
-                    }
-                    });
-                }
-            }, 50);
-        } catch (error) {
-            logToFile(`Error setting up always-on voice mode: ${error.message}`);
-            console.error("Error setting up always-on voice mode:", error);
-        }
+        logToFile('Push-to-talk not configured - voice input disabled');
+        console.log('Push-to-talk not configured - voice input disabled');
     }
 }
 
@@ -209,7 +170,6 @@ function startServer() {
             "allow_insecure_coding": false,
             "code_timeout_mins": 10,
             "whisper_to_player": false,
-            "voice_mode": true,
             "key_binding": "",
             "openai_api_key": "",
             "model": "",
@@ -365,8 +325,7 @@ function startServer() {
                     personality: profileData.personality,
                     autoMessage: profileData.autoMessage || '',
                     triggerOnJoin: !!profileData.triggerOnJoin,
-                    triggerOnRespawn: !!profileData.triggerOnRespawn,
-                    auth: profileData.auth || "offline"
+                    triggerOnRespawn: !!profileData.triggerOnRespawn
                 });
             }
         });
@@ -555,11 +514,10 @@ function startServer() {
                 if (!newSettings.useOwnApiKey && (key === 'openai_api_key' || key === 'model')) {
                     return false;
                 }
-                // Skip key_binding, input_device_id and voice_mode as they are optional
-                if (key === 'key_binding' || key === 'input_device_id' || key === 'voice_mode') {
+                // Skip key_binding and input_device_id as they are optional
+                if (key === 'key_binding' || key === 'input_device_id') {
                     return false;
                 }
-
                 if (key === 'profiles') return !Array.isArray(value) || value.length === 0;
                 return value === "" || value === null || value === undefined;
             })
@@ -625,7 +583,6 @@ function startServer() {
             profileData.autoMessage = profile.autoMessage || '';
             profileData.triggerOnJoin = !!profile.triggerOnJoin;
             profileData.triggerOnRespawn = !!profile.triggerOnRespawn;
-            profileData.auth = profile.auth || "offline";
             fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
         });
 

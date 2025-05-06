@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSupabase } from "../SupabaseContext/useSupabase";
 import pkg from "../../../../package.json";
 
-import { isValidMinecraftUsername, isValidEmail, validateUserSettings } from "../../utils/validation";
+import { isValidMinecraftUsername, validateUserSettings } from "../../utils/validation";
 import { useUserSettings } from "../UserSettingsContext/UserSettingsContext";
 import { checkServerAlive, startAgent, stopAgent } from "../../utils/api";
 import { Profile } from "../../types/apiTypes";
@@ -42,7 +42,7 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
       return;
     }
 
-    const invalidProfileNames = selectedProfiles.filter(profile => !isValidMinecraftUsername(profile.name) && (profile.auth === "microsoft" && !isValidEmail(profile.name)));
+    const invalidProfileNames = selectedProfiles.filter(profile => !isValidMinecraftUsername(profile.name));
     if (invalidProfileNames.length > 0) {
       declareError("AgentProvider", `Invalid profile names: ${invalidProfileNames.map(profile => profile.name).join(', ')}. They should be 3-16 characters long and can only contain letters, numbers, and underscores.`, true);
       return;

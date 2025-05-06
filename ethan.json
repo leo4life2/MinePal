@@ -27,7 +27,5 @@
     "idle_staring": true,
     "cheat": false,
     "farming": false
-  },
-
-  "auth": "offline"
+  }
 }

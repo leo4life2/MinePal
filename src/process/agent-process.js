@@ -123,7 +123,7 @@ export class AgentProcess {
                     agentLogStream.write('Restarting agent...\n');
                     agentLogStream.end();
                 }
-                this.start(profile, userDataDir, useOwnApiKey, openai_api_key, true);
+                this.start(profile, userDataDir, useOwnApiKey, openai_api_key, true, 'Agent process restarted.');
             }
         });
     

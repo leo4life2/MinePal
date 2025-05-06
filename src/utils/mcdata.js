@@ -7,8 +7,6 @@ import { plugin as collectblock } from 'mineflayer-collectblock';
 import { loader as autoEat } from 'mineflayer-auto-eat';
 import plugin from 'mineflayer-armor-manager';
 import protocolForge from 'minecraft-protocol-forge';
-import { exec } from 'child_process';
-import os from 'os';
 
 const armorManager = plugin;
 
@@ -31,25 +29,13 @@ class MCData {
         return MCData.instance;
     }
 
-    initBot(name, profile) {
+    initBot(name) {
         this.bot = createBot({
             username: name,
             host: this.settings.host,
             port: this.settings.port,
-            auth: profile.auth,
-            version: undefined,
-            onMsaCode: (code) => {
-                if (os.platform() === 'win32') {
-                    exec(`start ${code.verification_uri}`);
-                    exec(`mshta vbscript:Execute("msgbox ""${code.user_code}"":close")`);
-                } else if (os.platform() === 'darwin') {
-                    exec(`open ${code.verification_uri}`);
-                    exec(`osascript -e 'display dialog "${code.user_code}" with title "Authentication Code"'`);
-                } else {
-                    exec(`xdg-open ${code.verification_uri}`);
-                    exec(`zenity --info --text="${code.user_code}" --title="Authentication Code"`);
-                }
-            }
+            auth: this.settings.auth,
+            version: false,
         });
 
         // Create bot gets the version of the game for us

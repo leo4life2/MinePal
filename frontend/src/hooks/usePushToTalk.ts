@@ -4,11 +4,6 @@ import { useUserSettings } from '../contexts/UserSettingsContext/UserSettingsCon
 import { useAgent } from '../contexts/AgentContext/AgentContext';
 import settings from '../utils/settings';
 
-const cleanDeviceLabel = (label: string) => {
-  if (!label) return "";
-  return label.replace(/\s*\([^)]*\)\s*/g, "").replace(/^Default\s*-\s*/i, "").trim();
-};
-
 export default function usePushToTalk() {
   const wsRef = useRef<WebSocket | null>(null);
   const { declareError } = useErrorReport();
@@ -17,23 +12,6 @@ export default function usePushToTalk() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const isRecordingRef = useRef(false);
-  const findDeviceIdByLabel = useCallback(async (targetLabel: string) => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioDevices = devices.filter((device) => device.kind === "audioinput");
-      const cleanedTargetLabel = cleanDeviceLabel(targetLabel);
-      for (const device of audioDevices) {
-        const cleanedDeviceLabel = cleanDeviceLabel(device.label);
-        if (cleanedDeviceLabel.includes(cleanedTargetLabel)) {
-          return device.deviceId;
-        }
-      }
-      return void 0;
-    } catch (error) {
-      console.error("Error finding device:", error);
-      return void 0;
-    }
-  }, []);
 
   const handleStartRecording = useCallback(async () => {
     if (isRecordingRef.current) return; // Already recording
@@ -167,90 +145,10 @@ export default function usePushToTalk() {
         try {
           const data = JSON.parse(event.data);
           
-          if (data.type === "keydown") {
-            handleStartRecording().catch((err) =>
-              declareError("usePushToTalk", err)
-            );
-          } else if (data.type === "keyup") {
+          if (data.type === 'keydown') {
+            handleStartRecording().catch((err) => declareError('usePushToTalk', err));
+          } else if (data.type === 'keyup') {
             handleStopRecording();
-          } else if (data.type === "keydown2") {
-            if (isRecordingRef.current) {
-              handleStopRecording();
-            }
-            const deviceId = await findDeviceIdByLabel(
-              userSettings.input_device_id
-            );
-            const stream = await navigator.mediaDevices.getUserMedia({
-              audio: {
-                deviceId: deviceId ? { exact: deviceId } : void 0,
-                echoCancellation: true,
-                noiseSuppression: true,
-              },
-            });
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
-
-            const audioContext = new AudioContext();
-            const analyser = audioContext.createAnalyser();
-            const microphone = audioContext.createMediaStreamSource(stream);
-            const javascriptNode = audioContext.createScriptProcessor(
-              2048,
-              1,
-              1
-            );
-
-            analyser.smoothingTimeConstant = 0.3;
-            analyser.fftSize = 1024;
-
-            microphone.connect(analyser);
-            analyser.connect(javascriptNode);
-            javascriptNode.connect(audioContext.destination);
-
-            let startedTime = 0;
-
-            javascriptNode.onaudioprocess = function () {
-              const array = new Uint8Array(analyser.frequencyBinCount);
-              analyser.getByteFrequencyData(array);
-              let values = 0;
-
-              const length = array.length;
-              for (let i = 0; i < length; i++) {
-                values += array[i];
-              }
-
-              const average = values / length;
-              if (
-                average >= 25 &&
-                (startedTime === 0 || Date.now() - startedTime < 10000)
-              ) {
-                if (
-                  !isRecordingRef.current &&
-                  Date.now() - startedTime > 1000
-                ) {
-                  startedTime = Date.now();
-                  handleStartRecording().catch((err) =>
-                    declareError("usePushToTalk", err)
-                  );
-                }
-              } else {
-                if (isRecordingRef.current && Date.now() - startedTime > 1000) {
-                  handleStopRecording();
-                  startedTime = 0;
-                }
-              }
-            };
-
-            mediaRecorder.onstop = () => {
-              stream.getTracks().forEach((track) => track.stop());
-              javascriptNode.disconnect();
-              analyser.disconnect();
-            };
-
-            mediaRecorder.start(100);
-          } else if (data.type === "keyup2") {
-            if (isRecordingRef.current) {
-              handleStopRecording();
-            }
           } else if (data.type === 'bot-kicked') {
             // Create appropriate error message based on the reason
             let errorMessage = "Bot disconnected";
