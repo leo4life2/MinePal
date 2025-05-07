@@ -13,6 +13,38 @@ export default function useWebSockets() {
   const audioChunksRef = useRef<Blob[]>([]);
   const isRecordingRef = useRef(false);
 
+  // Refs for audio queue
+  const queueRef = useRef<string[]>([]);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playNext = useCallback(() => {
+    if (!queueRef.current.length) {
+      currentAudioRef.current = null;
+      return;
+    }
+    const src = queueRef.current.shift()!;
+    const audio = new Audio(src);
+    currentAudioRef.current = audio;
+    audio.onended = () => {
+        // When audio ends, nullify currentAudioRef BEFORE calling playNext
+        // to allow the next item in queue to play immediately if playNext is called again quickly
+        currentAudioRef.current = null; 
+        playNext();
+    };
+    audio.onerror = (e) => {
+        console.error('Error during audio playback:', e);
+        declareError('useWebSockets', new Error('Audio playback error'));
+        currentAudioRef.current = null; // Clear current audio on error
+        playNext(); // Attempt to play next in queue
+    };
+    audio.play().catch(e => {
+        console.error('Error starting audio play:', e);
+        declareError('useWebSockets', new Error('Failed to start audio playback'));
+        currentAudioRef.current = null; // Clear current audio if play() fails
+        playNext(); // Attempt to play next in queue
+    });
+  }, [declareError]);
+
   const handleStartRecording = useCallback(async () => {
     if (isRecordingRef.current) return; // Already recording
     isRecordingRef.current = true;
@@ -152,19 +184,16 @@ export default function useWebSockets() {
           } else if (data.type === 'play-audio-frontend') {
             if (data.audioData && typeof data.audioData === 'string') {
               console.log('Received audio data for playback from server.');
-              try {
-                const audioSrc = `data:audio/wav;base64,${data.audioData}`;
-                const audio = new Audio(audioSrc);
-                audio.play().catch(e => {
-                  console.error('Error playing audio:', e);
-                  declareError('useWebSockets', new Error(`Frontend audio playback failed: ${e.message}`));
-                });
-              } catch (e: unknown) {
-                console.error('Error constructing audio for playback:', e);
-                if (e instanceof Error) {
-                  declareError('useWebSockets', new Error(`Frontend audio construction failed: ${e.message}`));
-                } else {
-                  declareError('useWebSockets', new Error(`Frontend audio construction failed: Unknown error`));
+              const audioSrc = `data:audio/wav;base64,${data.audioData}`;
+              if (currentAudioRef.current) {
+                queueRef.current.push(audioSrc);     // wait your turn
+                console.log('Audio queued. Queue length:', queueRef.current.length);
+              } else {
+                // No audio playing, and queue might be empty or have this new item as first.
+                // Add to queue and start if it's the only item.
+                queueRef.current.push(audioSrc); // Add to queue first
+                if (queueRef.current.length === 1) { // If it was empty before this push
+                    playNext(); // start immediately
                 }
               }
             } else {
@@ -216,6 +245,15 @@ export default function useWebSockets() {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
     }
+    // Clear the audio queue and stop any currently playing audio on disconnect
+    if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current.onended = null; // Remove listener to prevent further calls to playNext
+        currentAudioRef.current.onerror = null;
+        currentAudioRef.current = null;
+    }
+    queueRef.current = [];
+
     mediaRecorderRef.current = null;
     isRecordingRef.current = false;
     
