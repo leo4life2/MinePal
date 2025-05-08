@@ -1,0 +1,104 @@
+/* frontend/src/components/VoiceSelector/VoiceSelector.css */
+.voice-selector-container {
+  position: relative;
+  width: 100%; /* Or a specific width if preferred */
+  font-family: inherit;
+}
+
+.voice-selector-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  background: var(--input-bg-color, #333);
+  border: 1px solid var(--border-color, #444);
+  border-radius: 8px;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.voice-selector-selected:hover {
+  border-color: var(--primary-color, #555);
+}
+
+.voice-selector-selected.open {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.voice-selector-name {
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 10px;
+}
+
+.voice-selector-play-button {
+  background: transparent;
+  border: none;
+  color: var(--text-color-muted, #aaa);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.voice-selector-play-button:hover {
+  color: var(--primary-color, #fff);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.voice-selector-play-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.voice-selector-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--input-bg-color, #333);
+  border: 1px solid var(--border-color, #444);
+  border-top: none;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  z-index: 10;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.voice-selector-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  color: var(--text-color);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color-light, #3a3a3a);
+}
+
+.voice-selector-option:last-child {
+  border-bottom: none;
+}
+
+.voice-selector-option:hover {
+  background-color: var(--bg-hover-color, #444);
+}
+
+.voice-selector-option.selected {
+  background-color: var(--primary-color-translucent, rgba(var(--primary-color-rgb), 0.2));
+  font-weight: 600;
+}
+
+.voice-selector-chevron {
+  transition: transform 0.2s ease;
+}
+
+.voice-selector-chevron.open {
+  transform: rotate(180deg);
+} 

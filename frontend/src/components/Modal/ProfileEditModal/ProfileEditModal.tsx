@@ -1,9 +1,26 @@
 import { useState } from 'react';
 import { Memory, deleteMemory, fetchBotMemories, sendMessage } from '../../../utils/api';
 import { Profile } from '../../../types/apiTypes';
-import { Settings as SettingsIcon, X as CloseIcon, ChevronDown, Trash2 } from 'react-feather';
+import { X as CloseIcon, Trash2 } from 'react-feather';
 import './ProfileEditModal.css';
 import { ModalWrapper } from '..';
+import { ProfileSettingsSection } from '../../ProfileSettings/ProfileSettings';
+import VoiceSelector, { VoiceOption } from '../../VoiceSelector/VoiceSelector';
+
+// Renamed voice options constant
+const AVAILABLE_VOICE_OPTIONS: VoiceOption[] = [
+  { id: 'alloy', name: 'Alloy', audioUrl: 'https://cdn.openai.com/API/voice-previews/alloy.flac' },
+  { id: 'ash', name: 'Ash', audioUrl: 'https://cdn.openai.com/API/voice-previews/ash.flac' },
+  { id: 'ballad', name: 'Ballad', audioUrl: 'https://cdn.openai.com/API/voice-previews/ballad.flac' },
+  { id: 'coral', name: 'Coral', audioUrl: 'https://cdn.openai.com/API/voice-previews/coral.flac' },
+  { id: 'echo', name: 'Echo', audioUrl: 'https://cdn.openai.com/API/voice-previews/echo.flac' },
+  { id: 'fable', name: 'Fable', audioUrl: 'https://cdn.openai.com/API/voice-previews/fable.flac' },
+  { id: 'onyx', name: 'Onyx', audioUrl: 'https://cdn.openai.com/API/voice-previews/onyx.flac' },
+  { id: 'nova', name: 'Nova', audioUrl: 'https://cdn.openai.com/API/voice-previews/nova.flac' },
+  { id: 'sage', name: 'Sage', audioUrl: 'https://cdn.openai.com/API/voice-previews/sage.flac' },
+  { id: 'shimmer', name: 'Shimmer', audioUrl: 'https://cdn.openai.com/API/voice-previews/shimmer.flac' },
+  { id: 'verse', name: 'Verse', audioUrl: 'https://cdn.openai.com/API/voice-previews/verse.flac' },
+];
 
 interface ProfileEditModalProps {
   profile: Profile;
@@ -22,12 +39,17 @@ function ProfileEditModal({
   onClose, 
   onError 
 }: ProfileEditModalProps) {
-  const [editingProfile, setEditingProfile] = useState<Profile>({ ...profile });
+  const [editingProfile, setEditingProfile] = useState<Profile>({ 
+    ...profile, 
+    enable_voice: profile.enable_voice ?? false,
+    base_voice_id: profile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id,
+    tone_and_style: profile.tone_and_style ?? '',
+    voice_only_mode: profile.voice_only_mode ?? false,
+  });
   const [error, setError] = useState<string>();
   const [showMemories, setShowMemories] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [memoryError, setMemoryError] = useState<string>();
-  const [showMoreSettings, setShowMoreSettings] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
@@ -64,7 +86,11 @@ function ProfileEditModal({
       personality: editingProfile.personality.trim(),
       autoMessage: editingProfile.autoMessage?.trim() || '',
       triggerOnJoin: !!editingProfile.triggerOnJoin,
-      triggerOnRespawn: !!editingProfile.triggerOnRespawn
+      triggerOnRespawn: !!editingProfile.triggerOnRespawn,
+      enable_voice: !!editingProfile.enable_voice,
+      base_voice_id: editingProfile.base_voice_id,
+      tone_and_style: editingProfile.tone_and_style?.trim() ?? '',
+      voice_only_mode: !!editingProfile.voice_only_mode,
     };
 
     if (sanitized.name === '' || sanitized.personality === '') {
@@ -103,6 +129,7 @@ function ProfileEditModal({
         
         {!showMemories ? (
           <>
+          <div className="input-groups-container">
             <div className="input-group">
               <label className="input-label">Name</label>
               <input
@@ -124,22 +151,82 @@ function ProfileEditModal({
                   ...current,
                   personality: value,
                 }))}
-                placeholder="Describe your pal's personality"
+                placeholder="Describe your pal\'s personality"
               />
             </div>
+          </div>
             
-            <button 
-              className={`settings-toggle ${showMoreSettings ? 'expanded' : ''}`}
-              onClick={() => setShowMoreSettings(!showMoreSettings)}
-              aria-expanded={showMoreSettings}
-            >
-              <SettingsIcon size={18} />
-              <span>More Settings</span>
-              <ChevronDown className={`arrow ${showMoreSettings ? 'expanded' : ''}`} size={20} strokeWidth={2.5} />
-            </button>
+            <div className="profile-settings-sections-container">
+              <ProfileSettingsSection title="Pal Voice" isExpanded={false}>
+                <div className="voice-settings-group">
+                  <div className="profile-setting-item">
+                    <label className="sub-input-label">
+                      Enable Voice
+                    </label>
+                    <div className="profile-switch-container">
+                      <label className="profile-switch">
+                        <input
+                          type="checkbox"
+                          checked={!!editingProfile.enable_voice}
+                          onChange={(e) => setEditingProfile((current) => ({
+                            ...current,
+                            enable_voice: e.target.checked,
+                          }))}
+                        />
+                        <span className="profile-slider"></span>
+                      </label>
+                    </div>
+                  </div>
 
-            {showMoreSettings && (
-              <div className="more-settings-content">
+                  <div className="profile-setting-item">
+                    <label className="sub-input-label">
+                      Voice-Only Mode
+                    </label>
+                    <div className="profile-switch-container">
+                      <label className="profile-switch">
+                        <input
+                          type="checkbox"
+                          checked={!!editingProfile.voice_only_mode}
+                          onChange={(e) => setEditingProfile((current) => ({
+                            ...current,
+                            voice_only_mode: e.target.checked,
+                          }))}
+                        />
+                        <span className="profile-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="profile-setting-item profile-setting-item--stacked">
+                    <label className="sub-input-label">
+                      Base Voice
+                    </label>
+                    <VoiceSelector 
+                      options={AVAILABLE_VOICE_OPTIONS}
+                      selectedId={editingProfile.base_voice_id}
+                      onChange={(id) => setEditingProfile(current => ({ ...current, base_voice_id: id }))}
+                      placeholder="Select base voice"
+                    />
+                  </div>
+
+                  <div className="profile-setting-item profile-setting-item--stacked">
+                    <label htmlFor="tone-style-input" className="sub-input-label">
+                      Tone & Style
+                    </label>
+                    <div className="message-input">
+                      <input
+                        id="tone-style-input"
+                        type="text"
+                        value={editingProfile.tone_and_style}
+                        onChange={(e) => setEditingProfile(current => ({ ...current, tone_and_style: e.target.value }))}
+                        placeholder="e.g., calm and friendly, or excited and energetic"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </ProfileSettingsSection>
+
+              <ProfileSettingsSection title="Messaging" isExpanded={false}>
                 <div className="automated-messages-group">
                   <div className="input-group">
                     <label className="sub-input-label">Auto Message</label>
@@ -218,8 +305,8 @@ function ProfileEditModal({
                     </button>
                   </div>
                 </div>
-              </div>
-            )}
+              </ProfileSettingsSection>
+            </div>
 
             <div className="button-group">
               <button className="save-button" onClick={handleSaveChanges}>Save</button>

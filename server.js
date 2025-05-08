@@ -609,6 +609,10 @@ function startServer() {
             profileData.autoMessage = profile.autoMessage || '';
             profileData.triggerOnJoin = !!profile.triggerOnJoin;
             profileData.triggerOnRespawn = !!profile.triggerOnRespawn;
+            profileData.enable_voice = !!profile.enable_voice;
+            profileData.base_voice_id = profile.base_voice_id;
+            profileData.tone_and_style = profile.tone_and_style;
+            profileData.voice_only_mode = !!profile.voice_only_mode;
             fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
         });
 

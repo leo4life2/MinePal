@@ -4,6 +4,10 @@ export interface Profile {
   autoMessage?: string;
   triggerOnJoin?: boolean;
   triggerOnRespawn?: boolean;
+  enable_voice?: boolean;
+  base_voice_id?: string;
+  tone_and_style?: string;
+  voice_only_mode?: boolean;
 }
 
 export type OpenAIModel = "gpt-4o-mini" | "gpt-4o";

@@ -82,32 +82,6 @@
   resize: vertical;
 }
 
-.more-settings-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  color: var(--text-color);
-  cursor: pointer;
-  padding: 8px 0;
-  font-weight: 500;
-}
-
-.more-settings-toggle svg {
-  color: #666666;
-}
-
-.more-settings-toggle svg.arrow {
-  transition: transform 0.2s ease;
-  opacity: 0.6;
-  min-width: 20px;
-  color: #666666;
-}
-
-.more-settings-toggle .arrow.expanded {
-  transform: rotate(180deg);
-}
-
 .modal-content .button-group {
   display: flex;
   justify-content: space-between; /* Center the button horizontally */
@@ -565,50 +539,6 @@
   transform: scale(1.1);
 }
 
-.more-settings-toggle {
-  width: 100%;
-  padding: 16px;
-  background: var(--bg-color);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  color: var(--text-color);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: all 0.3s ease;
-}
-
-.more-settings-toggle:hover,
-.more-settings-toggle:focus {
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-1px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.more-settings-toggle span {
-  flex: 1;
-  text-align: left;
-  font-weight: 600;
-}
-
-.more-settings-toggle .arrow {
-  transition: transform 0.2s ease;
-  opacity: 0.6;
-  min-width: 20px;
-  color: #666666;
-}
-
-.more-settings-toggle .arrow.expanded {
-  transform: rotate(180deg);
-}
-
-.more-settings-content {
-  padding: 16px 16px 0.1px 16px;
-  background: var(--bg-color);
-  border-radius: 0 0 12px 12px;
-  animation: slideDown 0.3s ease;
-}
-
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -646,4 +576,8 @@
 .send-message-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.profile-settings-sections-container {
+  padding: 0 5px 0 5px;
 }

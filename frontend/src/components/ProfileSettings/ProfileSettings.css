@@ -1,0 +1,176 @@
+/* ProfileSettings.css */
+.profile-settings-section {
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  margin-bottom: 10px; /* Add some spacing between sections if multiple are used */
+  padding-bottom: 10px; /* Add some padding before the border */
+}
+
+.profile-settings-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.profile-section-toggle {
+  /* Equivalent to .section-toggle */
+  width: 100%;
+  padding: 12px 0; /* Adjusted padding for a slightly more compact look within modal */
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: none;
+  transition: opacity 0.3s ease;
+  outline: none;
+  text-align: left;
+  font-weight: 600;
+  font-size: 1rem; /* Match general modal text size */
+}
+
+.profile-section-toggle:hover,
+.profile-section-toggle:focus {
+  opacity: 0.8;
+  outline: none;
+}
+
+.profile-section-toggle .profile-arrow {
+  /* Equivalent to .section-toggle .arrow */
+  transition: transform 0.3s ease;
+  opacity: 0.6;
+  min-width: 16px; /*ChevronDown size */
+  color: var(--icon-color, #666666); /* Use a variable or a specific color */
+}
+
+.profile-section-toggle .profile-arrow.expanded {
+  /* Equivalent to .section-toggle .arrow.expanded */
+  transform: rotate(180deg);
+}
+
+.profile-section-content {
+  /* Equivalent to .section-content */
+  padding-top: 10px; /* Add some space between toggle and content */
+  animation: profileSlideDown 0.3s ease-out;
+}
+
+@keyframes profileSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px; /* Adjust if content can be very tall */
+  }
+}
+
+/* Styling for items within the profile settings section, if needed */
+/* This provides similar spacing to .setting-item from Settings.css */
+.profile-setting-item {
+  padding: 0 0 12px 0;
+  margin-bottom: 15px;
+  display: flex; /* Default to single-row: label left, control right */
+  align-items: center; /* Vertically align items in the center */
+  justify-content: space-between; /* Push label to left, control to right */
+  gap: 10px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.profile-setting-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0; /* Ensure no margin if it is the last in its container */
+}
+
+/* Modifier for stacked layout (label above control) */
+.profile-setting-item--stacked {
+  flex-direction: column;
+  align-items: flex-start; /* Align children to the start of the cross axis (left) */
+  justify-content: flex-start;
+}
+
+.profile-setting-item--stacked:last-child {
+  padding-bottom: 0;
+}
+
+.profile-setting-item--stacked .sub-input-label {
+  /* Ensure label in stacked mode has some space below it and takes full width if needed */
+  width: 100%;
+  margin-bottom: 8px; /* Space between label and control */
+}
+
+.profile-setting-item--stacked .message-input,
+.profile-setting-item--stacked .voice-selector-container { /* Target VoiceSelector specifically */
+  width: 100%; /* Make control wrappers/controls take full width in stacked mode */
+}
+
+.profile-setting-item .input-label, /* Assuming you'll reuse .input-label */
+.profile-setting-item .sub-input-label {
+  display: block;
+  color: var(--text-color);
+  margin-bottom: 0; /* Override if .input-label has margin */
+  font-weight: normal;
+}
+
+/* Profile Switch toggle styles */
+.profile-switch-container {
+  /* Similar to .setting-item .switch-container */
+  display: flex;
+  justify-content: flex-end; /* Align switch to the right */
+  align-items: center; /* Vertically center if label and switch are side-by-side */
+  flex-grow: 1; /* Allow it to take space if the parent is flex */
+}
+
+.profile-switch {
+  /* Equivalent to .switch */
+  position: relative;
+  display: inline-block;
+  width: 48px;  /* Standard switch width */
+  height: 24px; /* Standard switch height */
+}
+
+.profile-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.profile-slider {
+  /* Equivalent to .slider */
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--input-bg-color, lightgray); /* Use a variable or a default */
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.profile-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .profile-slider {
+  background-color: var(--primary-color);
+}
+
+input:checked + .profile-slider:before {
+  transform: translateX(24px);
+}
+
+/* Ensure inputs within profile-setting-item's message-input inherit font */
+.profile-setting-item .message-input input {
+  font-family: inherit;
+}
