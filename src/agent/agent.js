@@ -12,7 +12,7 @@ import * as world from "./library/world.js";
 import { emote } from './library/skills.js';
 
 // --- Silence Timer Constants ---
-const MEAN_1 = 20; // Base mean silence duration in seconds for the first silence
+const MEAN_1 = 27; // Base mean silence duration in seconds for the first silence
 const STD_FACTOR = 10; // STD is MEAN_i / STD_FACTOR
 const R = 3.5;    // Exponential factor for increasing mean silence duration
 // --- End Silence Timer Constants ---
