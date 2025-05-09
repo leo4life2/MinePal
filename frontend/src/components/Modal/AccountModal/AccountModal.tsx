@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
 import { User as UserIcon, X as CloseIcon, Award } from 'react-feather';
 import { PricingModal, ModalWrapper, AuthModal } from '..';
+import TierBox from '../../TierBox/TierBox';
 import './AccountModal.css';
 import { HTTPS_BACKEND_URL } from '../../../constants';
 
@@ -11,7 +12,7 @@ const electron = isElectron ? window.require('electron') : null;
 const shell = electron?.shell;
 
 function AccountModal() {
-  const { user, signOut, isPaying, tierQuota, stripeData, refreshSubscription, clearAuthError } = useSupabase();
+  const { user, signOut, isPaying, stripeData, refreshSubscription, clearAuthError, userPlan } = useSupabase();
   const [showModal, setShowModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -28,6 +29,7 @@ function AccountModal() {
           <UserIcon size={18} className="account-icon" />
           <span className="account-name">Not signed in</span>
         </button>
+        <TierBox tier={userPlan} />
         
         <AuthModal 
           isOpen={showAuthModal} 
@@ -136,6 +138,7 @@ function AccountModal() {
         />
         <span className="account-name">{full_name}</span>
       </button>
+      <TierBox tier={userPlan} />
 
       { showModal && (
         <ModalWrapper onClose={() => setShowModal(false)}>
@@ -155,10 +158,10 @@ function AccountModal() {
               />
               <h3>{full_name}</h3>
               <p className="account-user-id">Minepal User ID: {user.id}</p>
-              {tierQuota !== null && (
-                <p className="account-plan">
-                  Your Plan: {tierQuota} responses/month
-                </p>
+              {userPlan && (
+                <div className="account-plan-container">
+                  <TierBox tier={userPlan} />
+                </div>
               )}
             </div>
 

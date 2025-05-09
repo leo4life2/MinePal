@@ -1,0 +1,15 @@
+.tier-box {
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px; /* To space it from the account button */
+}
+
+.tier-box-text {
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+} 

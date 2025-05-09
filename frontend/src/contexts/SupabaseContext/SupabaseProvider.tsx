@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { ReactNode, useEffect, useState } from 'react';
 import { SupabaseContext, SupabaseContextType, StripeData } from './SupabaseContext';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../constants';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, PRICING_PLANS, TierType } from '../../constants';
 import { IpcRendererEvent } from 'electron';
 
 // Get electron IPC renderer if we're in electron
@@ -94,6 +94,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
   const [tierQuota, setTierQuota] = useState<number | null>(null);
   const [requestsRemaining, setRequestsRemaining] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [userPlan, setUserPlan] = useState<TierType>('FREE');
   const [stripeData, setStripeData] = useState<StripeData>({
     customerId: null,
     subscriptionId: null,
@@ -132,6 +133,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
         setIsPaying(false);
         setTierQuota(null);
         setRequestsRemaining(null);
+        setUserPlan('FREE');
         setStripeData({
           customerId: null,
           subscriptionId: null,
@@ -149,6 +151,19 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
         stripe_subscription_item_id 
       } = data;
       
+      // Determine userPlan based on tier_quota
+      let determinedPlan: TierType = 'FREE';
+      if (tier_quota !== null && tier_quota !== undefined) {
+        const sortedPlans = [...PRICING_PLANS].sort((a, b) => b.quota - a.quota);
+        for (const plan of sortedPlans) {
+          if (tier_quota >= plan.quota) {
+            determinedPlan = plan.name.toUpperCase() as TierType;
+            break;
+          }
+        }
+      }
+      setUserPlan(determinedPlan);
+      
       // Set all states using the destructured values
       setIsPaying(stripe_subscription_id !== null && stripe_subscription_id !== "" && stripe_subscription_id !== undefined);
       setTierQuota(tier_quota ?? null);
@@ -164,6 +179,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
       setIsPaying(false);
       setTierQuota(null);
       setRequestsRemaining(null);
+      setUserPlan('FREE');
       setStripeData({
         customerId: null,
         subscriptionId: null,
@@ -204,7 +220,11 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
       if (currentUser) {
         fetchSubscriptionData(currentUser.id);
       } else {
-        setIsPaying(false); // Reset isPaying when user logs out
+        setIsPaying(false);
+        setTierQuota(null);
+        setRequestsRemaining(null);
+        setUserPlan('FREE');
+        setStripeData({ customerId: null, subscriptionId: null, subscriptionItemId: null });
       }
       
       setLoading(false);
@@ -330,6 +350,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     refreshSubscription,
     authError,
     clearAuthError,
+    userPlan,
   };
 
   return (

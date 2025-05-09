@@ -1,4 +1,6 @@
 .account-container {
+  display: flex;
+  align-items: center;
   position: relative;
   z-index: 1;
 }
@@ -292,4 +294,12 @@
 
 [data-theme='dark'] .cancel-plan-note {
   color: #aaa;
+}
+
+.account-plan-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
 } 

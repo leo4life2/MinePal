@@ -1,5 +1,6 @@
 import { SupabaseClient, User } from '@supabase/supabase-js';
 import { createContext } from 'react';
+import { TierType } from '../../constants';
 
 export interface StripeData {
   customerId: string | null;
@@ -20,6 +21,7 @@ export interface SupabaseContextType {
   signOut: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
   clearAuthError: () => void;
+  userPlan: TierType;
 }
 
 export const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined); 
