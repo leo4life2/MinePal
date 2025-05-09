@@ -1219,7 +1219,7 @@ export class Agent {
 
         // --- Call LLM ---
         // console.log("[_processPromptCycle] Calling LLM...");
-        console.log(`[_processPromptCycle] Calling LLM. Reason: ${reason || 'unknown'}`);
+        console.log(`[_processPromptCycle] Calling LLM. Reason: ${reason || 'unknown'}, latest 4 messages:\n ${this.history.turns.slice(-4).map(m => m.content).join('\n')} \n\n`);
         const llmResult = await this.prompter.promptConvo(history);
         
         const responseData = llmResult.json;
