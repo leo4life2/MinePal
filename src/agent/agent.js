@@ -1071,7 +1071,7 @@ export class Agent {
             const formattedDuration = formatDuration(plannedSilenceSeconds);
             // console.log(`[DEBUG] Silence timer fired after ${formattedDuration}.`);
             const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
-            await this.handleMessage('system', `[SILENCE | ${timeStr}] It's been ${formattedDuration} of silence.`);
+            await this.handleMessage('system', `[SILENCE | ${timeStr}] It's been ${formattedDuration} of silence. Say something new?`);
         }, delayMilliseconds);
     }
 
