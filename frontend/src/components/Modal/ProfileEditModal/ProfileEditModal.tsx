@@ -63,7 +63,6 @@ function ProfileEditModal({
             !!editingProfile.triggerOnRespawn !== !!profile.triggerOnRespawn ||
             !!editingProfile.enable_voice !== !!profile.enable_voice || 
             (editingProfile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) !== (profile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) ||
-            (editingProfile.tone_and_style?.trim() || '') !== (profile.tone_and_style?.trim() || '') ||
             !!editingProfile.voice_only_mode !== !!profile.voice_only_mode
         );
     }
@@ -77,7 +76,6 @@ function ProfileEditModal({
         !!editingProfile.triggerOnRespawn !== !!profile.triggerOnRespawn ||
         !!editingProfile.enable_voice !== !!profile.enable_voice ||
         (editingProfile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) !== (profile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) ||
-        (editingProfile.tone_and_style?.trim() || '') !== (profile.tone_and_style?.trim() || '') ||
         !!editingProfile.voice_only_mode !== !!profile.voice_only_mode
     );
   }, [editingProfile, profile, isNewProfile]);
@@ -139,7 +137,6 @@ function ProfileEditModal({
       triggerOnRespawn: !!editingProfile.triggerOnRespawn,
       enable_voice: !!editingProfile.enable_voice,
       base_voice_id: editingProfile.base_voice_id,
-      tone_and_style: editingProfile.tone_and_style?.trim() ?? '',
       voice_only_mode: !!editingProfile.voice_only_mode,
     };
 
@@ -295,21 +292,6 @@ function ProfileEditModal({
                       onChange={(id) => setEditingProfile(current => ({ ...current, base_voice_id: id }))}
                       placeholder="Select base voice"
                     />
-                  </div>
-
-                  <div className="profile-setting-item profile-setting-item--stacked">
-                    <label htmlFor="tone-style-input" className="sub-input-label">
-                      Tone & Style
-                    </label>
-                    <div className="message-input">
-                      <input
-                        id="tone-style-input"
-                        type="text"
-                        value={editingProfile.tone_and_style}
-                        onChange={(e) => setEditingProfile(current => ({ ...current, tone_and_style: e.target.value }))}
-                        placeholder="e.g., calm and friendly, or excited and energetic"
-                      />
-                    </div>
                   </div>
                 </div>
               </ProfileSettingsSection>

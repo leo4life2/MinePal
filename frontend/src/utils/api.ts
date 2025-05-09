@@ -56,7 +56,6 @@ export async function fetchSettings() {
       triggerOnRespawn: !!profile.triggerOnRespawn,
       enable_voice: !!profile.enable_voice,
       base_voice_id: profile.base_voice_id,
-      tone_and_style: profile.tone_and_style,
       voice_only_mode: !!profile.voice_only_mode
     }));
   }

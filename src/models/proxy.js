@@ -96,7 +96,7 @@ export class Proxy {
         return null;
     }
 
-    async sendRequest(turns, systemMessage, enable_voice=false, base_voice_id=null, tone_and_style=null) {
+    async sendRequest(turns, systemMessage, enable_voice=false, base_voice_id=null) {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(
             turns.map(turn => {
                 // If assistant, format all fields into content
@@ -147,8 +147,15 @@ export class Proxy {
                 type: "string",
                 description: "Same content as your in-game text, converted into a natural-sounding, expressive string optimized for text-to-speech. Expand abbreviations, slang, numbers, and symbols into spoken equivalents when it makes speech sound clearer and more natural, but preserve informal or expressive words exactly as written when expanding would alter their original emotional nuance, pronunciation, or tone. Insert commas, ellipses (…), or em-dashes (—) for appropriate pauses, and use expressive spelling (e.g., stretched vowels), natural interjections, and capitalization or italics for emphasis—but do not use brackets or markup."
             };
+            current_schema.properties.tone_and_style = {
+                type: "string",
+                description: "Provide a short, clear description of the desired speaking tone and style for the text-to-speech voice—this can include mood, energy level, pacing, pitch, and character traits, ranging from simple (“calm and cheerful”) to very descriptive (“high-pitched, bubbly anime-girl voice” or “laid-back, sluggish speech with slurred, lazy words”)."
+            };
             if (!current_schema.required.includes("string_for_speech")) {
                 current_schema.required.push("string_for_speech");
+            }
+            if (!current_schema.required.includes("tone_and_style")) {
+                current_schema.required.push("tone_and_style");
             }
         }
 
@@ -160,8 +167,6 @@ export class Proxy {
                 strict: true
             }
         };
-
-        console.log("[Proxy] stop field:", baseRequestBody.stop);
 
         try {
             if (this.openai_api_key) {
@@ -196,8 +201,7 @@ export class Proxy {
                 const requestBody = {
                     ...baseRequestBody,
                     enable_voice: enable_voice,
-                    base_voice_id: base_voice_id,
-                    tone_and_style: tone_and_style
+                    base_voice_id: base_voice_id
                  };
 
                 // Request arraybuffer to handle potential multipart responses
@@ -239,7 +243,25 @@ export class Proxy {
                     // Standard JSON response
                     try {
                         const jsonString = responseBuffer.toString('utf-8');
-                        return { json: JSON.parse(jsonString) };
+                        const parsedJson = JSON.parse(jsonString);
+
+                        // Check for the special audio failure case within a 200 response
+                        if (parsedJson.audio_status === "failed" && parsedJson.text_response && parsedJson.audio_error_details) {
+                            console.error("Audio generation failed (reported by backend):");
+                            console.error("TTS Service Error Details:", parsedJson.audio_error_details);
+                            try {
+                                // text_response is a stringified JSON, parse it to get the actual response data
+                                const actualJsonResponse = JSON.parse(parsedJson.text_response);
+                                return { json: actualJsonResponse, audio_failed_but_text_ok: true };
+                            } catch (textParseError) {
+                                console.error("Failed to parse text_response in audio failure case (200 OK):", textParseError);
+                                // If parsing text_response fails, this is a more severe issue with the backend's response format.
+                                return { json: { error: "Audio failed, and text_response from backend was malformed." } };
+                            }
+                        } else {
+                            // Normal successful JSON response
+                            return { json: parsedJson };
+                        }
                     } catch (e) {
                         console.error("Failed to parse application/json response:", e);
                         return { json: { error: "Failed to parse backend JSON response: " + e.message } };
@@ -262,10 +284,11 @@ export class Proxy {
                     } else {
                         responseDataText = err.response.data; // Could be string or object already
                     }
-
-                    try {
-                        const parsedErrorData = (typeof responseDataText === 'string' && responseDataText.startsWith('{')) ? JSON.parse(responseDataText) : responseDataText;
-                        if (typeof parsedErrorData === 'object' && parsedErrorData !== null && parsedErrorData.error) {
+  
+                      try {
+                         console.log("[Proxy] Response data text:", responseDataText);
+                          const parsedErrorData = (typeof responseDataText === 'string' && responseDataText.startsWith('{')) ? JSON.parse(responseDataText) : responseDataText;
+                          if (typeof parsedErrorData === 'object' && parsedErrorData !== null && parsedErrorData.error) {
                             if (typeof parsedErrorData.error === 'string') {
                                 errorDetailText = parsedErrorData.error;
                             } else if (typeof parsedErrorData.error.message === 'string') {

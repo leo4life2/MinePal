@@ -182,7 +182,7 @@ function startServer() {
     }
 
     // Backward compatibility: Ensure existing profiles are updated with new voice-related settings.
-    // If older profiles are found that lack 'enable_voice', 'base_voice_id', 'tone_and_style', or 'voice_only_mode',
+    // If older profiles are found that lack 'enable_voice', 'base_voice_id', or 'voice_only_mode',
     // these fields will be added, taking their default values from the main 'ethan.json' template file
     // located in the application's installation directory. This ensures smooth updates for users with older configurations.
     try {
@@ -198,7 +198,6 @@ function startServer() {
             const voiceFieldsFromTemplate = {
                 enable_voice: ethanTemplateData.enable_voice,
                 base_voice_id: ethanTemplateData.base_voice_id,
-                tone_and_style: ethanTemplateData.tone_and_style,
                 voice_only_mode: ethanTemplateData.voice_only_mode
             };
 
@@ -388,7 +387,6 @@ function startServer() {
                     triggerOnRespawn: !!profileData.triggerOnRespawn,
                     enable_voice: profileData.enable_voice,
                     base_voice_id: profileData.base_voice_id,
-                    tone_and_style: profileData.tone_and_style,
                     voice_only_mode: profileData.voice_only_mode
                 });
             }
@@ -675,7 +673,6 @@ function startServer() {
             profileData.triggerOnRespawn = !!profile.triggerOnRespawn;
             profileData.enable_voice = !!profile.enable_voice;
             profileData.base_voice_id = profile.base_voice_id;
-            profileData.tone_and_style = profile.tone_and_style;
             profileData.voice_only_mode = !!profile.voice_only_mode;
             fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
         });

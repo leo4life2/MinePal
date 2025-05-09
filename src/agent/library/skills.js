@@ -2020,8 +2020,6 @@ export async function goToBed(bot) {
     return false;
   }
 
-  console.log("beds:", beds);
-
   for (const loc of beds) {
     const bedPosition = loc; // findBlocks returns Vec3 positions directly
 
@@ -2043,7 +2041,7 @@ export async function goToBed(bot) {
 
       // Attempt to sleep
       await bot.sleep(bed);
-      log(bot, `Successfully entered bed at ${bedPosition}.`);
+      log(bot, `Successfully slept in bed at ${bedPosition}.`);
       
       // Wait until woken up
       while (bot.isSleeping) {

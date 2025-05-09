@@ -1220,34 +1220,37 @@ export class Agent {
         // --- Call LLM ---
         // console.log("[_processPromptCycle] Calling LLM...");
         console.log(`[_processPromptCycle] Calling LLM. Reason: ${reason || 'unknown'}`);
-        const { response: responseData, audio: audioBuffer, error } = await this.prompter.promptConvo(history);
+        const llmResult = await this.prompter.promptConvo(history);
+        
+        const responseData = llmResult.json;
+        const audioBuffer = llmResult.audio;
+        const audio_failed_but_text_ok = llmResult.audio_failed_but_text_ok || false;
+        let topLevelError = null;
+
+        if (responseData && typeof responseData.error === 'string') {
+            topLevelError = responseData.error;
+        } else if (!responseData) {
+            // This case should ideally be covered by the catch block in prompter.js ensuring json.error exists
+            topLevelError = "LLM result processing failed: No JSON data received from prompter.";
+        }
+        // If responseData exists and has no .error, topLevelError remains null (success)
+        
         // console.log("[_processPromptCycle] LLM response received.");
         // Log response data if needed (consider adding a debug flag)
         if (responseData) {
-            console.log("[DEBUG] LLM Response Data:", JSON.stringify(responseData, null, 2));
+            console.log("[DEBUG] LLM Response Data (from llmResult.json):", JSON.stringify(responseData, null, 2));
         }
+        console.log("[DEBUG] topLevelError and audio_failed_but_text_ok:", topLevelError, audio_failed_but_text_ok);
 
         // --- Process LLM Response ---
 
         // Handle errors first
-        if (error) {
-            console.error("[_processPromptCycle] Error from promptConvo:", error);
-            this.history.add('system', `[ERROR | ${timeStr}] LLM generation failed: ${error}`);
-            await this.sendMessage(`${error}`, true);
-            console.log('[idle state] Initializing promptingState to idle due to LLM response error');
+        if (topLevelError) {
+            console.error("[_processPromptCycle] Error from promptConvo:", topLevelError);
+            await this.sendMessage(`${topLevelError}`, true);
             this.promptingState = 'idle'; // Reset state on LLM error
             this._ensureSilenceTimerRunning(); // Ensure timer restarts
             return; // Stop processing this cycle
-        }
-
-        // Ensure we have valid response data
-        if (!responseData) {
-             console.error("[_processPromptCycle] promptConvo returned no error but also no response data.");
-             await this.sendMessage("Oops! Something went wrong internally (empty response). Please try again.", true);
-             console.log('[idle state] Initializing promptingState to idle due to LLM error (no response data)');
-             this.promptingState = 'idle'; // Reset state on LLM error
-             this._ensureSilenceTimerRunning(); // Ensure timer restarts
-             return; // Stop processing this cycle
         }
 
         // Extract and clean up fields
@@ -1275,7 +1278,6 @@ export class Agent {
 
         // Play Audio if present
         if (audioBuffer) {
-            console.log("[_processPromptCycle] Received audio data. Attempting to play...");
             // Convert buffer to base64 string
             const audioBase64 = audioBuffer.toString('base64');
             try {
@@ -1314,7 +1316,7 @@ export class Agent {
 
         // Process Chat
         console.log(`[_processPromptCycle] Processing chat message. Voice only mode: ${this.profile.voice_only_mode}`);
-        if (chatMessage && this.profile.voice_only_mode === false) {
+        if (chatMessage && (this.profile.voice_only_mode === false || audio_failed_but_text_ok)) {
             await this.sendMessage(chatMessage, true);
         }
 

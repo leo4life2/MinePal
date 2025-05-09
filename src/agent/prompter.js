@@ -117,39 +117,26 @@ export class Prompter {
         let systemPrompt = this.profile.conversing;
         systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
         
-        let responseData = null; // Initialize to null
-        let audioData = null; // Initialize audioData to null
-        let error = null;
-
         try {
-            const proxyResponse = await this.proxy.sendRequest(messages, systemPrompt, this.agent.profile.enable_voice, this.agent.profile.base_voice_id, this.agent.profile.tone_and_style);
-
-            // proxy.sendRequest now reliably returns { json: object, audio?: buffer }
-            // The json object itself might contain an error field.
-            if (proxyResponse && proxyResponse.json) {
-                responseData = proxyResponse.json;
-                audioData = proxyResponse.audio || null; // audio will be undefined if not present, defaulting to null
-
-                // Check if the returned JSON payload has an error property
-                if (typeof responseData.error === 'string') {
-                    error = responseData.error;
-                }
-            } else {
-                // This case should ideally not be reached if proxy.sendRequest is robust
-                error = "Proxy did not return the expected { json: ... } structure.";
-                responseData = null; // Ensure responseData is null
-            }
-        } catch (e) { 
-             // Catch errors during the proxy request itself
-             console.error("Error during LLM request:", e);
-             error = e.message || "An unknown error occurred during the LLM request.";
-             responseData = null; // Ensure responseData is null on request error
-             audioData = null;
+            // Directly return the response from proxy.sendRequest
+            // This object is expected to be { json: object, audio?: buffer, audio_failed_but_text_ok?: boolean }
+            // The json field itself might contain an error, e.g., { error: "message" }
+            return await this.proxy.sendRequest(
+                messages,
+                systemPrompt,
+                this.agent.profile.enable_voice,
+                this.agent.profile.base_voice_id
+            );
+        } catch (e) {
+            // This catch block handles errors if the proxy.sendRequest call itself fails catastrophically
+            // (e.g., network errors not handled by proxy.js, or errors in request construction before proxy.js runs).
+            // We ensure a consistent return structure that agent.js can handle.
+            console.error("Critical Error in prompter.promptConvo during proxy.sendRequest call:", e);
+            return {
+                json: { error: e.message || "Unknown critical error in prompter" },
+                audio: null,
+                audio_failed_but_text_ok: false
+            };
         }
-
-        // --- Return --- 
-        // Return the raw responseData if successful, or null if error occurred
-        // Include the error separately
-        return { response: responseData, audio: audioData, error: error };
     }
 }
