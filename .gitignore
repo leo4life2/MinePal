@@ -29,3 +29,5 @@ Thumbs.db
 
 agent-runlogs/
 node_modules*/
+
+.cursor/

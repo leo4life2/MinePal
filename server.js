@@ -181,6 +181,66 @@ function startServer() {
         settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     }
 
+    // Backward compatibility: Ensure existing profiles are updated with new voice-related settings.
+    // If older profiles are found that lack 'enable_voice', 'base_voice_id', 'tone_and_style', or 'voice_only_mode',
+    // these fields will be added, taking their default values from the main 'ethan.json' template file
+    // located in the application's installation directory. This ensures smooth updates for users with older configurations.
+    try {
+        const profilesDir = path.join(userDataDir, 'profiles');
+        const ethanTemplatePath = path.join(electronApp.getAppPath(), 'ethan.json');
+
+        if (fs.existsSync(profilesDir) && fs.existsSync(ethanTemplatePath)) {
+            const ethanTemplateData = JSON.parse(fs.readFileSync(ethanTemplatePath, 'utf8'));
+
+            // Define the voice setting fields and their intended default values from the template.
+            // It's assumed that 'ethan.json' (the template) has these fields with appropriate default values.
+            // If a field is not present in the template, its value will be 'undefined', and that will be copied.
+            const voiceFieldsFromTemplate = {
+                enable_voice: ethanTemplateData.enable_voice,
+                base_voice_id: ethanTemplateData.base_voice_id,
+                tone_and_style: ethanTemplateData.tone_and_style,
+                voice_only_mode: ethanTemplateData.voice_only_mode
+            };
+
+            fs.readdirSync(profilesDir).forEach(file => {
+                if (file.endsWith('.json')) {
+                    const profileFilePath = path.join(profilesDir, file);
+                    try {
+                        let profileData = JSON.parse(fs.readFileSync(profileFilePath, 'utf8'));
+                        let needsUpdate = false;
+
+                        for (const key in voiceFieldsFromTemplate) {
+                            if (profileData[key] === undefined) {
+                                profileData[key] = voiceFieldsFromTemplate[key];
+                                needsUpdate = true;
+                            }
+                        }
+
+                        if (needsUpdate) {
+                            fs.writeFileSync(profileFilePath, JSON.stringify(profileData, null, 4));
+                            logToFile(`Backward compatibility: Updated profile ${file} with default voice settings from template.`);
+                        }
+                    } catch (e) {
+                        logToFile(`Backward compatibility: Error processing profile ${file} for voice settings update: ${e.message}`);
+                    }
+                }
+            });
+        } else {
+            if (!fs.existsSync(profilesDir)) {
+                // This is expected for new users or if no custom profiles have been created yet.
+                logToFile(`Profiles directory (${profilesDir}) not found. Skipping voice settings backward compatibility for existing profiles.`);
+            }
+            if (!fs.existsSync(ethanTemplatePath)) {
+                // This is a more critical issue, as the template is needed for defaults.
+                logToFile(`Critical: Ethan template (${ethanTemplatePath}) not found. Cannot perform voice settings backward compatibility update.`);
+            }
+        }
+    } catch (error) {
+        logToFile(`Error during voice settings backward compatibility logic in startServer: ${error.message}`);
+    }
+
+    // -- End Voice Settings Backward Compatibility ---
+
     let profiles = settings.profiles;
     let load_memory = settings.load_memory;
     let agentProcessStarted = false;
@@ -325,7 +385,11 @@ function startServer() {
                     personality: profileData.personality,
                     autoMessage: profileData.autoMessage || '',
                     triggerOnJoin: !!profileData.triggerOnJoin,
-                    triggerOnRespawn: !!profileData.triggerOnRespawn
+                    triggerOnRespawn: !!profileData.triggerOnRespawn,
+                    enable_voice: profileData.enable_voice,
+                    base_voice_id: profileData.base_voice_id,
+                    tone_and_style: profileData.tone_and_style,
+                    voice_only_mode: profileData.voice_only_mode
                 });
             }
         });

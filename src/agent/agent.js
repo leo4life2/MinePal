@@ -1313,8 +1313,8 @@ export class Agent {
         }
 
         // Process Chat
-        if (chatMessage) {
-            // console.log(`[_processPromptCycle] Sending chat message: "${chatMessage}"`);
+        console.log(`[_processPromptCycle] Processing chat message. Voice only mode: ${this.profile.voice_only_mode}`);
+        if (chatMessage && this.profile.voice_only_mode === false) {
             await this.sendMessage(chatMessage, true);
         }
 

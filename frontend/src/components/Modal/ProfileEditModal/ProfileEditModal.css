@@ -581,3 +581,74 @@
 .profile-settings-sections-container {
   padding: 0 5px 0 5px;
 }
+
+/* Confirmation Dialog Styles */
+.confirm-dialog {
+  padding: 20px;
+  text-align: center;
+}
+
+.confirm-dialog p {
+  margin-bottom: 15px;
+  font-size: 1.0em; 
+  color: var(--text-color);
+  line-height: 1.5;
+}
+
+.confirm-dialog .button-group {
+  display: flex;
+  justify-content: space-between; 
+  gap: 15px; 
+  margin-top: 10px;
+}
+
+/* Buttons within confirmation dialog - leverage existing button styles where possible */
+.confirm-dialog .error-button,
+.confirm-dialog .secondary-button {
+  padding: 10px 20px; /* Match existing buttons */
+  border-radius: 8px; /* Match existing buttons */
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+/* Specific styling for discard/delete buttons */
+.confirm-dialog .error-button {
+  background-color: #e05757; /* From existing .delete-button */
+  color: #fff;
+}
+
+[data-theme='dark'] .confirm-dialog .error-button {
+  background-color: #a13939; /* From existing dark .delete-button */
+}
+
+.confirm-dialog .error-button:hover {
+  background-color: #c04545; /* From existing .delete-button:hover */
+}
+
+[data-theme='dark'] .confirm-dialog .error-button:hover {
+  background-color: #b14141; /* From existing dark .delete-button:hover */
+}
+
+/* Specific styling for cancel buttons */
+.confirm-dialog .secondary-button {
+  background-color: #6c757d; /* A neutral secondary color, adjust if you have one */
+  color: #fff;
+}
+
+[data-theme='dark'] .confirm-dialog .secondary-button {
+  background-color: #4a4a4a; /* Dark theme secondary */
+}
+
+.confirm-dialog .secondary-button:hover {
+  background-color: #5a6268;
+}
+
+[data-theme='dark'] .confirm-dialog .secondary-button:hover {
+  background-color: #5a5a5a;
+}
+
+[data-theme='dark'] .send-message-button:disabled {
+  opacity: 0.6;
+}

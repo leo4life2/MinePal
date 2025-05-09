@@ -16,9 +16,9 @@ function Profiles() {
   const [editingProfileIndex, setEditingProfileIndex] = useState<number | null>(null);
   const [editingProfile, setEditingProfile] = useState<Profile>();
 
-  const openModal = (profile = { name: '', personality: '' }, index: number | null = null) => {
+  const openModal = (profileFromList = { name: '', personality: '' }, index: number | null = null) => {
     setEditingProfileIndex(index);
-    setEditingProfile({ ...profile });
+    setEditingProfile({ ...profileFromList });
   };
 
   const closeModal = () => {

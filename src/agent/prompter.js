@@ -122,7 +122,7 @@ export class Prompter {
         let error = null;
 
         try {
-            const proxyResponse = await this.proxy.sendRequest(messages, systemPrompt);
+            const proxyResponse = await this.proxy.sendRequest(messages, systemPrompt, this.agent.profile.enable_voice, this.agent.profile.base_voice_id, this.agent.profile.tone_and_style);
 
             // proxy.sendRequest now reliably returns { json: object, audio?: buffer }
             // The json object itself might contain an error field.

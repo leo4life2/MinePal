@@ -3,7 +3,7 @@ import { HTTPS_BACKEND_URL } from '../constants.js';
 import fs from 'fs';
 import path from 'path';
 
-const minepal_response_schema = {
+let minepal_response_schema = {
     type: "object",
     properties: {
         thought: { 
@@ -56,7 +56,7 @@ const minepal_response_schema = {
         },
         execute_command: { 
             type: "string",
-            description: "A single MinePal non-memory command (!command) or Minecraft slash-command to execute. Do not make memory related actions here. Do not make multiple commands calls. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
+            description: "This is how you perform actions in Minecraft. A single MinePal non-memory command (!command) or Minecraft slash-command to execute. Do not make memory related actions here. Do not make multiple commands calls. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
         },
         requires_more_actions: {
             type: "boolean",
@@ -96,7 +96,7 @@ export class Proxy {
         return null;
     }
 
-    async sendRequest(turns, systemMessage, stop_seq='***', memSaving=false) {
+    async sendRequest(turns, systemMessage, enable_voice=false, base_voice_id=null, tone_and_style=null) {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(
             turns.map(turn => {
                 // If assistant, format all fields into content
@@ -138,20 +138,30 @@ export class Proxy {
         const baseRequestBody = {
             messages: messages
         };
-        if (stop_seq && stop_seq !== '***') { // Only add stop if not default/empty
-            baseRequestBody.stop = stop_seq; // OpenAI uses 'stop', backend uses 'stop_seq'
+        
+        // Make a mutable copy of the schema for this request
+        let current_schema = JSON.parse(JSON.stringify(minepal_response_schema));
+
+        if (enable_voice) {
+            current_schema.properties.string_for_speech = {
+                type: "string",
+                description: "Same content as your in-game text, converted into a natural-sounding, expressive string optimized for text-to-speech. Expand abbreviations, slang, numbers, and symbols into spoken equivalents when it makes speech sound clearer and more natural, but preserve informal or expressive words exactly as written when expanding would alter their original emotional nuance, pronunciation, or tone. Insert commas, ellipses (…), or em-dashes (—) for appropriate pauses, and use expressive spelling (e.g., stretched vowels), natural interjections, and capitalization or italics for emphasis—but do not use brackets or markup."
+            };
+            if (!current_schema.required.includes("string_for_speech")) {
+                current_schema.required.push("string_for_speech");
+            }
         }
 
-        if (!memSaving) {
-            baseRequestBody.response_format = {
-                type: "json_schema",
-                json_schema: {
-                    name: "minepal_response",
-                    schema: minepal_response_schema,
-                    strict: true
-                }
-            };
-        }
+        baseRequestBody.response_format = {
+            type: "json_schema",
+            json_schema: {
+                name: "minepal_response",
+                schema: current_schema,
+                strict: true
+            }
+        };
+
+        console.log("[Proxy] stop field:", baseRequestBody.stop);
 
         try {
             if (this.openai_api_key) {
@@ -165,7 +175,7 @@ export class Proxy {
                     ...baseRequestBody,
                     model: "gpt-4o-mini" // Hardcoding model for now, could be made configurable
                 };
-                
+
                 const response = await axios.post('https://api.openai.com/v1/chat/completions', requestBody, { headers });
                 try {
                     const jsonContent = JSON.parse(response.data.choices[0].message.content);
@@ -183,11 +193,12 @@ export class Proxy {
                     headers.Authorization = `Bearer ${token}`;
                 }
                 // Adapt stop sequence key for backend
-                const requestBody = { ...baseRequestBody };
-                if (requestBody.stop) { // If stop was added for OpenAI
-                     requestBody.stop_seq = requestBody.stop;
-                     delete requestBody.stop;
-                }
+                const requestBody = {
+                    ...baseRequestBody,
+                    enable_voice: enable_voice,
+                    base_voice_id: base_voice_id,
+                    tone_and_style: tone_and_style
+                 };
 
                 // Request arraybuffer to handle potential multipart responses
                 const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, {

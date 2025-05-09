@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Memory, deleteMemory, fetchBotMemories, sendMessage } from '../../../utils/api';
 import { Profile } from '../../../types/apiTypes';
 import { X as CloseIcon, Trash2 } from 'react-feather';
@@ -40,11 +40,7 @@ function ProfileEditModal({
   onError 
 }: ProfileEditModalProps) {
   const [editingProfile, setEditingProfile] = useState<Profile>({ 
-    ...profile, 
-    enable_voice: profile.enable_voice ?? false,
-    base_voice_id: profile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id,
-    tone_and_style: profile.tone_and_style ?? '',
-    voice_only_mode: profile.voice_only_mode ?? false,
+    ...profile
   });
   const [error, setError] = useState<string>();
   const [showMemories, setShowMemories] = useState(false);
@@ -52,6 +48,60 @@ function ProfileEditModal({
   const [memoryError, setMemoryError] = useState<string>();
   const [customMessage, setCustomMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const isDirty = useCallback(() => {
+    // For a new profile, check if any significant fields have been filled from their initial empty/default state.
+    // A new profile (passed via 'profile' prop) typically starts with name: '', personality: '', and other fields undefined.
+    if (isNewProfile) {
+        return (
+            editingProfile.name.trim() !== (profile.name || '') ||
+            editingProfile.personality.trim() !== (profile.personality || '') ||
+            (editingProfile.autoMessage?.trim() || '') !== (profile.autoMessage?.trim() || '') ||
+            !!editingProfile.triggerOnJoin !== !!profile.triggerOnJoin ||
+            !!editingProfile.triggerOnRespawn !== !!profile.triggerOnRespawn ||
+            !!editingProfile.enable_voice !== !!profile.enable_voice || 
+            (editingProfile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) !== (profile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) ||
+            (editingProfile.tone_and_style?.trim() || '') !== (profile.tone_and_style?.trim() || '') ||
+            !!editingProfile.voice_only_mode !== !!profile.voice_only_mode
+        );
+    }
+
+    // For an existing profile, compare current editingProfile state with the original profile prop.
+    return (
+        editingProfile.name.trim() !== profile.name.trim() ||
+        editingProfile.personality.trim() !== profile.personality.trim() ||
+        (editingProfile.autoMessage?.trim() || '') !== (profile.autoMessage?.trim() || '') ||
+        !!editingProfile.triggerOnJoin !== !!profile.triggerOnJoin ||
+        !!editingProfile.triggerOnRespawn !== !!profile.triggerOnRespawn ||
+        !!editingProfile.enable_voice !== !!profile.enable_voice ||
+        (editingProfile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) !== (profile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) ||
+        (editingProfile.tone_and_style?.trim() || '') !== (profile.tone_and_style?.trim() || '') ||
+        !!editingProfile.voice_only_mode !== !!profile.voice_only_mode
+    );
+  }, [editingProfile, profile, isNewProfile]);
+
+  const handleAttemptClose = () => {
+    if (showDeleteConfirm) {
+        return;
+    }
+    if (isDirty()) {
+      setShowUnsavedConfirm(true);
+      setShowDeleteConfirm(false);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowUnsavedConfirm(false);
+    onClose();
+  };
+
+  const handleCancelDiscard = () => {
+    setShowUnsavedConfirm(false);
+  };
 
   const viewMemories = async () => {
     if (!editingProfile?.name) return;
@@ -99,11 +149,33 @@ function ProfileEditModal({
     }
 
     try {
+      setError(undefined);
+      setShowUnsavedConfirm(false);
+      setShowDeleteConfirm(false);
       await onSave(sanitized);
       // onClose will be called by parent component after saving
     } catch (error) {
       setError(`Failed to save profile: ${error}`);
     }
+  };
+
+  const handleDeleteWithConfirmation = async () => {
+    setShowDeleteConfirm(true);
+    setShowUnsavedConfirm(false);
+  };
+
+  const executeDelete = async () => {
+    setShowDeleteConfirm(false);
+    try {
+      await onDelete();
+      // onClose will be called by parent component after deleting successfully
+    } catch (e) {
+      setError(`Failed to delete profile: ${e}`);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
   };
 
   const handleSendMessage = async () => {
@@ -121,13 +193,29 @@ function ProfileEditModal({
   };
 
   return (
-    <ModalWrapper onClose={onClose}>
+    <ModalWrapper onClose={handleAttemptClose}>
       <div className={`modal-content profile-modal ${showMemories ? 'showing-memories' : ''}`}>
-        <button className="modal-close-icon" onClick={onClose}>
+        <button className="modal-close-icon" onClick={handleAttemptClose} disabled={showDeleteConfirm || showUnsavedConfirm}>
           <CloseIcon size={18} />
         </button>
         
-        {!showMemories ? (
+        {showUnsavedConfirm ? (
+          <div className="confirm-dialog unsaved-confirm-dialog">
+            <p>You have unsaved changes. Are you sure you want to discard them?</p>
+            <div className="button-group">
+              <button className="discard-button error-button" onClick={handleConfirmDiscard}>Discard</button>
+              <button className="cancel-button secondary-button" onClick={handleCancelDiscard}>Cancel</button>
+            </div>
+          </div>
+        ) : showDeleteConfirm ? (
+          <div className="confirm-dialog delete-confirm-dialog">
+            <p>{`Are you sure you want to delete the pal "${editingProfile.name}"? This action cannot be undone.`}</p>
+            <div className="button-group">
+              <button className="delete-button error-button" onClick={executeDelete}>Delete</button>
+              <button className="cancel-button secondary-button" onClick={cancelDelete}>Cancel</button>
+            </div>
+          </div>
+        ) : !showMemories ? (
           <>
           <div className="input-groups-container">
             <div className="input-group">
@@ -314,7 +402,7 @@ function ProfileEditModal({
                 <button className="view-memories-button" onClick={viewMemories}>View Memories</button>
               )}
               {!isNewProfile && (
-                <button className="delete-button" onClick={onDelete}>Delete Pal</button>
+                <button className="delete-button error-button" onClick={handleDeleteWithConfirmation}>Delete Pal</button>
               )}
             </div>
             {error && <div className="error-message">{error}</div>}
