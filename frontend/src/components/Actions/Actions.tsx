@@ -170,7 +170,7 @@ function Actions() {
     if (requestsRemaining === 0) {
       return isPaying ? "Upgrade Plan" : "Purchase Plan";
     }
-    return agentActive ? "Stop Bot" : "Start Bot";
+    return agentActive ? "Stop Pal" : "Start Pal";
   };
 
   return (

@@ -22,6 +22,7 @@ export interface SupabaseContextType {
   refreshSubscription: () => Promise<void>;
   clearAuthError: () => void;
   userPlan: TierType;
+  getCustomerPortal: (action?: 'cancel' | 'update') => Promise<void>;
 }
 
 export const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined); 

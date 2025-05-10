@@ -14,6 +14,7 @@ export interface PricingPlan {
   price: number;
   quota: number;
   priceId: string; // Stripe price ID
+  features?: string[]; // Adding features array
 }
 
 const TEST_PRICING_PLANS: PricingPlan[] = [
@@ -22,21 +23,24 @@ const TEST_PRICING_PLANS: PricingPlan[] = [
     name: 'Basic',
     price: 2.99,
     quota: 1800,
-    priceId: 'price_1R0YEFAbdM8AcunxnUxj07sw'
+    priceId: 'price_1R0YEFAbdM8AcunxnUxj07sw',
+    features: []
   },
   {
     id: 2,
     name: 'Standard',
     price: 7.99,
     quota: 5400,
-    priceId: 'price_1R0YFHAbdM8AcunxY1rm8fkw'
+    priceId: 'price_1R0YFHAbdM8AcunxY1rm8fkw',
+    features: ['Pal Voice']
   },
   {
     id: 3,
     name: 'Pro',
     price: 13.99,
     quota: 10500,
-    priceId: 'price_1R0YFYAbdM8AcunxKH04jHck'
+    priceId: 'price_1R0YFYAbdM8AcunxKH04jHck',
+    features: ['Pal Voice']
   }
 ];
 
@@ -46,21 +50,24 @@ const LIVE_PRICING_PLANS: PricingPlan[] = [
     name: 'Basic',
     price: 2.99,
     quota: 1800,
-    priceId: 'price_1R2MrRAbdM8AcunxfX4snQNi'
+    priceId: 'price_1R2MrRAbdM8AcunxfX4snQNi',
+    features: []
   },
   {
     id: 2,
     name: 'Standard',
     price: 7.99,
     quota: 5400,
-    priceId: 'price_1R2MrTAbdM8AcunxqGPVw0ZR'
+    priceId: 'price_1R2MrTAbdM8AcunxqGPVw0ZR',
+    features: ['Pal Voice']
   },
   {
     id: 3,
     name: 'Pro',
     price: 13.99,
     quota: 10500,
-    priceId: 'price_1R2MrVAbdM8AcunxMUql3BtU'
+    priceId: 'price_1R2MrVAbdM8AcunxMUql3BtU',
+    features: ['Pal Voice']
   }
 ];
 

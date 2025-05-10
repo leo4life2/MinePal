@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PRICING_PLANS, PricingPlan, HTTPS_BACKEND_URL } from '../../../constants';
-import { X as CloseIcon } from 'react-feather';
+import { X as CloseIcon, Music, ExternalLink } from 'react-feather';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
 import './PricingModal.css';
 import { ModalWrapper } from '..';
@@ -124,6 +124,25 @@ function PricingModal({ onClose }: PricingModalProps) {
                 <div className="plan-details">
                   <h3 className="plan-name">{plan.name}</h3>
                   <div className="plan-quota">{plan.quota} responses/mo</div>
+                  {plan.features && plan.features.includes('Pal Voice') && (
+                    <a 
+                      href="https://minepal.net/pal-voice" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="pal-voice-feature"
+                      onClick={(e) => {
+                        // Use Electron shell to open external links if available
+                        if (shell) {
+                          e.preventDefault();
+                          shell.openExternal('https://minepal.net/pal-voice');
+                        }
+                      }}
+                    >
+                      <Music size={14} />
+                      Includes Pal Voice
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
                   <div className="plan-value">
                     <span className="price-per-response">${pricePerResponse}</span> per response
                   </div>

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './TierBox.css';
 import { TierType } from '../../constants';
+import PricingModal from '../Modal/PricingModal/PricingModal';
 
 interface TierBoxProps {
   tier: TierType;
@@ -14,12 +15,35 @@ const tierColors: Record<TierType, string> = {
 };
 
 const TierBox: React.FC<TierBoxProps> = ({ tier }) => {
+  const [showPricingModal, setShowPricingModal] = useState(false);
   const backgroundColor = tierColors[tier];
 
+  const handleClick = () => {
+    if (tier === 'FREE') {
+      setShowPricingModal(true);
+    }
+    // Do nothing if not FREE tier
+  };
+
+  const handleClosePricingModal = () => {
+    setShowPricingModal(false);
+  };
+
+  const isClickable = tier === 'FREE';
+
   return (
-    <div className="tier-box" style={{ backgroundColor }}>
-      <span className="tier-box-text">{tier}</span>
-    </div>
+    <>
+      <div 
+        className={`tier-box ${isClickable ? 'tier-box--clickable' : ''}`}
+        style={{ backgroundColor }}
+        onClick={handleClick}
+      >
+        <span className="tier-box-text">{tier}</span>
+      </div>
+      {showPricingModal && (
+        <PricingModal onClose={handleClosePricingModal} />
+      )}
+    </>
   );
 };
 

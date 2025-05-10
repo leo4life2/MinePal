@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { ReactNode, useEffect, useState } from 'react';
 import { SupabaseContext, SupabaseContextType, StripeData } from './SupabaseContext';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, PRICING_PLANS, TierType } from '../../constants';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, PRICING_PLANS, TierType, HTTPS_BACKEND_URL } from '../../constants';
 import { IpcRendererEvent } from 'electron';
 
 // Get electron IPC renderer if we're in electron
@@ -317,6 +317,51 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     };
   }, []);
 
+  // Function to get customer portal URL (moved from AccountModal)
+  const getCustomerPortal = async (action?: 'cancel' | 'update') => {
+    if (!stripeData.customerId) {
+      throw new Error('No customer ID found. Please contact support.');
+    }
+
+    if (action && !stripeData.subscriptionId) {
+      throw new Error('No subscription ID found. Please contact support.');
+    }
+
+    // Call the backend API to get customer portal URL
+    const response = await fetch(`${HTTPS_BACKEND_URL}/api/customer-portal/${stripeData.customerId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(
+        errorData?.message || 
+        `Failed to get customer portal URL (${response.status})`
+      );
+    }
+
+    const { url } = await response.json();
+
+    // Append the appropriate path if we're handling a subscription action
+    let finalUrl = url;
+    if (action && stripeData.subscriptionId) {
+      finalUrl = `${url}/subscriptions/${stripeData.subscriptionId}/${action}`;
+    }
+
+    // Open the portal URL in external browser
+    if (shell) {
+      shell.openExternal(finalUrl);
+    } else {
+      // For non-Electron environments, you might want to redirect or log
+      console.log('Customer Portal URL (non-Electron):', finalUrl);
+      // window.location.href = finalUrl; // Example for browser redirect
+      throw new Error('Customer portal can only be opened automatically in the desktop app.');
+    }
+  };
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -351,6 +396,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     authError,
     clearAuthError,
     userPlan,
+    getCustomerPortal,
   };
 
   return (

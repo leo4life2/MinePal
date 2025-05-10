@@ -4,15 +4,9 @@ import { User as UserIcon, X as CloseIcon, Award } from 'react-feather';
 import { PricingModal, ModalWrapper, AuthModal } from '..';
 import TierBox from '../../TierBox/TierBox';
 import './AccountModal.css';
-import { HTTPS_BACKEND_URL } from '../../../constants';
-
-// Get electron shell if we're in electron
-const isElectron = window && window.process && window.process.type;
-const electron = isElectron ? window.require('electron') : null;
-const shell = electron?.shell;
 
 function AccountModal() {
-  const { user, signOut, isPaying, stripeData, refreshSubscription, clearAuthError, userPlan } = useSupabase();
+  const { user, signOut, isPaying, clearAuthError, userPlan, getCustomerPortal } = useSupabase();
   const [showModal, setShowModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -29,7 +23,6 @@ function AccountModal() {
           <UserIcon size={18} className="account-icon" />
           <span className="account-name">Not signed in</span>
         </button>
-        <TierBox tier={userPlan} />
         
         <AuthModal 
           isOpen={showAuthModal} 
@@ -54,71 +47,33 @@ function AccountModal() {
   };
 
   const handlePlanButtonClick = async () => {
-    if (isPaying) {
-      await getCustomerPortal('update');
-    } else {
-      // If user is not paying, show pricing modal
-      setShowPricingModal(true);
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (isPaying) {
+        await getCustomerPortal('update');
+        setShowModal(false);
+      } else {
+        // If user is not paying, show pricing modal
+        setShowPricingModal(true);
+        setShowModal(false);
+      }
+    } catch (err) {
+      console.error('Error handling plan button click:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process request. Please try again later.');
+    } finally {
+      setIsLoading(false);
     }
-    setShowModal(false);
   };
 
   const handleCancelPlan = async () => {
-    await getCustomerPortal('cancel');
-  };
-
-  const getCustomerPortal = async (action?: 'cancel' | 'update') => {
-    if (!stripeData.customerId) {
-      setError('No customer ID found. Please contact support.');
-      return;
-    }
-
-    if (action && !stripeData.subscriptionId) {
-      setError('No subscription ID found. Please contact support.');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
-
     try {
-      // Refresh subscription data first to ensure we have the latest info
-      await refreshSubscription();
-
-      // Call the backend API to get customer portal URL
-      const response = await fetch(`${HTTPS_BACKEND_URL}/api/customer-portal/${stripeData.customerId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.message || 
-          `Failed to get customer portal URL (${response.status})`
-        );
-      }
-
-      const { url } = await response.json();
-
-      // Append the appropriate path if we're handling a subscription action
-      let finalUrl = url;
-      if (action && stripeData.subscriptionId) {
-        finalUrl = `${url}/subscriptions/${stripeData.subscriptionId}/${action}`;
-      }
-
-      // Open the portal URL in external browser
-      if (shell) {
-        shell.openExternal(finalUrl);
-      } else {
-        console.log('Not in Electron environment, would open:', finalUrl);
-      }
-
+      await getCustomerPortal('cancel');
       setShowModal(false);
     } catch (err) {
-      console.error('Error getting customer portal URL:', err);
+      console.error('Error cancelling plan via customer portal:', err);
       setError(err instanceof Error ? err.message : 'Failed to access customer portal. Please try again later.');
     } finally {
       setIsLoading(false);

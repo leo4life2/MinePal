@@ -85,13 +85,14 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  text-align: left;
-  flex: 1;
+  flex-grow: 1;
+  margin-right: 10px;
+  gap: 3px;
 }
 
 .plan-name {
   color: var(--text-color);
-  margin: 0 0 4px 0;
+  margin: 0;
   font-size: 1.2rem;
 }
 
@@ -213,6 +214,30 @@
   margin: 12px 0;
   font-size: 0.85rem;
   text-align: center;
+}
+
+.pal-voice-feature {
+  color: #BC6C25;
+  font-weight: 700;
+  cursor: pointer;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  gap: 5px;
+}
+
+.pal-voice-feature:hover {
+  text-decoration: underline;
+}
+
+.pal-voice-feature svg:first-child {
+  margin-right: 2px;
+}
+
+.pal-voice-feature svg:last-child {
+  margin-left: 2px;
+  opacity: 0.7;
 }
 
 @media (max-width: 480px) {

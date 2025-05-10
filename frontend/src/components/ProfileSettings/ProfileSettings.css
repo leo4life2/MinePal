@@ -174,3 +174,17 @@ input:checked + .profile-slider:before {
 .profile-setting-item .message-input input {
   font-family: inherit;
 }
+
+.profile-section-toggle > span {
+  display: flex; /* Changed to flex for internal alignment */
+  align-items: center;
+  gap: 6px; /* Adjust gap as needed */
+  flex-grow: 1; /* Allow the title text to take available space */
+}
+
+/* Styling for the new container we added in ProfileEditModal.tsx for the title */
+.profile-section-title-container {
+  display: flex;
+  align-items: center;
+  gap: 6px; /* Gap between title text and tier boxes, and between tier boxes */
+}

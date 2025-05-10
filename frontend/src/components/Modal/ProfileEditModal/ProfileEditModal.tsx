@@ -3,9 +3,12 @@ import { Memory, deleteMemory, fetchBotMemories, sendMessage } from '../../../ut
 import { Profile } from '../../../types/apiTypes';
 import { X as CloseIcon, Trash2 } from 'react-feather';
 import './ProfileEditModal.css';
-import { ModalWrapper } from '..';
+import { ModalWrapper, PricingModal } from '..';
 import { ProfileSettingsSection } from '../../ProfileSettings/ProfileSettings';
 import VoiceSelector, { VoiceOption } from '../../VoiceSelector/VoiceSelector';
+import TierBox from '../../TierBox/TierBox';
+import { TierType } from '../../../constants';
+import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
 
 // Renamed voice options constant
 const AVAILABLE_VOICE_OPTIONS: VoiceOption[] = [
@@ -50,6 +53,28 @@ function ProfileEditModal({
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [portalError, setPortalError] = useState<string | null>(null);
+
+  const { userPlan, getCustomerPortal } = useSupabase();
+
+  const handleVoiceSettingChange = async (updateFunc: () => void) => {
+    if (userPlan === 'FREE') {
+      setShowPricingModal(true);
+      setPortalError(null);
+    } else if (userPlan === 'BASIC') {
+      setPortalError(null);
+      try {
+        await getCustomerPortal('update');
+      } catch (err) {
+        console.error('Error opening customer portal:', err);
+        setPortalError(err instanceof Error ? err.message : 'Failed to open customer portal.');
+      }
+    } else {
+      updateFunc();
+      setPortalError(null);
+    }
+  };
 
   const isDirty = useCallback(() => {
     // For a new profile, check if any significant fields have been filled from their initial empty/default state.
@@ -236,13 +261,22 @@ function ProfileEditModal({
                   ...current,
                   personality: value,
                 }))}
-                placeholder="Describe your pal\'s personality"
+                placeholder="Describe your pal's personality"
               />
             </div>
           </div>
             
             <div className="profile-settings-sections-container">
-              <ProfileSettingsSection title="Pal Voice" isExpanded={false}>
+              <ProfileSettingsSection 
+                title={(
+                  <span className="profile-section-title-container">
+                    Pal Voice
+                    <TierBox tier={'STANDARD' as TierType} />
+                    <TierBox tier={'PRO' as TierType} />
+                  </span>
+                )}
+                isExpanded={false}
+              >
                 <div className="voice-settings-group">
                   <div className="profile-setting-item">
                     <label className="sub-input-label">
@@ -253,10 +287,14 @@ function ProfileEditModal({
                         <input
                           type="checkbox"
                           checked={!!editingProfile.enable_voice}
-                          onChange={(e) => setEditingProfile((current) => ({
-                            ...current,
-                            enable_voice: e.target.checked,
-                          }))}
+                          onChange={(e) => {
+                            handleVoiceSettingChange(() => {
+                              setEditingProfile((current) => ({
+                                ...current,
+                                enable_voice: e.target.checked,
+                              }));
+                            });
+                          }}
                         />
                         <span className="profile-slider"></span>
                       </label>
@@ -272,10 +310,14 @@ function ProfileEditModal({
                         <input
                           type="checkbox"
                           checked={!!editingProfile.voice_only_mode}
-                          onChange={(e) => setEditingProfile((current) => ({
-                            ...current,
-                            voice_only_mode: e.target.checked,
-                          }))}
+                          onChange={(e) => {
+                            handleVoiceSettingChange(() => {
+                              setEditingProfile((current) => ({
+                                ...current,
+                                voice_only_mode: e.target.checked,
+                              }));
+                            });
+                          }}
                         />
                         <span className="profile-slider"></span>
                       </label>
@@ -289,7 +331,11 @@ function ProfileEditModal({
                     <VoiceSelector 
                       options={AVAILABLE_VOICE_OPTIONS}
                       selectedId={editingProfile.base_voice_id}
-                      onChange={(id) => setEditingProfile(current => ({ ...current, base_voice_id: id }))}
+                      onChange={(id) => {
+                        handleVoiceSettingChange(() => {
+                          setEditingProfile(current => ({ ...current, base_voice_id: id }));
+                        });
+                      }}
                       placeholder="Select base voice"
                     />
                   </div>
@@ -388,6 +434,7 @@ function ProfileEditModal({
               )}
             </div>
             {error && <div className="error-message">{error}</div>}
+            {portalError && <div className="error-message">{portalError}</div>}
           </>
         ) : (
           <div className="memories-modal">
@@ -414,6 +461,12 @@ function ProfileEditModal({
             </div>
             {memoryError && <div className="error-message">{memoryError}</div>}
           </div>
+        )}
+        {showPricingModal && (
+          <PricingModal onClose={() => {
+            setShowPricingModal(false);
+            setPortalError(null);
+          }} />
         )}
       </div>
     </ModalWrapper>

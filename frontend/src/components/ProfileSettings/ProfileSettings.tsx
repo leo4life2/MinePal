@@ -3,7 +3,7 @@ import { ChevronDown } from 'react-feather';
 import './ProfileSettings.css'; // This path remains correct as it's relative to the new location
 
 interface ProfileSettingsSectionProps {
-  title: string;
+  title: ReactNode;
   isExpanded?: boolean;
   children: ReactNode;
 }
