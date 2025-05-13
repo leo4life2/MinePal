@@ -1655,7 +1655,7 @@ export class Agent {
      * @param {string} msg - Message to log before shutting down.
      */
     cleanKill(msg='Killing agent process...', reason = null) {
-        this.sendMessage('Goodbye world.')
+        this.sendMessage('Caught a bug! Restarting myself...')
         this.history.save();
         this._stopProcessingLoop(); // Stop the loop on clean kill
 
