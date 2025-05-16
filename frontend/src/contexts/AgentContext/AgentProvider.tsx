@@ -77,8 +77,9 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
       if (error instanceof Error) {
         declareError("AgentProvider", error);
       } else {
-        declareError("AgentProvider", "An unknown error occurred while stopping the agent.");
+        declareError("AgentProvider", "An unknown error occurred while starting the agent.");
       }
+      throw error;
     }
   }, [userSettings, selectedProfiles, declareError, clearError, isPaying]);
 

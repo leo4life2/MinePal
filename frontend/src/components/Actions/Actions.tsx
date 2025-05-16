@@ -143,9 +143,22 @@ function Actions() {
           console.error('Failed to connect WebSocket:', wsError);
           // Don't set error state for WebSocket failures
         }
-      } catch (error) {
-        console.error('Failed to start bot:', error);
-        setError(error instanceof Error ? error.message : 'Unknown error');
+      } catch (err) {
+        console.error('Failed to start bot:', err);
+        let errorMessage = 'An unknown error occurred while trying to start the Pal.';
+        
+        // Type guard for Axios-like error structure
+        if (typeof err === 'object' && err !== null && 'response' in err) {
+          const responseError = err as { response?: { data?: { error?: string } } }; // Type assertion
+          if (responseError.response && responseError.response.data && typeof responseError.response.data.error === 'string') {
+            errorMessage = responseError.response.data.error;
+          } else if (err instanceof Error) { // Fallback if response.data.error is not there but it's an Error instance
+            errorMessage = err.message;
+          }
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        setError(errorMessage);
       }
     } else {
       try {

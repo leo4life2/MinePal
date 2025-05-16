@@ -91,7 +91,22 @@ export async function startAgent(userSettings: UserSettings): Promise<boolean> {
     body: JSON.stringify(userSettings),
   });
 
-  return response.ok;
+  if (!response.ok) {
+    let errorData;
+    try {
+      errorData = await response.json(); // Attempt to get detailed error from server
+    } catch (e) {
+      // If parsing JSON fails, use the status text
+      throw new Error(response.statusText || `HTTP error ${response.status}`);
+    }
+    // Throw an error that includes the server's response data, if available
+    const err = new Error(errorData?.error || response.statusText || `HTTP error ${response.status}`);
+    // Attach the response data to the error object for further inspection if needed
+    (err as any).response = { data: errorData }; 
+    throw err;
+  }
+
+  return true; // If response.ok is true, implies success
 }
 
 export async function stopAgent(): Promise<boolean> {

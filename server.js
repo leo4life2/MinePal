@@ -592,6 +592,44 @@ function startServer() {
             });
         }
 
+        // Validation for profile files and structure
+        const missingProfileFiles = [];
+        const invalidProfileObjects = [];
+        const profilesBaseDir = path.join(userDataDir, 'profiles');
+
+        if (newSettings.profiles && Array.isArray(newSettings.profiles)) {
+            for (let i = 0; i < newSettings.profiles.length; i++) {
+                const profile = newSettings.profiles[i];
+                if (profile && typeof profile.name === 'string' && profile.name.trim() !== '') {
+                    const profilePath = path.join(profilesBaseDir, `${profile.name}.json`);
+                    if (!fs.existsSync(profilePath)) {
+                        missingProfileFiles.push(profile.name);
+                    }
+                } else {
+                    invalidProfileObjects.push({ index: i, profile_data: profile });
+                    logToFile(`API: POST /start - Malformed profile object in request at index ${i}: ${JSON.stringify(profile)}`);
+                }
+            }
+        } // If newSettings.profiles is not an array or is missing, the 'emptyFields' check should handle it if 'profiles' is required.
+
+        if (invalidProfileObjects.length > 0) {
+            const errorMsg = `One or more profile objects in the request are invalid (e.g., missing a name or incorrect format). Please check profile configurations.`;
+            logToFile(`API: POST /start error - ${errorMsg} Details: ${JSON.stringify(invalidProfileObjects)}`);
+            return res.status(400).json({
+                error: errorMsg,
+                invalid_profiles_detail: invalidProfileObjects 
+            });
+        }
+
+        if (missingProfileFiles.length > 0) {
+            const errorMsg = `The following profile configurations are missing: ${missingProfileFiles.join(', ')}. Please create them or ensure they are selected correctly in your settings.`;
+            logToFile(`API: POST /start error - ${errorMsg}`);
+            return res.status(400).json({
+                error: errorMsg,
+                missing_profiles: missingProfileFiles
+            });
+        }
+
         // removed from UI, hardcoding these settings
         newSettings.allow_insecure_coding = false;
         newSettings.code_timeout_mins = 10;
