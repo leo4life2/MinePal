@@ -1685,6 +1685,11 @@ export class Agent {
         if (clean) {
             message = this.cleanChat(message);
         }
-        this.bot.chat(message);
+        // Add a check for this.bot and this.bot.chat
+        if (this.bot && typeof this.bot.chat === 'function') {
+            this.bot.chat(message);
+        } else {
+            console.warn('[_sendMessage] Agent not fully initialized or bot.chat not available, cannot send message:', message);
+        }
     }
 }
