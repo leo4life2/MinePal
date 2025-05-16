@@ -104,10 +104,18 @@ export async function craftRecipe(bot, itemName, num = 1) {
           placedTable = true;
         }
       } else {
-        log(bot, `You do not have a crafting table to craft ${itemName}. Consider making one.`);
+        // No crafting table in inventory and none nearby
+        const itemId = MCData.getInstance().getItemId(itemName);
+        const allPotentialRecipes = bot.recipesAll(itemId, null, false); // Check inventory-only recipes
+        if (!allPotentialRecipes || allPotentialRecipes.length === 0) {
+            log(bot, `No known recipes to craft ${itemName} without a crafting table, and you don't have one.`);
+        } else {
+            // Recipes exist but require a table which is not available
+            log(bot, `Cannot craft ${itemName} as it requires a crafting table, which you don't have and none are nearby.`);
+        }
         return false;
       }
-    } else {
+    } else { // Crafting table is nearby
       recipes = bot.recipesFor(
         MCData.getInstance().getItemId(itemName),
         null,
@@ -116,14 +124,46 @@ export async function craftRecipe(bot, itemName, num = 1) {
       );
     }
   }
+
   if (!recipes || recipes.length === 0) {
-    const craftableItems = queryList
-      .find((query) => query.name === "!craftable")
-      .perform({ bot });
-    log(
-      bot,
-      `You do not have the resources to craft ${itemName}. You can craft the following items: ${craftableItems}`
-    );
+    const itemId = MCData.getInstance().getItemId(itemName);
+    // craftingTable variable holds the context: null for inventory, or block object for table
+    const wasTableAttempted = craftingTable !== null;
+    const allPotentialRecipes = bot.recipesAll(itemId, null, wasTableAttempted);
+
+    if (!allPotentialRecipes || allPotentialRecipes.length === 0) {
+      log(bot, `No known recipes to craft ${itemName}${wasTableAttempted ? ' using a crafting table' : ' from inventory'}.`);
+    } else {
+      const recipeToAnalyze = allPotentialRecipes[0]; // Analyze the first available recipe
+      const recipeRequiresTable = recipeToAnalyze.requiresTable;
+
+      if (recipeRequiresTable && !craftingTable) {
+         log(bot, `Cannot craft ${itemName} as it requires a crafting table, which is not available.`);
+      } else {
+        const targetCraftCount = Math.ceil(num / recipeToAnalyze.result.count);
+        const missingReport = [];
+
+        for (const ingredient of recipeToAnalyze.delta) {
+          if (ingredient.count < 0) { // Negative count means it's a required ingredient
+            const requiredAmount = Math.abs(ingredient.count) * targetCraftCount;
+            const currentAmount = bot.inventory.count(ingredient.id, ingredient.metadata);
+            if (currentAmount < requiredAmount) {
+              const itemInfo = bot.registry.items[ingredient.id];
+              const ingredientName = itemInfo ? (itemInfo.displayName || itemInfo.name) : `item ID ${ingredient.id}`;
+              missingReport.push(`${requiredAmount - currentAmount}x ${ingredientName}`);
+            }
+          }
+        }
+
+        if (missingReport.length > 0) {
+          log(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
+        } else {
+          // This case should be rare if recipesFor failed due to ingredients
+          log(bot, `Cannot craft ${itemName}. Resources might be unavailable or a conflicting recipe state was encountered.`);
+        }
+      }
+    }
+
     if (placedTable) {
       await collectBlock(bot, "crafting_table", 1);
     }
@@ -132,17 +172,54 @@ export async function craftRecipe(bot, itemName, num = 1) {
 
   const recipe = recipes[0];
   const actualNum = Math.ceil(num / recipe.result.count); // Adjust num based on recipe result count
-  await bot.craft(recipe, actualNum, craftingTable);
-  log(
-    bot,
-    `Successfully crafted ${itemName}, you now have ${
-      world.getInventoryCounts(bot)[itemName]
-    } ${itemName}.`
-  );
-  if (placedTable) {
-    await collectBlock(bot, "crafting_table", 1);
+
+  // Pre-crafting ingredient availability check, even if recipesFor succeeded initially
+  const missingIngredientsReport = [];
+  for (const deltaItem of recipe.delta) {
+    if (deltaItem.count < 0) { // Ingredients have negative counts in delta
+      const requiredAmount = Math.abs(deltaItem.count) * actualNum;
+      const currentAmount = bot.inventory.count(deltaItem.id, deltaItem.metadata);
+      if (currentAmount < requiredAmount) {
+        const itemInfo = bot.registry.items[deltaItem.id];
+        const ingredientName = itemInfo ? (itemInfo.displayName || itemInfo.name) : `item ID ${deltaItem.id}`;
+        missingIngredientsReport.push(`${requiredAmount - currentAmount}x ${ingredientName}`);
+      }
+    }
   }
-  return true;
+
+  if (missingIngredientsReport.length > 0) {
+    log(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingIngredientsReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
+    if (placedTable) {
+      try {
+        await collectBlock(bot, "crafting_table", 1);
+      } catch (cleanupErr) {
+        log(bot, `Failed to clean up placed crafting table after pre-craft check failure: ${cleanupErr.message}`);
+      }
+    }
+    return false;
+  }
+
+  try {
+    await bot.craft(recipe, actualNum, craftingTable);
+    log(
+      bot,
+      `Successfully crafted ${itemName}, you now have ${world.getInventoryCounts(bot)[itemName] || 0} ${itemName}.`
+    );
+    if (placedTable) {
+      await collectBlock(bot, "crafting_table", 1);
+    }
+    return true;
+  } catch (err) {
+    log(bot, `Crafting ${num}x ${itemName} failed during the actual crafting attempt: ${err.message}. This might be due to a quick inventory change or an internal crafting error.`);
+    if (placedTable) {
+      try {
+        await collectBlock(bot, "crafting_table", 1);
+      } catch (cleanupErr) {
+        log(bot, `Failed to clean up placed crafting table after crafting error: ${cleanupErr.message}`);
+      }
+    }
+    return false;
+  }
 }
 
 export async function smeltWithFurnace(bot, furnaceIdentifier, itemName, fuelItemName, fuelQuantity, num = 1) {
