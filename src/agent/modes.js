@@ -400,9 +400,20 @@ const modes = [
             // Note: No need to constantly call setMovements unless config changes
             // The 'true' flag keeps the goal dynamic
             const goal = new pf.goals.GoalFollow(this.targetEntity, this.followDistance);
-            if (!bot.pathfinder.isMoving() || JSON.stringify(bot.pathfinder.goal) !== JSON.stringify(goal)) {
-                // Set goal if not moving or if goal parameters changed (simple check)
-                // Avoid spamming setGoal if already correctly pathing
+            const pathfinderGoal = bot.pathfinder.goal;
+
+            let goalChanged = true; // Assume goal changed unless proven otherwise
+            if (pathfinderGoal && pathfinderGoal.constructor === goal.constructor) {
+                // Compare relevant properties. For GoalFollow, it's the entity and distance.
+                // Make sure pathfinderGoal.entity exists before accessing its id.
+                if (pathfinderGoal.entity && pathfinderGoal.entity.id === this.targetEntity.id &&
+                    pathfinderGoal.distance === this.followDistance) {
+                    goalChanged = false;
+                }
+            }
+
+            if (!bot.pathfinder.isMoving() || goalChanged) {
+                // Set goal if not moving or if goal parameters changed
                 bot.pathfinder.setGoal(goal, true);
             }
         },
