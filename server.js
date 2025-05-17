@@ -198,7 +198,12 @@ function startServer() {
             const voiceFieldsFromTemplate = {
                 enable_voice: ethanTemplateData.enable_voice,
                 base_voice_id: ethanTemplateData.base_voice_id,
-                voice_only_mode: ethanTemplateData.voice_only_mode
+                voice_only_mode: ethanTemplateData.voice_only_mode,
+                enable_rare_finds: ethanTemplateData.enable_rare_finds,
+                enable_entity_sleep: ethanTemplateData.enable_entity_sleep,
+                enable_entity_hurt: ethanTemplateData.enable_entity_hurt,
+                enable_silence_timer: ethanTemplateData.enable_silence_timer,
+                enable_weather_listener: ethanTemplateData.enable_weather_listener
             };
 
             fs.readdirSync(profilesDir).forEach(file => {
@@ -387,7 +392,12 @@ function startServer() {
                     triggerOnRespawn: !!profileData.triggerOnRespawn,
                     enable_voice: profileData.enable_voice,
                     base_voice_id: profileData.base_voice_id,
-                    voice_only_mode: profileData.voice_only_mode
+                    voice_only_mode: profileData.voice_only_mode,
+                    enable_rare_finds: !!profileData.enable_rare_finds,
+                    enable_entity_sleep: !!profileData.enable_entity_sleep,
+                    enable_entity_hurt: !!profileData.enable_entity_hurt,
+                    enable_silence_timer: !!profileData.enable_silence_timer,
+                    enable_weather_listener: !!profileData.enable_weather_listener
                 });
             }
         });
@@ -712,6 +722,11 @@ function startServer() {
             profileData.enable_voice = !!profile.enable_voice;
             profileData.base_voice_id = profile.base_voice_id;
             profileData.voice_only_mode = !!profile.voice_only_mode;
+            profileData.enable_rare_finds = !!profile.enable_rare_finds;
+            profileData.enable_entity_sleep = !!profile.enable_entity_sleep;
+            profileData.enable_entity_hurt = !!profile.enable_entity_hurt;
+            profileData.enable_silence_timer = !!profile.enable_silence_timer;
+            profileData.enable_weather_listener = !!profile.enable_weather_listener;
             fs.writeFileSync(newProfilePath, JSON.stringify(profileData, null, 4));
         });
 

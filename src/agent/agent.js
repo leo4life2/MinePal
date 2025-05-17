@@ -1047,6 +1047,9 @@ export class Agent {
      * Sets the timer for the next potential silence message.
      */
     _setNextSilenceTimer() {
+        if (!this.profile.enable_silence_timer) {
+            return;
+        }
         // Clear any potentially existing timer first
         if (this.silenceTimer) {
             clearTimeout(this.silenceTimer);
@@ -1153,7 +1156,7 @@ export class Agent {
                         this._ensureSilenceTimerRunning(); // Ensure timer restarts after error recovery
                     } 
                     // --- Restart Silence Timer ---
-                    this._setNextSilenceTimer();
+                    if (this.profile.enable_silence_timer) this._setNextSilenceTimer();
                 }
             } else {
                 // console.log(`[_processingLoop] Skipping cycle. Queued: ${this.promptQueued}, State: ${this.promptingState}, Reason: ${this.queuedPromptReason}`);
@@ -1180,6 +1183,7 @@ export class Agent {
      * Ensures the silence timer is running if it's not already.
      */
     _ensureSilenceTimerRunning() {
+        if (!this.profile.enable_silence_timer) return;
         if (!this.silenceTimer) {
             // console.log("[DEBUG] Silence timer was not running. Restarting.");
             this._setNextSilenceTimer();
@@ -1455,9 +1459,9 @@ export class Agent {
         });
 
         // Weather event listener using state tracking
-        this.bot.on('weatherUpdate', () => {
+        if (this.profile.enable_weather_listener) this.bot.on('weatherUpdate', () => {
             // Only trigger in overworld with clear sky (though weather usually happens regardless of sky)
-            if (this.bot.game.dimension !== 'overworld') return; 
+            if (this.bot.game.dimension !== 'overworld') return;
 
             const currentRain = this.bot.rainState;
             const currentThunder = this.bot.thunderState;
@@ -1568,7 +1572,7 @@ export class Agent {
             }
         });
 
-        this.bot.on('entityHurt', async (entity) => {
+        if (this.profile.enable_entity_hurt) this.bot.on('entityHurt', async (entity) => {
             // First, check if the hurt entity is a player
             if (entity.type === 'player') {
                 // Now check if it's the owner
@@ -1613,7 +1617,7 @@ export class Agent {
             }
         });
 
-        this.bot.on('entitySleep', async (entity) => {
+        if (this.profile.enable_entity_sleep) this.bot.on('entitySleep', async (entity) => {
             if (entity.type === 'player' && entity.username === this.owner) {
                 const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
                 const message = `[OWNER SLEEP | ${timeStr}] (${this.owner}) is sleeping. You should sleep too.`;
@@ -1622,7 +1626,7 @@ export class Agent {
         });
 
         // Listener for newly discovered rare blocks
-        this.bot.on('rare_finds', async (blockList) => {
+        if (this.profile.enable_rare_finds) this.bot.on('rare_finds', async (blockList) => {
             if (!blockList || blockList.length === 0) return;
 
             // Aggregate counts by block name
