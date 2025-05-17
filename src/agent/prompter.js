@@ -125,7 +125,8 @@ export class Prompter {
                 messages,
                 systemPrompt,
                 this.agent.profile.enable_voice,
-                this.agent.profile.base_voice_id
+                this.agent.profile.base_voice_id,
+                this.agent.profile.allow_self_prompting
             );
         } catch (e) {
             // This catch block handles errors if the proxy.sendRequest call itself fails catastrophically

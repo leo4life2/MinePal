@@ -7,6 +7,12 @@ export interface Profile {
   enable_voice?: boolean;
   base_voice_id?: string;
   voice_only_mode?: boolean;
+  enable_rare_finds?: boolean;
+  enable_entity_sleep?: boolean;
+  enable_entity_hurt?: boolean;
+  enable_silence_timer?: boolean;
+  enable_weather_listener?: boolean;
+  allow_self_prompting?: boolean;
 }
 
 export type OpenAIModel = "gpt-4o-mini" | "gpt-4o";

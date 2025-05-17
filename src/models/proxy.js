@@ -96,7 +96,7 @@ export class Proxy {
         return null;
     }
 
-    async sendRequest(turns, systemMessage, enable_voice=false, base_voice_id=null) {
+    async sendRequest(turns, systemMessage, enable_voice=false, base_voice_id=null, allowSelfPrompting=true) {
         let messages = [{'role': 'system', 'content': systemMessage}].concat(
             turns.map(turn => {
                 // If assistant, format all fields into content
@@ -141,6 +141,11 @@ export class Proxy {
         
         // Make a mutable copy of the schema for this request
         let current_schema = JSON.parse(JSON.stringify(minepal_response_schema));
+        if (!allowSelfPrompting) {
+            delete current_schema.properties.requires_more_actions;
+            const idx = current_schema.required.indexOf("requires_more_actions");
+            if (idx !== -1) current_schema.required.splice(idx, 1);
+        }
 
         if (enable_voice) {
             current_schema.properties.string_for_speech = {
@@ -184,6 +189,9 @@ export class Proxy {
                 const response = await axios.post('https://api.openai.com/v1/chat/completions', requestBody, { headers });
                 try {
                     const jsonContent = JSON.parse(response.data.choices[0].message.content);
+                    if (!allowSelfPrompting) {
+                        jsonContent.requires_more_actions = false;
+                    }
                     return { json: jsonContent };
                 } catch (e) {
                     console.error("OpenAI response JSON parsing error:", e, response.data.choices[0].message.content);
@@ -234,6 +242,9 @@ export class Proxy {
                         }
 
                         if (!parsedJson) throw new Error("No JSON part in multipart response");
+                        if (!allowSelfPrompting && typeof parsedJson === 'object') {
+                            parsedJson.requires_more_actions = false;
+                        }
                         return { json: parsedJson, audio: audioWavData }; // audioWavData will be null if not present
                     } catch (e) {
                         console.error("Multipart processing error:", e);
@@ -252,6 +263,9 @@ export class Proxy {
                             try {
                                 // text_response is a stringified JSON, parse it to get the actual response data
                                 const actualJsonResponse = JSON.parse(parsedJson.text_response);
+                                if (!allowSelfPrompting && typeof actualJsonResponse === 'object') {
+                                    actualJsonResponse.requires_more_actions = false;
+                                }
                                 return { json: actualJsonResponse, audio_failed_but_text_ok: true };
                             } catch (textParseError) {
                                 console.error("Failed to parse text_response in audio failure case (200 OK):", textParseError);
@@ -260,6 +274,9 @@ export class Proxy {
                             }
                         } else {
                             // Normal successful JSON response
+                            if (!allowSelfPrompting && typeof parsedJson === 'object') {
+                                parsedJson.requires_more_actions = false;
+                            }
                             return { json: parsedJson };
                         }
                     } catch (e) {

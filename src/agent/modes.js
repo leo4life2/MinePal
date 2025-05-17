@@ -677,4 +677,8 @@ export function initModes(agent) {
     if (modes_json) {
         agent.bot.modes.loadJson(modes_json);
     }
+
+    if (agent.bot.modes.modes_map['monitor_rare_blocks']) {
+        agent.bot.modes.modes_map['monitor_rare_blocks'].on = !!agent.profile.enable_rare_finds;
+    }
 }

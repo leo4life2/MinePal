@@ -56,7 +56,13 @@ export async function fetchSettings() {
       triggerOnRespawn: !!profile.triggerOnRespawn,
       enable_voice: !!profile.enable_voice,
       base_voice_id: profile.base_voice_id,
-      voice_only_mode: !!profile.voice_only_mode
+      voice_only_mode: !!profile.voice_only_mode,
+      enable_rare_finds: !!profile.enable_rare_finds,
+      enable_entity_sleep: !!profile.enable_entity_sleep,
+      enable_entity_hurt: !!profile.enable_entity_hurt,
+      enable_silence_timer: !!profile.enable_silence_timer,
+      enable_weather_listener: !!profile.enable_weather_listener,
+      allow_self_prompting: !!profile.allow_self_prompting
     }));
   }
   return filteredSettings;
