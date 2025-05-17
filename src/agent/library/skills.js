@@ -69,8 +69,6 @@ export async function craftRecipe(bot, itemName, num = 1) {
    * @example
    * await skills.craftRecipe(bot, "stick");
    **/
-  let placedTable = false;
-
   // get recipes that don't require a crafting table
   let recipes = bot.recipesFor(
     MCData.getInstance().getItemId(itemName),
@@ -79,7 +77,7 @@ export async function craftRecipe(bot, itemName, num = 1) {
     null
   );
   let craftingTable = null;
-  if (!recipes || recipes.length === 0) {
+  if ((!recipes || recipes.length === 0) && itemName !== "crafting_table") {
     // Look for crafting table
     craftingTable = world.getNearestBlock(bot, "crafting_table", MID_DISTANCE);
     if (craftingTable === null) {
@@ -95,32 +93,29 @@ export async function craftRecipe(bot, itemName, num = 1) {
       }
 
       if (hasTable) {
-        let pos = world.getNearestFreeSpace(bot, 1, 6);
-        await placeBlock(bot, "crafting_table", pos.x, pos.y, pos.z);
         craftingTable = world.getNearestBlock(
           bot,
           "crafting_table",
           MID_DISTANCE
         );
         if (craftingTable) {
-          recipes = bot.recipesFor(
+           recipes = bot.recipesFor(
             MCData.getInstance().getItemId(itemName),
             null,
             1,
             craftingTable
           );
           console.log(`Recipes for ${itemName} with crafting table:`, recipes);
-          placedTable = true;
         }
-      } else {
-        // No crafting table in inventory and none nearby
+      }
+      // If still no table (either never had one, couldn't craft one, or couldn't place one)
+      if (!craftingTable) {
         const itemId = MCData.getInstance().getItemId(itemName);
         const allPotentialRecipes = bot.recipesAll(itemId, null, false); // Check inventory-only recipes
         if (!allPotentialRecipes || allPotentialRecipes.length === 0) {
-            log(bot, `No known recipes to craft ${itemName} without a crafting table, and you don't have one.`);
+            log(bot, `No known recipes to craft ${itemName} without a crafting table.`);
         } else {
-            // Recipes exist but require a table which is not available
-            log(bot, `Cannot craft ${itemName} as it requires a crafting table, which you don't have and none are nearby.`);
+            log(bot, `Cannot craft ${itemName} as it requires a crafting table.`);
         }
         return false;
       }
@@ -173,9 +168,7 @@ export async function craftRecipe(bot, itemName, num = 1) {
       }
     }
 
-    if (placedTable) {
-      await collectBlock(bot, "crafting_table", 1);
-    }
+    // REMOVED: Logic to collect placed crafting table was here
     return false;
   }
 
@@ -198,13 +191,7 @@ export async function craftRecipe(bot, itemName, num = 1) {
 
   if (missingIngredientsReport.length > 0) {
     log(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingIngredientsReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
-    if (placedTable) {
-      try {
-        await collectBlock(bot, "crafting_table", 1);
-      } catch (cleanupErr) {
-        log(bot, `Failed to clean up placed crafting table after pre-craft check failure: ${cleanupErr.message}`);
-      }
-    }
+    // REMOVED: Logic to collect placed crafting table was here
     return false;
   }
 
@@ -214,19 +201,11 @@ export async function craftRecipe(bot, itemName, num = 1) {
       bot,
       `Successfully crafted ${itemName}, you now have ${world.getInventoryCounts(bot)[itemName] || 0} ${itemName}.`
     );
-    if (placedTable) {
-      await collectBlock(bot, "crafting_table", 1);
-    }
+    // REMOVED: Logic to collect placed crafting table was here
     return true;
   } catch (err) {
     log(bot, `Crafting ${num}x ${itemName} failed during the actual crafting attempt: ${err.message}. This might be due to a quick inventory change or an internal crafting error.`);
-    if (placedTable) {
-      try {
-        await collectBlock(bot, "crafting_table", 1);
-      } catch (cleanupErr) {
-        log(bot, `Failed to clean up placed crafting table after crafting error: ${cleanupErr.message}`);
-      }
-    }
+    // REMOVED: Logic to collect placed crafting table was here
     return false;
   }
 }
