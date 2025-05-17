@@ -1207,6 +1207,7 @@ export class Agent {
         this.history.add('system', `[HUD_REMINDER] Your HUD always shows the current ground truth. If earlier dialogue contradicts HUD data, always prioritize HUD.`);
         this.history.add('system', `[GOAL_REMINDER] If your history says a goal is completed, *it's completed.* Don't re-attempt or re-execute a completed goal.`);
         this.history.add('system', `[CHAT_REMINDER] Don't say the same thing twice in a row.`);
+        this.history.add('system', `[CRAFT_REMINDER] Remember to be *very* verstatile, proactive, and adaptive when crafting. If you need something, see if you can craft it from your inventory. Never give up unless you've tried everything you can think of.`);
         this.history.add('system', `[MEMORY_REMINDER] Remember to be proactive about saving owner related info, update obsolete memories, or delete duplicates or completely obsolete memories as needed.`);
 
         // Get HUD diff and add it if changes occurred
