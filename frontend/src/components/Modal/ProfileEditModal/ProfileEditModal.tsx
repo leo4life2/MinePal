@@ -357,7 +357,7 @@ function ProfileEditModal({
               </div>
             </ProfileSettingsSection>
 
-            <ProfileSettingsSection title="Bot Behavior" isExpanded={false}>
+            <ProfileSettingsSection title="Awareness Settings" isExpanded={false}>
               <div className="voice-settings-group">
                 <div className="profile-setting-item">
                   <label className="sub-input-label">Rare Finds Alerts</label>
@@ -379,7 +379,7 @@ function ProfileEditModal({
                 </div>
 
                 <div className="profile-setting-item">
-                  <label className="sub-input-label">Entity Sleep Alerts</label>
+                  <label className="sub-input-label">Player Sleep Alerts</label>
                   <div className="profile-switch-container">
                     <label className="profile-switch">
                       <input
@@ -398,7 +398,7 @@ function ProfileEditModal({
                 </div>
 
                 <div className="profile-setting-item">
-                  <label className="sub-input-label">Entity Hurt Alerts</label>
+                  <label className="sub-input-label">Player Hurt Alerts</label>
                   <div className="profile-switch-container">
                     <label className="profile-switch">
                       <input
@@ -417,7 +417,7 @@ function ProfileEditModal({
                 </div>
 
                 <div className="profile-setting-item">
-                  <label className="sub-input-label">Silence Timer</label>
+                  <label className="sub-input-label">Breaks Silences</label>
                   <div className="profile-switch-container">
                     <label className="profile-switch">
                       <input
