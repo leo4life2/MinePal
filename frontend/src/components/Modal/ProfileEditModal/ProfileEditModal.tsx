@@ -88,7 +88,12 @@ function ProfileEditModal({
             !!editingProfile.triggerOnRespawn !== !!profile.triggerOnRespawn ||
             !!editingProfile.enable_voice !== !!profile.enable_voice || 
             (editingProfile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) !== (profile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) ||
-            !!editingProfile.voice_only_mode !== !!profile.voice_only_mode
+            !!editingProfile.voice_only_mode !== !!profile.voice_only_mode ||
+            !!editingProfile.enable_rare_finds !== !!profile.enable_rare_finds ||
+            !!editingProfile.enable_entity_sleep !== !!profile.enable_entity_sleep ||
+            !!editingProfile.enable_entity_hurt !== !!profile.enable_entity_hurt ||
+            !!editingProfile.enable_silence_timer !== !!profile.enable_silence_timer ||
+            !!editingProfile.enable_weather_listener !== !!profile.enable_weather_listener
         );
     }
 
@@ -101,7 +106,12 @@ function ProfileEditModal({
         !!editingProfile.triggerOnRespawn !== !!profile.triggerOnRespawn ||
         !!editingProfile.enable_voice !== !!profile.enable_voice ||
         (editingProfile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) !== (profile.base_voice_id ?? AVAILABLE_VOICE_OPTIONS[0]?.id) ||
-        !!editingProfile.voice_only_mode !== !!profile.voice_only_mode
+        !!editingProfile.voice_only_mode !== !!profile.voice_only_mode ||
+        !!editingProfile.enable_rare_finds !== !!profile.enable_rare_finds ||
+        !!editingProfile.enable_entity_sleep !== !!profile.enable_entity_sleep ||
+        !!editingProfile.enable_entity_hurt !== !!profile.enable_entity_hurt ||
+        !!editingProfile.enable_silence_timer !== !!profile.enable_silence_timer ||
+        !!editingProfile.enable_weather_listener !== !!profile.enable_weather_listener
     );
   }, [editingProfile, profile, isNewProfile]);
 
@@ -163,6 +173,11 @@ function ProfileEditModal({
       enable_voice: !!editingProfile.enable_voice,
       base_voice_id: editingProfile.base_voice_id,
       voice_only_mode: !!editingProfile.voice_only_mode,
+      enable_rare_finds: !!editingProfile.enable_rare_finds,
+      enable_entity_sleep: !!editingProfile.enable_entity_sleep,
+      enable_entity_hurt: !!editingProfile.enable_entity_hurt,
+      enable_silence_timer: !!editingProfile.enable_silence_timer,
+      enable_weather_listener: !!editingProfile.enable_weather_listener,
     };
 
     if (sanitized.name === '' || sanitized.personality === '') {
@@ -339,8 +354,107 @@ function ProfileEditModal({
                       placeholder="Select base voice"
                     />
                   </div>
+              </div>
+            </ProfileSettingsSection>
+
+            <ProfileSettingsSection title="Bot Behavior" isExpanded={false}>
+              <div className="voice-settings-group">
+                <div className="profile-setting-item">
+                  <label className="sub-input-label">Rare Finds Alerts</label>
+                  <div className="profile-switch-container">
+                    <label className="profile-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!editingProfile.enable_rare_finds}
+                        onChange={(e) =>
+                          setEditingProfile((current) => ({
+                            ...current,
+                            enable_rare_finds: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className="profile-slider"></span>
+                    </label>
+                  </div>
                 </div>
-              </ProfileSettingsSection>
+
+                <div className="profile-setting-item">
+                  <label className="sub-input-label">Entity Sleep Alerts</label>
+                  <div className="profile-switch-container">
+                    <label className="profile-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!editingProfile.enable_entity_sleep}
+                        onChange={(e) =>
+                          setEditingProfile((current) => ({
+                            ...current,
+                            enable_entity_sleep: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className="profile-slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="profile-setting-item">
+                  <label className="sub-input-label">Entity Hurt Alerts</label>
+                  <div className="profile-switch-container">
+                    <label className="profile-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!editingProfile.enable_entity_hurt}
+                        onChange={(e) =>
+                          setEditingProfile((current) => ({
+                            ...current,
+                            enable_entity_hurt: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className="profile-slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="profile-setting-item">
+                  <label className="sub-input-label">Silence Timer</label>
+                  <div className="profile-switch-container">
+                    <label className="profile-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!editingProfile.enable_silence_timer}
+                        onChange={(e) =>
+                          setEditingProfile((current) => ({
+                            ...current,
+                            enable_silence_timer: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className="profile-slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="profile-setting-item">
+                  <label className="sub-input-label">Weather Alerts</label>
+                  <div className="profile-switch-container">
+                    <label className="profile-switch">
+                      <input
+                        type="checkbox"
+                        checked={!!editingProfile.enable_weather_listener}
+                        onChange={(e) =>
+                          setEditingProfile((current) => ({
+                            ...current,
+                            enable_weather_listener: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className="profile-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </ProfileSettingsSection>
 
               <ProfileSettingsSection title="Messaging" isExpanded={false}>
                 <div className="automated-messages-group">
