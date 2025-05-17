@@ -85,6 +85,15 @@ export async function craftRecipe(bot, itemName, num = 1) {
     if (craftingTable === null) {
       // Try to place crafting table
       let hasTable = world.getInventoryCounts(bot)["crafting_table"] > 0;
+
+      // Attempt to craft a crafting table if we don't have one but may have resources
+      if (!hasTable && itemName !== "crafting_table") {
+        const craftedTable = await craftRecipe(bot, "crafting_table", 1);
+        if (craftedTable) {
+          hasTable = true;
+        }
+      }
+
       if (hasTable) {
         let pos = world.getNearestFreeSpace(bot, 1, 6);
         await placeBlock(bot, "crafting_table", pos.x, pos.y, pos.z);
