@@ -80,10 +80,12 @@ export async function craftRecipe(bot, itemName, num = 1) {
   );
   let craftingTable = null;
   if (!recipes || recipes.length === 0) {
+    // Bot cannot craft the item
+    console.log("[craftRecipe] No recipes found for " + itemName);
     // Look for crafting table
     craftingTable = world.getNearestBlock(bot, "crafting_table", MID_DISTANCE);
     if (craftingTable === null) {
-      // Try to place crafting table
+      // Try to place a crafting table
       let hasTable = world.getInventoryCounts(bot)["crafting_table"] > 0;
       if (hasTable) {
         let pos = world.getNearestFreeSpace(bot, 1, 6);
@@ -104,16 +106,16 @@ export async function craftRecipe(bot, itemName, num = 1) {
           placedTable = true;
         }
       } else {
-        // No crafting table in inventory and none nearby
+        // No crafting table item in inventory and no crafting table block nearby.
+        // This means `craftingTable` is null.
         const itemId = MCData.getInstance().getItemId(itemName);
-        const allPotentialRecipes = bot.recipesAll(itemId, null, false); // Check inventory-only recipes
-        if (!allPotentialRecipes || allPotentialRecipes.length === 0) {
-            log(bot, `No known recipes to craft ${itemName} without a crafting table, and you don't have one.`);
-        } else {
-            // Recipes exist but require a table which is not available
-            log(bot, `Cannot craft ${itemName} as it requires a crafting table, which you don't have and none are nearby.`);
+        // Check if there are any recipes at all for this item that can be made in inventory (requiresTable = false).
+        const inventoryOnlyPotentialRecipes = bot.recipesAll(itemId, null, false);
+
+        if (!inventoryOnlyPotentialRecipes || inventoryOnlyPotentialRecipes.length === 0) {
+          log(bot, `Cannot craft ${itemName}: crafting table is required.`);
+          return false;
         }
-        return false;
       }
     } else { // Crafting table is nearby
       recipes = bot.recipesFor(
@@ -155,15 +157,20 @@ export async function craftRecipe(bot, itemName, num = 1) {
           }
         }
 
-        log(bot, `Cannot craft ${itemName} as you do not have the required ingredients.`);
+        if (missingReport.length > 0) {
+          log(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
+        } else {
+          // This case implies recipesFor failed but allPotentialRecipes[0] somehow suggests we have ingredients.
+          // This should be rare if recipesFor is robust.
+          // Or, it could mean recipeToAnalyze.result.count is 0 or invalid, leading to targetCraftCount issues.
+          log(bot, `Cannot craft ${itemName}. Resources might be unavailable or a conflicting recipe state was encountered (e.g. recipesFor failed but a recipe in recipesAll seems craftable).`);
+        }
       }
-    }
-
-    if (placedTable) {
-      await collectBlock(bot, "crafting_table", 1);
     }
     return false;
   }
+
+  console.log("[craftRecipe] crafting " + itemName);
 
   const recipe = recipes[0];
   const actualNum = Math.ceil(num / recipe.result.count); // Adjust num based on recipe result count
@@ -184,13 +191,6 @@ export async function craftRecipe(bot, itemName, num = 1) {
 
   if (missingIngredientsReport.length > 0) {
     log(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingIngredientsReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
-    if (placedTable) {
-      try {
-        await collectBlock(bot, "crafting_table", 1);
-      } catch (cleanupErr) {
-        log(bot, `Failed to clean up placed crafting table after pre-craft check failure: ${cleanupErr.message}`);
-      }
-    }
     return false;
   }
 
@@ -200,19 +200,9 @@ export async function craftRecipe(bot, itemName, num = 1) {
       bot,
       `Successfully crafted ${itemName}, you now have ${world.getInventoryCounts(bot)[itemName] || 0} ${itemName}.`
     );
-    if (placedTable) {
-      await collectBlock(bot, "crafting_table", 1);
-    }
     return true;
   } catch (err) {
     log(bot, `Crafting ${num}x ${itemName} failed during the actual crafting attempt: ${err.message}. This might be due to a quick inventory change or an internal crafting error.`);
-    if (placedTable) {
-      try {
-        await collectBlock(bot, "crafting_table", 1);
-      } catch (cleanupErr) {
-        log(bot, `Failed to clean up placed crafting table after crafting error: ${cleanupErr.message}`);
-      }
-    }
     return false;
   }
 }
@@ -2281,7 +2271,7 @@ export async function activateNearestBlock(bot, type) {
    * @returns {Promise<boolean>} true if the block was activated, false otherwise.
    * @example
    * await skills.activateNearestBlock(bot, "lever");
-   * **/
+   **/
   let block = world.getNearestBlock(bot, type, 16);
   if (!block) {
     log(bot, `Could not find any ${type} to activate.`);
