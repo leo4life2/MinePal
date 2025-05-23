@@ -155,12 +155,7 @@ export async function craftRecipe(bot, itemName, num = 1) {
           }
         }
 
-        if (missingReport.length > 0) {
-          log(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
-        } else {
-          // This case should be rare if recipesFor failed due to ingredients
-          log(bot, `Cannot craft ${itemName}. Resources might be unavailable or a conflicting recipe state was encountered.`);
-        }
+        log(bot, `Cannot craft ${itemName} as you do not have the required ingredients.`);
       }
     }
 
