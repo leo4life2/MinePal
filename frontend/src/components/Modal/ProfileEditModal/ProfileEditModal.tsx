@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Memory, deleteMemory, fetchBotMemories, sendMessage } from '../../../utils/api';
+import { useState, useCallback } from 'react';
+import { sendMessage } from '../../../utils/api';
 import { Profile } from '../../../types/apiTypes';
 import { X as CloseIcon } from 'react-feather';
 import './ProfileEditModal.css';
@@ -9,7 +9,6 @@ import VoiceSelector, { VoiceOption } from '../../VoiceSelector/VoiceSelector';
 import TierBox from '../../TierBox/TierBox';
 import { TierType } from '../../../constants';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
-import MemoriesModal from '../MemoriesModal/MemoriesModal';
 
 // Renamed voice options constant
 const AVAILABLE_VOICE_OPTIONS: VoiceOption[] = [

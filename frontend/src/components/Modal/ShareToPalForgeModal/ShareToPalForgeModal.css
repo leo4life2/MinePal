@@ -1,0 +1,326 @@
+.share-to-palforge-modal {
+  width: 500px;
+  max-width: 90vw;
+}
+
+.share-modal-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.share-modal-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+.share-modal-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.share-modal-step {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.share-modal-step--review {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.share-modal-section {
+  margin-bottom: 28px;
+}
+
+.share-modal-section h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.optional-tag {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Image Upload Area */
+.image-upload-area {
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: var(--bg-secondary);
+  position: relative;
+  width: 80%;
+  max-width: 400px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-upload-area:hover {
+  border-color: var(--primary-color);
+  background-color: var(--bg-hover);
+}
+
+.image-upload-area.dragging {
+  border-color: var(--primary-color);
+  background-color: var(--primary-color-light);
+}
+
+.image-upload-area.has-image {
+  padding: 0;
+  cursor: default;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.upload-placeholder svg {
+  color: var(--text-tertiary);
+}
+
+.upload-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.file-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.image-preview-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-image-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.remove-image-button:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.remove-image-button svg {
+  color: white;
+}
+
+/* Description Textarea */
+.description-textarea {
+  width: 100%;
+  height: 120px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.description-textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.character-count {
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+/* Review Section */
+.review-section {
+  margin-bottom: 24px;
+}
+
+.review-section h3 {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+}
+
+.review-item {
+  margin-bottom: 20px;
+}
+
+.review-item label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.review-content {
+  font-size: 14px;
+  color: var(--text-primary);
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  cursor: default;
+}
+
+.review-content--multiline {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.review-image {
+  width: 100%;
+  max-width: 200px;
+  height: auto;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+/* Modal Actions */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-actions--split {
+  justify-content: space-between;
+}
+
+.next-button,
+.back-button,
+.share-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.next-button {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.next-button:hover {
+  background-color: var(--hover-color);
+}
+
+.back-button {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: none;
+}
+
+.back-button:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.share-button {
+  background-color: #F0C000;
+  color: white;
+}
+
+.share-button:hover:not(:disabled) {
+  background-color: #d4a700;
+}
+
+.share-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dark mode adjustments */
+.dark .image-upload-area {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.dark .image-upload-area:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.dark .image-upload-area.dragging {
+  background-color: rgba(var(--primary-color-rgb), 0.1);
+}
+
+.dark .description-textarea {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='dark'] .review-content {
+  background-color: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* CSS Variables (add these to your root styles if not already present) */
+:root {
+  --success-color: #10b981;
+  --success-color-dark: #059669;
+  --primary-color-light: rgba(59, 130, 246, 0.1);
+  --primary-color-rgb: 59, 130, 246;
+} 

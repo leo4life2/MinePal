@@ -5,7 +5,7 @@ import { useUserSettings } from '../contexts/UserSettingsContext/UserSettingsCon
 import './Profiles.css';
 import { useAgent } from '../contexts/AgentContext/AgentContext';
 import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContext';
-import { ProfileEditModal, MemoriesModal } from './Modal';
+import { ProfileEditModal, MemoriesModal, ShareToPalForgeModal } from './Modal';
 import { Edit2 as EditIcon, Share2 } from 'react-feather';
 // @ts-ignore
 import BrainIcon from '../assets/brain.svg?react';
@@ -18,6 +18,7 @@ function Profiles() {
   const [editingProfileIndex, setEditingProfileIndex] = useState<number | null>(null);
   const [editingProfile, setEditingProfile] = useState<Profile>();
   const [viewingMemoriesProfile, setViewingMemoriesProfile] = useState<Profile | null>(null);
+  const [sharingProfile, setSharingProfile] = useState<Profile | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [memoryError, setMemoryError] = useState<string>();
 
@@ -105,9 +106,13 @@ function Profiles() {
     openMemoriesModal(profile);
   };
 
-  const handleMoreClick = (e: React.MouseEvent) => {
+  const handleShareClick = (e: React.MouseEvent, profile: Profile) => {
     e.stopPropagation();
-    // No-op for now
+    setSharingProfile(profile);
+  };
+
+  const closeShareModal = () => {
+    setSharingProfile(null);
   };
 
   return (
@@ -140,7 +145,7 @@ function Profiles() {
             </button>
             <button 
               className="profile-action-button profile-action-button--share"
-              onClick={handleMoreClick}
+              onClick={(e) => handleShareClick(e, profile)}
               title="Share"
             >
               <Share2 size={16} />
@@ -170,6 +175,13 @@ function Profiles() {
           memoryError={memoryError}
           onDeleteMemory={(memoryId) => handleDeleteMemory(viewingMemoriesProfile.name, memoryId)}
           onClose={closeModal} 
+        />
+      )}
+
+      {sharingProfile && (
+        <ShareToPalForgeModal
+          profile={sharingProfile}
+          onClose={closeShareModal}
         />
       )}
     </div>
