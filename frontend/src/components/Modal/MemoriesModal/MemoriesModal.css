@@ -1,86 +1,209 @@
+/* Memories Modal Container */
 .memories-modal {
-  width: 100%;
-}
-
-.memories-modal h3 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  color: var(--primary-color);
-  font-size: 1.5rem;
-}
-
-.memories-table {
-  max-height: 500px;
-  overflow-y: auto;
-  margin-bottom: 0;
-  background: var(--bg-color);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-}
-
-.memories-table::-webkit-scrollbar {
-  width: 8px;
-}
-
-.memories-table::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-.memories-table::-webkit-scrollbar-thumb {
-  background-color: var(--primary-color);
-  border-radius: 10px;
-}
-
-.memory-row {
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
   display: flex;
-  align-items: center;
-  padding: 15px;
+  flex-direction: column;
+  background: var(--bg-light-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  position: relative;
+  padding: 24px;
+}
+
+/* Modal Title */
+.memories-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0 0 20px 0;
+  padding-right: 40px; /* Space for close button */
+}
+
+/* Memories Container */
+.memories-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 200px;
+  max-height: 50vh;
+  border-radius: 8px;
+  background: var(--bg-light-color);
+}
+
+/* Memories List */
+.memories-list {
+    padding: 0;
+}
+
+/* Individual Memory Item */
+.memory-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #f8f9fa; /* Light gray background for light mode */
   border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.3s ease;
+  transition: all 0.2s ease;
 }
 
-.memory-row:hover {
-  background: #fff;
+.memory-item:first-child {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
 }
 
-[data-theme='dark'] .memory-row:hover {
-  background: #2a2a2a;
+.memory-item:last-child {
+  border-bottom: none;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.memory-item:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Memory Content */
+.memory-content {
+  flex: 1;
 }
 
 .memory-text {
-  flex: 1;
-  word-break: break-word;
+  margin: 0;
   color: var(--text-color);
+  font-size: 14px;
   line-height: 1.5;
-  font-size: 0.9rem;
+  word-wrap: break-word;
 }
 
-.delete-memory-button {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #c04545;
-  padding: 0 8px;
-  border-radius: 4px;
-  transition: all 0.3s ease;
-}
-
-.delete-memory-button:hover {
-  background-color: rgba(242, 95, 76, 0.1);
-}
-
-.no-memories {
-  padding: 30px;
-  text-align: center;
-  color: var(--text-color);
-  font-style: italic;
-  font-size: 0.9rem;
-}
-
-.button-group {
+/* Delete Button */
+.memory-delete-button {
+  width: 32px;
+  height: 32px;
   display: flex;
-  justify-content: space-between;
-  margin-top: 24px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--error-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.memory-delete-button svg {
+  width: 16px; /* Ensure SVG has explicit size */
+  height: 16px; /* Ensure SVG has explicit size */
+  flex-shrink: 0; /* Prevent flex from shrinking the SVG */
+  stroke: currentColor; /* Ensure icon color is applied */
+}
+
+.memory-delete-button:hover {
+  background: rgba(var(--error-message-color-rgb), 0.1);
+  border: none;
+}
+
+/* No Memories State */
+.no-memories {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 40px;
+}
+
+.no-memories p {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Error Message */
+.memories-error {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(var(--error-message-color-rgb), 0.1);
+  border-radius: 6px;
+}
+
+.memories-error p {
+  margin: 0;
+  color: var(--error-color);
+  font-size: 14px;
+}
+
+/* Scrollbar Styling */
+.memories-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.memories-container::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.memories-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.memories-container::-webkit-scrollbar-thumb:hover {
+  background: var(--border-color);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .memories-modal {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  background: #1a1a1a;
+}
+
+[data-theme="dark"] .memory-item {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .memory-item:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .memories-modal {
+    width: 95%;
+    padding: 20px;
+  }
+  
+  .memories-modal-title {
+    font-size: 18px;
+  }
+  
+  .memory-item {
+    padding: 10px;
+  }
+  
+  .memory-text {
+    font-size: 13px;
+  }
+}
+
+/* Close icon styling (shared with other modals) */
+.modal-close-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  color: #aaa;
+  cursor: pointer;
+  padding: 5px;
+  line-height: 0;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.modal-close-icon:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #666;
+}
+
+[data-theme='dark'] .modal-close-icon:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #aaa;
 } 

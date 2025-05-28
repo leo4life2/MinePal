@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { saveProfiles } from '../utils/api';
+import { saveProfiles, Memory, fetchBotMemories, deleteMemory } from '../utils/api';
 import { Profile } from '../types/apiTypes';
 import { useUserSettings } from '../contexts/UserSettingsContext/UserSettingsContext';
 import './Profiles.css';
 import { useAgent } from '../contexts/AgentContext/AgentContext';
 import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContext';
-import { ProfileEditModal } from './Modal';
+import { ProfileEditModal, MemoriesModal } from './Modal';
 import { Edit2 as EditIcon, Share2 } from 'react-feather';
 // @ts-ignore
 import BrainIcon from '../assets/brain.svg?react';
@@ -17,18 +17,46 @@ function Profiles() {
 
   const [editingProfileIndex, setEditingProfileIndex] = useState<number | null>(null);
   const [editingProfile, setEditingProfile] = useState<Profile>();
-  const [showMemories, setShowMemories] = useState(false);
+  const [viewingMemoriesProfile, setViewingMemoriesProfile] = useState<Profile | null>(null);
+  const [memories, setMemories] = useState<Memory[]>([]);
+  const [memoryError, setMemoryError] = useState<string>();
 
-  const openModal = (profileFromList = { name: '', personality: '' }, index: number | null = null) => {
+  const openEditModal = (profileFromList = { name: '', personality: '' }, index: number | null = null) => {
     setEditingProfileIndex(index);
     setEditingProfile({ ...profileFromList });
-    setShowMemories(false);
+    setViewingMemoriesProfile(null);
+  };
+
+  const openMemoriesModal = async (profile: Profile) => {
+    setViewingMemoriesProfile(profile);
+    setEditingProfile(undefined);
+    setEditingProfileIndex(null);
+    try {
+      const botMemories = await fetchBotMemories(profile.name);
+      setMemories(botMemories);
+      setMemoryError(undefined);
+    } catch (error) {
+      declareError("Memories", error);
+      setMemoryError(`Failed to fetch memories: ${error}`);
+    }
   };
 
   const closeModal = () => {
     setEditingProfile(undefined);
     setEditingProfileIndex(null);
-    setShowMemories(false);
+    setViewingMemoriesProfile(null);
+  };
+  
+  const handleDeleteMemory = async (profileName: string, memoryId: string) => {
+    if (!profileName) return;
+    try {
+      await deleteMemory(profileName, memoryId);
+      setMemories(prevMemories => prevMemories.filter(m => m.id !== memoryId));
+      setMemoryError(undefined);
+    } catch (error) {
+      declareError("Memories", error);
+      setMemoryError(`Failed to delete memory: ${error}`);
+    }
   };
 
   const handleSaveProfile = async (profileToSave: Profile) => {
@@ -63,19 +91,18 @@ function Profiles() {
   };
 
   const handleCheckboxClick = (e: React.MouseEvent, profile: Profile) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation();
     toggleProfile(profile);
   };
 
   const handleEditClick = (e: React.MouseEvent, profile: Profile, index: number) => {
     e.stopPropagation();
-    openModal(profile, index);
+    openEditModal(profile, index);
   };
 
-  const handleMemoriesClick = (e: React.MouseEvent, profile: Profile, index: number) => {
+  const handleMemoriesClick = (e: React.MouseEvent, profile: Profile) => {
     e.stopPropagation();
-    openModal(profile, index);
-    setShowMemories(true);
+    openMemoriesModal(profile);
   };
 
   const handleMoreClick = (e: React.MouseEvent) => {
@@ -91,7 +118,7 @@ function Profiles() {
             <input
               type="checkbox"
               checked={selectedProfiles.some(p => p.name === profile.name)}
-              onChange={() => {}} // Controlled component
+              onChange={() => {}}
               onClick={(e) => handleCheckboxClick(e, profile)}
             />
             <span className="profile-name">{profile.name}</span>
@@ -106,7 +133,7 @@ function Profiles() {
             </button>
             <button 
               className="profile-action-button profile-action-button--memories"
-              onClick={(e) => handleMemoriesClick(e, profile, index)}
+              onClick={(e) => handleMemoriesClick(e, profile)}
               title="View memories"
             >
               <BrainIcon width={17} height={17} />
@@ -121,7 +148,7 @@ function Profiles() {
           </div>
         </div>
       ))}
-      <div className="profile-box empty" onClick={() => openModal()}>
+      <div className="profile-box empty" onClick={() => openEditModal()}>
         <span>+</span>
       </div>
 
@@ -133,8 +160,16 @@ function Profiles() {
           onDelete={handleDeleteProfile}
           onClose={closeModal}
           onError={(section, error) => declareError(section, error)}
-          showMemories={showMemories}
-          onShowMemoriesChange={setShowMemories}
+        />
+      )}
+
+      {viewingMemoriesProfile && (
+        <MemoriesModal 
+          profileName={viewingMemoriesProfile.name} 
+          memories={memories} 
+          memoryError={memoryError}
+          onDeleteMemory={(memoryId) => handleDeleteMemory(viewingMemoriesProfile.name, memoryId)}
+          onClose={closeModal} 
         />
       )}
     </div>

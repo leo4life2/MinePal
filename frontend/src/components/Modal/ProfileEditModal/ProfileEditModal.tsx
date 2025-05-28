@@ -33,8 +33,6 @@ interface ProfileEditModalProps {
   onDelete: () => Promise<void>;
   onClose: () => void;
   onError: (section: string, error: unknown) => void;
-  showMemories?: boolean;
-  onShowMemoriesChange?: (show: boolean) => void;
 }
 
 function ProfileEditModal({ 
@@ -44,29 +42,17 @@ function ProfileEditModal({
   onDelete, 
   onClose, 
   onError,
-  showMemories: externalShowMemories = false
 }: ProfileEditModalProps) {
   const [editingProfile, setEditingProfile] = useState<Profile>({ 
     ...profile
   });
   const [error, setError] = useState<string>();
-  const [showMemories, setShowMemories] = useState(externalShowMemories);
-  const [memories, setMemories] = useState<Memory[]>([]);
-  const [memoryError, setMemoryError] = useState<string>();
   const [customMessage, setCustomMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
-
-  // Update internal state when external prop changes
-  useEffect(() => {
-    setShowMemories(externalShowMemories);
-    if (externalShowMemories && editingProfile?.name) {
-      viewMemories();
-    }
-  }, [externalShowMemories, editingProfile?.name]);
 
   const { userPlan, getCustomerPortal } = useSupabase();
 
@@ -148,32 +134,6 @@ function ProfileEditModal({
     setShowUnsavedConfirm(false);
   };
 
-  const viewMemories = async () => {
-    if (!editingProfile?.name) return;
-    
-    try {
-      const botMemories = await fetchBotMemories(editingProfile.name);
-      setMemories(botMemories);
-      setMemoryError(undefined);
-    } catch (error) {
-      onError("Memories", error);
-      setMemoryError(`Failed to fetch memories: ${error}`);
-    }
-  };
-
-  const handleDeleteMemory = async (memoryId: string) => {
-    if (!editingProfile?.name) return;
-
-    try {
-      await deleteMemory(editingProfile.name, memoryId);
-      setMemories(prevMemories => prevMemories.filter(m => m.id !== memoryId));
-      setMemoryError(undefined);
-    } catch (error) {
-      onError("Memories", error);
-      setMemoryError(`Failed to delete memory: ${error}`);
-    }
-  };
-
   const handleSaveChanges = async () => {
     const sanitized = {
       name: editingProfile.name.trim(),
@@ -242,7 +202,7 @@ function ProfileEditModal({
 
   return (
     <ModalWrapper onClose={handleAttemptClose}>
-      <div className={`modal-content profile-modal ${showMemories ? 'showing-memories' : ''}`}>
+      <div className={`modal-content profile-modal`}>
         <button className="modal-close-icon" onClick={handleAttemptClose} disabled={showDeleteConfirm || showUnsavedConfirm}>
           <CloseIcon size={18} />
         </button>
@@ -263,7 +223,7 @@ function ProfileEditModal({
               <button className="cancel-button secondary-button" onClick={cancelDelete}>Cancel</button>
             </div>
           </div>
-        ) : !showMemories ? (
+        ) : (
           <>
           <div className="input-groups-container">
             <div className="input-group">
@@ -287,7 +247,7 @@ function ProfileEditModal({
                   ...current,
                   personality: value,
                 }))}
-                placeholder="Your Pal's identity prompt shapes its behavior and interactions. Start by giving your Pal a clear role or background—think of who or what they are. Next, set a unique communication style, whether casual, formal, quirky, or humorous. Clearly outline their personality traits to define how they react and interact. Don’t worry about getting it perfect right away—you can always come back and fine-tune your Pal's personality whenever you like!"
+                placeholder="Your Pal's identity prompt shapes its behavior and interactions. Start by giving your Pal a clear role or background—think of who or what they are. Next, set a unique communication style, whether casual, formal, quirky, or humorous. Clearly outline their personality traits to define how they react and interact. Don't worry about getting it perfect right away—you can always come back and fine-tune your Pal's personality whenever you like!"
               />
             </div>
           </div>
@@ -570,13 +530,6 @@ function ProfileEditModal({
             {error && <div className="error-message">{error}</div>}
             {portalError && <div className="error-message">{portalError}</div>}
           </>
-        ) : (
-          <MemoriesModal
-            profileName={editingProfile.name}
-            memories={memories}
-            memoryError={memoryError}
-            onDeleteMemory={handleDeleteMemory}
-          />
         )}
         {showPricingModal && (
           <PricingModal onClose={() => {
