@@ -1,0 +1,86 @@
+.memories-modal {
+  width: 100%;
+}
+
+.memories-modal h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+
+.memories-table {
+  max-height: 500px;
+  overflow-y: auto;
+  margin-bottom: 0;
+  background: var(--bg-color);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.memories-table::-webkit-scrollbar {
+  width: 8px;
+}
+
+.memories-table::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.memories-table::-webkit-scrollbar-thumb {
+  background-color: var(--primary-color);
+  border-radius: 10px;
+}
+
+.memory-row {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.3s ease;
+}
+
+.memory-row:hover {
+  background: #fff;
+}
+
+[data-theme='dark'] .memory-row:hover {
+  background: #2a2a2a;
+}
+
+.memory-text {
+  flex: 1;
+  word-break: break-word;
+  color: var(--text-color);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.delete-memory-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #c04545;
+  padding: 0 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.delete-memory-button:hover {
+  background-color: rgba(242, 95, 76, 0.1);
+}
+
+.no-memories {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-color);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.button-group {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+} 

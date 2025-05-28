@@ -84,7 +84,7 @@
 
 .modal-content .button-group {
   display: flex;
-  justify-content: space-between; /* Center the button horizontally */
+  justify-content: center;
   margin-top: 24px;
 }
 
@@ -215,43 +215,6 @@
   text-align: center;
 }
 
-.memories-modal h3 {
-  margin-top: 0;
-  margin-bottom: 16px;
-  color: var(--text-color);
-}
-
-.memories-table {
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 16px;
-  max-height: 50vh;
-  overflow-y: auto;
-}
-
-.memory-row:last-child {
-  border-bottom: none;
-}
-
-.memory-text {
-  flex: 1;
-  font-size: 14px;
-  color: var(--text-color);
-}
-
-.delete-memory-button:hover {
-  background-color: rgba(242, 95, 76, 0.1);
-}
-
-.no-memories {
-  padding: 30px;
-  text-align: center;
-  color: var(--text-color);
-  font-style: italic;
-  font-size: 0.9rem;
-}
-
 .modal {
   position: fixed;
   top: 0;
@@ -347,79 +310,6 @@
 
 [data-theme='dark'] .modal-content .delete-button:hover {
   background-color: #b14141; /* Same as the main delete button hover dark version */
-}
-
-.memories-modal {
-  width: 100%;
-}
-
-.memories-modal h3 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  color: var(--primary-color);
-  font-size: 1.5rem;
-}
-
-.memories-table {
-  max-height: 500px;
-  overflow-y: auto;
-  margin-bottom: 20px;
-  background: var(--bg-color);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-}
-
-.memories-table::-webkit-scrollbar {
-  width: 8px;
-}
-
-.memories-table::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-.memories-table::-webkit-scrollbar-thumb {
-  background-color: var(--primary-color);
-  border-radius: 10px;
-}
-
-.memory-row {
-  display: flex;
-  align-items: center;
-  padding: 15px;
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.3s ease;
-}
-
-.memory-row:hover {
-  background: #fff;
-}
-
-[data-theme='dark'] .memory-row:hover {
-  background: #2a2a2a;
-}
-
-.memory-text {
-  flex: 1;
-  word-break: break-word;
-  color: var(--text-color);
-  line-height: 1.5;
-  font-size: 0.9rem;
-}
-
-.delete-memory-button {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #c04545;
-  padding: 0 8px;
-  border-radius: 4px;
-  transition: all 0.3s ease;
-}
-
-.delete-memory-button:hover {
-  background-color: rgba(242, 95, 76, 0.1);
 }
 
 .automated-messages-group {
@@ -651,4 +541,68 @@
 
 [data-theme='dark'] .send-message-button:disabled {
   opacity: 0.6;
+}
+
+.save-button--primary {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Danger Zone Styles */
+.danger-zone {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+[data-theme='dark'] .danger-zone-title {
+  color: #f85149;
+}
+
+.danger-zone-content {
+  border: 1px solid #ffdce0;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #ffeef0;
+}
+
+[data-theme='dark'] .danger-zone-content {
+  border-color: #5d1f26;
+  background-color: #2d1418;
+}
+
+.danger-zone-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.danger-zone-text {
+  flex: 1;
+}
+
+.danger-zone-text strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-color);
+}
+
+.danger-zone-text p {
+  margin: 0;
+  font-size: 14px;
+  color: #6a737d;
+}
+
+[data-theme='dark'] .danger-zone-text p {
+  color: #8b949e;
+}
+
+.delete-button--danger {
+  padding: 8px 16px;
+  font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }

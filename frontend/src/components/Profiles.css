@@ -1,13 +1,13 @@
 .profile-box {
   display: flex;
   align-items: center;
-  padding: 10px 18px 10px 10px;
+  padding: 10px;
   border: 1px solid var(--border-color);
   background: #fff;
   border-radius: 8px;
   margin-bottom: 10px;
-  cursor: pointer;
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 [data-theme='dark'] .profile-box {
@@ -22,6 +22,13 @@
   transform: translateY(-1px);
 }
 
+.profile-content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  padding-right: 10px;
+}
+
 .profile-box input {
   margin-right: 10px;
   width: auto; /* Ensure the checkbox does not take full width */
@@ -31,15 +38,55 @@
   flex: 1;
 }
 
-.edit-icon {
-  color: #666666;
-  opacity: 0.7;
-  transition: all 0.2s ease;
+.profile-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-.profile-box:hover .edit-icon {
-  color: var(--primary-color);
-  opacity: 1;
+.profile-action-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  background: #fff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #666666;
+  padding: 0;
+}
+
+[data-theme='dark'] .profile-action-button {
+  background: #3a3a3a;
+  color: #999999;
+}
+
+.profile-action-button:hover {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.profile-action-button--memories:hover {
+  background: #4296F0;
+  border-color: #4296F0;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.profile-action-button--share:hover {
+  background: #F0C000;
+  border-color: #F0C000;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.profile-action-button:active {
+  transform: scale(0.95);
 }
 
 .profile-box.empty {
@@ -52,6 +99,7 @@
   background: transparent;
   transition: opacity 0.3s ease;
   opacity: 0.5;
+  cursor: pointer;
 }
 
 .profile-box.empty:hover {

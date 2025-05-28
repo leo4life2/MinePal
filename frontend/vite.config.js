@@ -1,19 +1,23 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
+import svgr from 'vite-plugin-svgr';
 
 export default defineConfig({
-  plugins: [react({
-    swcOptions: {
-      jsc: {
-        transform: {
-          react: {
-            development: true,
-            throwIfNamespace: true,
-          }
-        }
-      }
-    }
-  })],
+  plugins: [
+    svgr(),
+    react({
+      swcOptions: {
+        jsc: {
+          transform: {
+            react: {
+              development: true,
+              throwIfNamespace: true,
+            },
+          },
+        },
+      },
+    })
+  ],
   server: {
   },
   base: './', // Ensure assets are loaded relative to the index.html location

@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Memory, deleteMemory, fetchBotMemories, sendMessage } from '../../../utils/api';
 import { Profile } from '../../../types/apiTypes';
-import { X as CloseIcon, Trash2 } from 'react-feather';
+import { X as CloseIcon } from 'react-feather';
 import './ProfileEditModal.css';
 import { ModalWrapper, PricingModal } from '..';
 import { ProfileSettingsSection } from '../../ProfileSettings/ProfileSettings';
@@ -9,6 +9,7 @@ import VoiceSelector, { VoiceOption } from '../../VoiceSelector/VoiceSelector';
 import TierBox from '../../TierBox/TierBox';
 import { TierType } from '../../../constants';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
+import MemoriesModal from '../MemoriesModal/MemoriesModal';
 
 // Renamed voice options constant
 const AVAILABLE_VOICE_OPTIONS: VoiceOption[] = [
@@ -32,6 +33,8 @@ interface ProfileEditModalProps {
   onDelete: () => Promise<void>;
   onClose: () => void;
   onError: (section: string, error: unknown) => void;
+  showMemories?: boolean;
+  onShowMemoriesChange?: (show: boolean) => void;
 }
 
 function ProfileEditModal({ 
@@ -40,13 +43,14 @@ function ProfileEditModal({
   onSave, 
   onDelete, 
   onClose, 
-  onError 
+  onError,
+  showMemories: externalShowMemories = false
 }: ProfileEditModalProps) {
   const [editingProfile, setEditingProfile] = useState<Profile>({ 
     ...profile
   });
   const [error, setError] = useState<string>();
-  const [showMemories, setShowMemories] = useState(false);
+  const [showMemories, setShowMemories] = useState(externalShowMemories);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [memoryError, setMemoryError] = useState<string>();
   const [customMessage, setCustomMessage] = useState('');
@@ -55,6 +59,14 @@ function ProfileEditModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
+
+  // Update internal state when external prop changes
+  useEffect(() => {
+    setShowMemories(externalShowMemories);
+    if (externalShowMemories && editingProfile?.name) {
+      viewMemories();
+    }
+  }, [externalShowMemories, editingProfile?.name]);
 
   const { userPlan, getCustomerPortal } = useSupabase();
 
@@ -142,7 +154,6 @@ function ProfileEditModal({
     try {
       const botMemories = await fetchBotMemories(editingProfile.name);
       setMemories(botMemories);
-      setShowMemories(true);
       setMemoryError(undefined);
     } catch (error) {
       onError("Memories", error);
@@ -246,7 +257,7 @@ function ProfileEditModal({
           </div>
         ) : showDeleteConfirm ? (
           <div className="confirm-dialog delete-confirm-dialog">
-            <p>{`Are you sure you want to delete the pal "${editingProfile.name}"? This action cannot be undone.`}</p>
+            <p>{`Are you sure you want to delete the Pal "${editingProfile.name}"? This action cannot be undone.`}</p>
             <div className="button-group">
               <button className="delete-button error-button" onClick={executeDelete}>Delete</button>
               <button className="cancel-button secondary-button" onClick={cancelDelete}>Cancel</button>
@@ -264,19 +275,19 @@ function ProfileEditModal({
                   ...current,
                   name: value,
                 }))}
-                placeholder="Enter pal name"
+                placeholder="Pal's name"
               />
             </div>
             
             <div className="input-group">
-              <label className="input-label">Personality Description</label>
+              <label className="input-label">Identity Prompt</label>
               <textarea
                 value={editingProfile.personality}
                 onChange={({ target: { value } }) => setEditingProfile((current) => ({
                   ...current,
                   personality: value,
                 }))}
-                placeholder="Describe your pal's personality"
+                placeholder="Your Pal's identity prompt shapes its behavior and interactions. Start by giving your Pal a clear role or background—think of who or what they are. Next, set a unique communication style, whether casual, formal, quirky, or humorous. Clearly outline their personality traits to define how they react and interact. Don’t worry about getting it perfect right away—you can always come back and fine-tune your Pal's personality whenever you like!"
               />
             </div>
           </div>
@@ -472,7 +483,7 @@ function ProfileEditModal({
                       />
                     </div>
                     <div className="message-triggers">
-                      <label title="Best for login type commands to execute when bot joins a server">
+                      <label title="Best for login type commands to execute when Pal joins a server">
                         <input
                           type="radio"
                           name="trigger"
@@ -517,13 +528,13 @@ function ProfileEditModal({
 
                 <div className="bot-say-group">
                   <div className="input-group">
-                    <label className="sub-input-label">Bot Say</label>
+                    <label className="sub-input-label">Pal Say</label>
                     <div className="message-input">
                       <input
                         type="text"
                         value={customMessage}
                         onChange={(e) => setCustomMessage(e.target.value)}
-                        placeholder="Send messages in the game's chat as the bot"
+                        placeholder="Send messages in the game's chat as the Pal"
                       />
                     </div>
                     <button 
@@ -539,42 +550,33 @@ function ProfileEditModal({
             </div>
 
             <div className="button-group">
-              <button className="save-button" onClick={handleSaveChanges}>Save</button>
-              {!isNewProfile && (
-                <button className="view-memories-button" onClick={viewMemories}>View Memories</button>
-              )}
-              {!isNewProfile && (
-                <button className="delete-button error-button" onClick={handleDeleteWithConfirmation}>Delete Pal</button>
-              )}
+              <button className="save-button save-button--primary" onClick={handleSaveChanges}>Save</button>
             </div>
+            
+            {!isNewProfile && (
+              <div className="danger-zone">
+                <div className="danger-zone-content">
+                  <div className="danger-zone-item">
+                    <div className="danger-zone-text">
+                      <strong>Delete this Pal</strong>
+                      <p>Once you delete a Pal, there is no going back. Please be certain.</p>
+                    </div>
+                    <button className="delete-button delete-button--danger" onClick={handleDeleteWithConfirmation}>Delete Pal</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {error && <div className="error-message">{error}</div>}
             {portalError && <div className="error-message">{portalError}</div>}
           </>
         ) : (
-          <div className="memories-modal">
-            <h3>Memories for {editingProfile.name}</h3>
-            <div className="memories-table">
-              {memories.length > 0 ? (
-                memories.map((memory) => (
-                  <div key={memory.id} className="memory-row">
-                    <div className="memory-text">{memory.text}</div>
-                    <button 
-                      className="delete-memory-button"
-                      onClick={() => handleDeleteMemory(memory.id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div className="no-memories">No memories found</div>
-              )}
-            </div>
-            <div className="button-group">
-              <button className="back-button" onClick={() => setShowMemories(false)}>Back</button>
-            </div>
-            {memoryError && <div className="error-message">{memoryError}</div>}
-          </div>
+          <MemoriesModal
+            profileName={editingProfile.name}
+            memories={memories}
+            memoryError={memoryError}
+            onDeleteMemory={handleDeleteMemory}
+          />
         )}
         {showPricingModal && (
           <PricingModal onClose={() => {

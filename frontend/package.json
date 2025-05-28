@@ -13,7 +13,8 @@
     "mixpanel-browser": "^2.53.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-feather": "^2.0.10"
+    "react-feather": "^2.0.10",
+    "vite-plugin-svgr": "^4.3.0"
   },
   "devDependencies": {
     "@types/mixpanel-browser": "^2.50.2",
