@@ -7,6 +7,7 @@ import { useAgent } from '../contexts/AgentContext/AgentContext';
 import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContext';
 import { ProfileEditModal, MemoriesModal, ShareToPalForgeModal, CreatePalOptionsModal } from './Modal';
 import { Settings as EditIcon, Share2 } from 'react-feather';
+import useDeepLinks from '../hooks/useDeepLinks';
 // @ts-ignore
 import BrainIcon from '../assets/brain.svg?react';
 
@@ -81,6 +82,36 @@ function Profiles() {
     updateField("profiles", updatedProfiles);
     closeModal();
   };
+
+  const handleImportPal = async (importedProfile: Profile) => {
+    try {
+      // Check if a profile with this name already exists
+      if (profiles.some(p => p.name === importedProfile.name)) {
+        // Add a number suffix to make the name unique
+        let counter = 1;
+        let uniqueName = `${importedProfile.name} (${counter})`;
+        while (profiles.some(p => p.name === uniqueName)) {
+          counter++;
+          uniqueName = `${importedProfile.name} (${counter})`;
+        }
+        importedProfile.name = uniqueName;
+      }
+
+      const updatedProfiles = [...profiles, importedProfile];
+      await saveProfiles(updatedProfiles);
+      updateField("profiles", updatedProfiles);
+      
+    } catch (error) {
+      console.error('Failed to import pal:', error);
+      declareError('Import Pal', error);
+      throw error; // Re-throw to let the hook handle the error display
+    }
+  };
+
+  // Set up deeplink handling
+  useDeepLinks({
+    onImportPal: handleImportPal,
+  });
 
   const handleDeleteProfile = async () => {
     if (editingProfileIndex === null) return;

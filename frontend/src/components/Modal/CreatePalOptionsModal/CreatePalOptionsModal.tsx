@@ -25,6 +25,7 @@ function CreatePalOptionsModal({ onCreateFromScratch, onClose }: CreatePalOption
     } else {
       window.open('https://minepal.net/palforge', '_blank', 'noopener,noreferrer');
     }
+    onClose();
   };
 
   return (

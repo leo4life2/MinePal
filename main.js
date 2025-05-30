@@ -23,9 +23,6 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow;
 
-const DEV = false;
-const DEBUG = true;
-
 const logDirectory = app.getPath('userData');
 const logStream = createStream('app.log', {
     size: '500K', // Rotate every 500KB
@@ -66,17 +63,13 @@ function createWindow() {
         },
     });
 
-    if (DEV) {
+    if (process.env.NODE_ENV === 'dev' && false) { // i do this manually
         mainWindow.loadURL('http://localhost:5173');
     } else {
         const indexPath = path.join(app.getAppPath(), 'frontend', 'dist', 'index.html');
         mainWindow.loadFile(indexPath).catch(err => {
             logToFile('Failed to load index.html: ' + err);
         });
-    }
-
-    if (DEBUG) {
-        mainWindow.webContents.openDevTools(); // Open Electron DevTools
     }
 
     mainWindow.on('closed', function () {
@@ -105,7 +98,11 @@ if (!gotTheLock) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
       // Send the URL to the renderer process
-      mainWindow.webContents.send('auth-callback', url);
+      if (url.includes('/auth/callback')) {
+        mainWindow.webContents.send('auth-callback', url);
+      } else if (url.includes('/import/pal')) {
+        mainWindow.webContents.send('import-pal-callback', url);
+      }
     }
   });
 
@@ -116,7 +113,11 @@ if (!gotTheLock) {
     if (process.platform === 'win32') {
       const url = commandLine.find(arg => arg.startsWith('minepal://'));
       if (url) {
-        mainWindow.webContents.send('auth-callback', url);
+        if (url.includes('/auth/callback')) {
+          mainWindow.webContents.send('auth-callback', url);
+        } else if (url.includes('/import/pal')) {
+          mainWindow.webContents.send('import-pal-callback', url);
+        }
       }
     }
 
