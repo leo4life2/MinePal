@@ -5,8 +5,8 @@ import { useUserSettings } from '../contexts/UserSettingsContext/UserSettingsCon
 import './Profiles.css';
 import { useAgent } from '../contexts/AgentContext/AgentContext';
 import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContext';
-import { ProfileEditModal, MemoriesModal, ShareToPalForgeModal } from './Modal';
-import { Edit2 as EditIcon, Share2 } from 'react-feather';
+import { ProfileEditModal, MemoriesModal, ShareToPalForgeModal, CreatePalOptionsModal } from './Modal';
+import { Settings as EditIcon, Share2 } from 'react-feather';
 // @ts-ignore
 import BrainIcon from '../assets/brain.svg?react';
 
@@ -19,6 +19,7 @@ function Profiles() {
   const [editingProfile, setEditingProfile] = useState<Profile>();
   const [viewingMemoriesProfile, setViewingMemoriesProfile] = useState<Profile | null>(null);
   const [sharingProfile, setSharingProfile] = useState<Profile | null>(null);
+  const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [memoryError, setMemoryError] = useState<string>();
 
@@ -46,6 +47,10 @@ function Profiles() {
     setEditingProfile(undefined);
     setEditingProfileIndex(null);
     setViewingMemoriesProfile(null);
+  };
+
+  const handleCreateFromScratch = () => {
+    openEditModal();
   };
   
   const handleDeleteMemory = async (profileName: string, memoryId: string) => {
@@ -153,7 +158,7 @@ function Profiles() {
           </div>
         </div>
       ))}
-      <div className="profile-box empty" onClick={() => openEditModal()}>
+      <div className="profile-box empty" onClick={() => setShowCreateOptions(true)}>
         <span>+</span>
       </div>
 
@@ -182,6 +187,13 @@ function Profiles() {
         <ShareToPalForgeModal
           profile={sharingProfile}
           onClose={closeShareModal}
+        />
+      )}
+
+      {showCreateOptions && (
+        <CreatePalOptionsModal
+          onCreateFromScratch={handleCreateFromScratch}
+          onClose={() => setShowCreateOptions(false)}
         />
       )}
     </div>

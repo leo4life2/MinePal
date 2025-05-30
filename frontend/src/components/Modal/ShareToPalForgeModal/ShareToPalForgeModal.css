@@ -1,6 +1,7 @@
 .share-to-palforge-modal {
   width: 500px;
   max-width: 90vw;
+  position: relative;
 }
 
 .share-modal-header {
@@ -19,6 +20,16 @@
   font-size: 14px;
   color: var(--text-secondary);
   margin: 0;
+}
+
+.share-modal-subtitle a {
+  color: var(--primary-color);
+  text-decoration: underline;
+  transition: opacity 0.2s ease;
+}
+
+.share-modal-subtitle a:hover {
+  opacity: 0.8;
 }
 
 .share-modal-step {
@@ -133,26 +144,28 @@
 
 .remove-image-button {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  background: rgba(0, 0, 0, 0.7);
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  top: 6px;
+  right: 6px;
+  width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  color: white;
+}
+
+.remove-image-button svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke: currentColor;
 }
 
 .remove-image-button:hover {
   background: rgba(0, 0, 0, 0.9);
-}
-
-.remove-image-button svg {
-  color: white;
 }
 
 /* Description Textarea */
@@ -323,4 +336,217 @@
   --success-color-dark: #059669;
   --primary-color-light: rgba(59, 130, 246, 0.1);
   --primary-color-rgb: 59, 130, 246;
+}
+
+/* Image Cropper Styles */
+.image-cropper-container {
+  padding: 20px 0;
+}
+
+.cropper-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.cropper-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+.cropper-header p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.cropper-area {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #000;
+  margin-bottom: 24px;
+}
+
+.cropper-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.zoom-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.zoom-control label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.zoom-control input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.zoom-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+}
+
+.zoom-control input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  border: none;
+}
+
+.cropper-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.crop-cancel-button,
+.crop-done-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crop-cancel-button {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.crop-cancel-button:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.crop-done-button {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.crop-done-button:hover {
+  background-color: var(--hover-color);
+}
+
+/* Dark mode adjustments for cropper */
+[data-theme='dark'] .zoom-control input[type="range"] {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Success step styles */
+.share-modal-step--success {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.success-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.success-icon {
+  width: 60px;
+  height: 60px;
+  background: var(--primary-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bg-color);
+}
+
+.success-content h3 {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 1.5rem;
+}
+
+.success-content p {
+  margin: 0;
+  color: var(--text-color-secondary);
+  font-size: 1rem;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+.pal-link-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+.pal-link-section label {
+  color: var(--text-color);
+  font-weight: 600;
+  text-align: left;
+}
+
+.pal-link-container {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.pal-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  word-break: break-all;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.pal-link:hover {
+  text-decoration: underline;
+}
+
+.done-button {
+  background: var(--primary-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 32px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: transform 0.2s ease;
+  width: 100%;
+}
+
+.done-button:hover {
+  transform: translateY(-1px);
 } 

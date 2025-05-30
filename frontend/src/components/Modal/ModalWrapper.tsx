@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 
 interface ModalWrapperProps {
   onClose: () => void;
@@ -6,16 +6,28 @@ interface ModalWrapperProps {
 }
 
 const ModalWrapper: React.FC<ModalWrapperProps> = ({ onClose, children }) => {
-  // Handle background click to close modal
-  const handleBackgroundClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only close if the click was directly on the background element with className="modal"
-    if (e.target === e.currentTarget) {
+  const mouseDownOutside = useRef(false);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Track if mousedown happened outside the modal content
+    mouseDownOutside.current = e.target === e.currentTarget;
+  };
+
+  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only close if both mousedown AND mouseup happened outside
+    if (mouseDownOutside.current && e.target === e.currentTarget) {
       onClose();
     }
+    // Reset for next interaction
+    mouseDownOutside.current = false;
   };
 
   return (
-    <div className="modal" onClick={handleBackgroundClick}>
+    <div 
+      className="modal" 
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+    >
       {children}
     </div>
   );

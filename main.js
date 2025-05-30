@@ -24,7 +24,7 @@ const __dirname = path.dirname(__filename);
 let mainWindow;
 
 const DEV = false;
-const DEBUG = false;
+const DEBUG = true;
 
 const logDirectory = app.getPath('userData');
 const logStream = createStream('app.log', {
@@ -62,8 +62,7 @@ function createWindow() {
         height: 850,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false,
-            preload: path.join(__dirname, 'preload.js')
+            contextIsolation: false
         },
     });
 

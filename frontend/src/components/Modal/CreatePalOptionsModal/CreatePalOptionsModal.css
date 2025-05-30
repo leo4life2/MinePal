@@ -1,0 +1,134 @@
+.create-pal-options-modal {
+  width: 420px;
+  max-width: 90vw;
+  position: relative;
+  padding-bottom: 26px;
+}
+
+.create-pal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.create-pal-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  color: var(--text-primary);
+}
+
+.create-pal-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.create-pal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.create-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.create-option:hover {
+  border-color: var(--primary-color);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.option-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary-color);
+  color: white;
+}
+
+.option-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.create-from-scratch .option-icon {
+  background: var(--primary-color);
+}
+
+.browse-palforge .option-icon {
+  background: #F0C000;
+}
+
+.option-content {
+  flex: 1;
+}
+
+.option-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
+}
+
+.option-content p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Dark mode adjustments */
+[data-theme='dark'] .create-option {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='dark'] .create-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .create-pal-options-modal {
+    width: 95vw;
+  }
+  
+  .create-option {
+    padding: 14px;
+    gap: 14px;
+  }
+  
+  .option-icon {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .option-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .option-content h3 {
+    font-size: 15px;
+  }
+  
+  .option-content p {
+    font-size: 13px;
+  }
+} 
