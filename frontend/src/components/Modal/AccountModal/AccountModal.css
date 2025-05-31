@@ -165,6 +165,7 @@
   min-height: 420px;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .account-tab-panel {
@@ -201,6 +202,8 @@
 
 .subscription-tab-panel {
   animation: fadeIn 0.2s ease;
+  width: 100%;
+  max-width: 400px;
 }
 
 .subscription-container {
