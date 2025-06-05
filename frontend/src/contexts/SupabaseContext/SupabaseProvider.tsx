@@ -62,15 +62,19 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
                    console.log(`Supabase Auth: Refresh token successful at: ${new Date()}`);
                    // Keep lastRefreshAttemptTimestamp as the time this successful attempt *started*
               } else {
-                  // Refresh failed, allow the next attempt sooner by resetting timestamp?
-                  // Or keep the timestamp to enforce cooldown even on failure?
-                  // Let's reset to allow faster retry *if the server allows it*.
-                  // The server's 429 will be the ultimate gatekeeper.
-                  console.error('Supabase Auth: Refresh token attempt failed.', result ? result.error : 'No result');
-                  // Resetting timestamp:
-                  // lastRefreshAttemptTimestamp = 0; 
-                  // OR Keep timestamp (safer against loops if server error is temporary):
-                  // no change needed here, timestamp remains from the start of failed attempt
+                  // Refresh failed, provide comprehensive error logging
+                  console.error('Supabase Auth: Refresh token attempt failed.');
+                  console.error('Supabase Auth: Complete result object:', JSON.stringify(result, null, 2));
+                  console.error('Supabase Auth: Result data:', result ? JSON.stringify(result.data, null, 2) : 'No result object');
+                  console.error('Supabase Auth: Result error:', result && result.error ? JSON.stringify(result.error, null, 2) : 'No error property in result');
+                  console.error('Supabase Auth: Result structure breakdown:', {
+                    hasResult: !!result,
+                    hasData: !!(result && result.data),
+                    hasSession: !!(result && result.data && result.data.session),
+                    hasError: !!(result && result.error),
+                    resultKeys: result ? Object.keys(result) : 'No result object',
+                    dataKeys: (result && result.data) ? Object.keys(result.data) : 'No data object'
+                  });
               }
               return result;
           } catch(e) {
