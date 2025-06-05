@@ -33,23 +33,14 @@ function logToFile(message) {
     logStream.write(`${new Date().toISOString()} - ${message}\n`);
 }
 
-async function checkAndCopyProfile() {
+async function checkAndCreateProfilesDir() {
     const profilesDir = path.join(logDirectory, 'profiles');
-    const ethanJsonPath = path.join(app.getAppPath(), 'ethan.json');
-    const targetPath = path.join(profilesDir, 'ethan.json');
 
     try {
         await access(profilesDir);
     } catch (err) {
         await mkdir(profilesDir);
         logToFile('Created profiles directory');
-        // Only add ethan if there's no profile dir.
-        try {
-            await copyFile(ethanJsonPath, targetPath);
-            logToFile('Copied ethan.json to profiles directory');
-        } catch (err) {
-            logToFile('Failed to copy ethan.json: ' + err);
-        }
     }
 }
 
@@ -265,7 +256,7 @@ if (!gotTheLock) {
     } catch (error) {
         logToFile("Failed to start server: " + error);
     }
-    await checkAndCopyProfile(); // Check and copy profile
+    await checkAndCreateProfilesDir(); // Check and create profiles dir
     autoUpdater.checkForUpdatesAndNotify();
   });
 

@@ -37,6 +37,11 @@ export default function AgentProvider({ children }: React.PropsWithChildren) {
       return;
     }
 
+    if (!userSettings.player_username || userSettings.player_username.trim() === '') {
+      declareError("AgentProvider", "Please fill in your Minecraft username in settings.", true);
+      return;
+    }
+
     if (!isValidMinecraftUsername(userSettings.player_username)) {
       declareError("AgentProvider", "Invalid Minecraft username. It should be 3-16 characters long and can only contain letters, numbers, and underscores.", true);
       return;

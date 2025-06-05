@@ -163,9 +163,7 @@ function startServer() {
             "port": "25565",
             "auth": "offline",
             "player_username": "",
-            "profiles": [
-                "./ethan.json"
-            ],
+            "profiles": [],
             "load_memory": true,
             "allow_insecure_coding": false,
             "code_timeout_mins": 10,

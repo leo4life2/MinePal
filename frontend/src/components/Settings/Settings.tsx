@@ -5,6 +5,7 @@ import supportedLocales from '../../utils/supportedLocales';
 import { useAgent } from '../../contexts/AgentContext/AgentContext';
 import useInputDevices from '../../hooks/useInputDevices';
 import { BrowserKeyCodeMap, KeyDisplayMap } from '../../utils/keyCodes';
+import { validateUserSettings } from '../../utils/validation';
 import './Settings.css';
 
 interface SettingsSectionProps {
@@ -16,6 +17,11 @@ interface SettingsSectionProps {
 // Settings section component
 function SettingsSection({ title, isExpanded: defaultExpanded = false, children }: SettingsSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  
+  // Update internal state when prop changes
+  useEffect(() => {
+    setIsExpanded(defaultExpanded);
+  }, [defaultExpanded]);
   
   return (
     <div className="settings-section">
@@ -41,12 +47,32 @@ function Settings() {
   const { userSettings, updateField } = useUserSettings();
   const { agentActive } = useAgent();
   const { inputDevices } = useInputDevices();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(() => {
+    // Auto-expand if there are empty required fields
+    const emptyFields = validateUserSettings(userSettings);
+    return emptyFields.length > 0;
+  });
   const [gameMode, setGameMode] = useState('singleplayer');
   const [selectedDevice, setSelectedDevice] = useState<MediaDeviceInfo>();
   const [listeningForKey, setListeningForKey] = useState(false);
   const [keyDisplayName, setKeyDisplayName] = useState('');
+  const [voiceInputExpanded, setVoiceInputExpanded] = useState(() => {
+    // Auto-expand voice input section if key_binding is empty
+    return !userSettings.key_binding;
+  });
   const deviceInitialized = useRef(false);
+  
+  // Auto-expand settings if there are empty required fields
+  useEffect(() => {
+    const emptyFields = validateUserSettings(userSettings);
+    if (emptyFields.length > 0 && !isExpanded) {
+      setIsExpanded(true);
+    }
+    // Auto-expand voice input section if key_binding is empty
+    if (!userSettings.key_binding && !voiceInputExpanded) {
+      setVoiceInputExpanded(true);
+    }
+  }, [userSettings, isExpanded, voiceInputExpanded]);
   
   // Safely access host using a defensive approach
   useEffect(() => {
@@ -242,7 +268,7 @@ function Settings() {
             </div>
           </SettingsSection>
 
-          <SettingsSection title="Voice Input" isExpanded={false}>
+          <SettingsSection title="Voice Input" isExpanded={voiceInputExpanded}>
             <div className="setting-item">
               <label htmlFor="language" className="input-label">Language/Accent</label>
               <div className="select-wrapper">
