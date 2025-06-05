@@ -1564,7 +1564,7 @@ export class Agent {
         });
 
         // Owner-specific entity event listeners
-        this.bot.on('entityDead', async (entity) => {
+        if (this.profile.enable_entity_hurt) this.bot.on('entityDead', async (entity) => {
             if (entity.type === 'player' && entity.username === this.owner) {
                 const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
                 const message = `[OWNER DIED | ${timeStr}] (${this.owner}) has just died!!`;

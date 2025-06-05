@@ -58,9 +58,9 @@ let minepal_response_schema = {
             type: "string",
             description: "This is how you perform actions in Minecraft. A single MinePal non-memory command (!command) or Minecraft slash-command to execute. Do not make memory related actions here. Do not make multiple commands calls. Always prioritize MinePal custom commands and use slash commands sparingly or only if user asks for it. Leave empty if no command is necessary."
         },
-        requires_more_actions: {
-            type: "boolean",
-            description: "Set to true if you need to continue executing commands to complete your goal. False if your current goal is complete and you can halt."
+        next_action: {
+            type: "string",
+            description: "Leave this empty unless there's clearly a goal that we need to execute and there's a clear MinePal non-memory command (!command) you can take to make a step towards completing that goal."
         },
         manage_memories: {
             type: "array",
@@ -72,7 +72,7 @@ let minepal_response_schema = {
         }
 
     },
-    required: ["thought", "say_in_game", "emote", "execute_command", "requires_more_actions", "current_goal_status", "manage_memories"],
+    required: ["thought", "say_in_game", "emote", "execute_command", "next_action", "current_goal_status", "manage_memories"],
     additionalProperties: false
 };
 
@@ -184,6 +184,8 @@ export class Proxy {
                 const response = await axios.post('https://api.openai.com/v1/chat/completions', requestBody, { headers });
                 try {
                     const jsonContent = JSON.parse(response.data.choices[0].message.content);
+                    // Add requires_more_actions based on next_action
+                    jsonContent.requires_more_actions = !!(jsonContent.next_action && jsonContent.next_action.trim() !== '');
                     return { json: jsonContent };
                 } catch (e) {
                     console.error("OpenAI response JSON parsing error:", e, response.data.choices[0].message.content);
@@ -234,6 +236,8 @@ export class Proxy {
                         }
 
                         if (!parsedJson) throw new Error("No JSON part in multipart response");
+                        // Add requires_more_actions based on next_action
+                        parsedJson.requires_more_actions = !!(parsedJson.next_action && parsedJson.next_action.trim() !== '');
                         return { json: parsedJson, audio: audioWavData }; // audioWavData will be null if not present
                     } catch (e) {
                         console.error("Multipart processing error:", e);
@@ -252,6 +256,8 @@ export class Proxy {
                             try {
                                 // text_response is a stringified JSON, parse it to get the actual response data
                                 const actualJsonResponse = JSON.parse(parsedJson.text_response);
+                                // Add requires_more_actions based on next_action
+                                actualJsonResponse.requires_more_actions = !!(actualJsonResponse.next_action && actualJsonResponse.next_action.trim() !== '');
                                 return { json: actualJsonResponse, audio_failed_but_text_ok: true };
                             } catch (textParseError) {
                                 console.error("Failed to parse text_response in audio failure case (200 OK):", textParseError);
@@ -260,6 +266,8 @@ export class Proxy {
                             }
                         } else {
                             // Normal successful JSON response
+                            // Add requires_more_actions based on next_action
+                            parsedJson.requires_more_actions = !!(parsedJson.next_action && parsedJson.next_action.trim() !== '');
                             return { json: parsedJson };
                         }
                     } catch (e) {

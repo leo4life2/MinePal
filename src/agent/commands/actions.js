@@ -28,7 +28,7 @@ export const actionsList = [
   {
     name: "!stop",
     description:
-      "Force stop all actions and commands that are currently executing.",
+      "Force stop all actions and commands that are currently executing. Stops following the player too.",
     perform: async function (agent) {
       console.log("[CODERSTOP] Stop command.");
       await agent.coder.stop();
