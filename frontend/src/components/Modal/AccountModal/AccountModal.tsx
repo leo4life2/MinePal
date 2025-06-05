@@ -182,7 +182,7 @@ function AccountModal() {
           alt={full_name} 
           className="account-avatar"
         />
-        <span className="account-name">{full_name}</span>
+        <span className="account-name">My Account</span>
       </button>
       <TierBox tier={userPlan} />
 

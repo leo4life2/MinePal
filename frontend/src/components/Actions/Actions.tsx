@@ -85,7 +85,7 @@ function Actions() {
 
       // Open the portal URL in external browser
       if (shell) {
-        shell.openExternal(finalUrl);
+        shell.openExternal(finalUrl).catch((e: unknown) => console.log(JSON.stringify(e, null, 2)));
       } else {
         console.log('Not in Electron environment, would open:', url);
       }
