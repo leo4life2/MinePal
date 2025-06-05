@@ -8,7 +8,7 @@ import { useErrorReport } from '../contexts/ErrorReportContext/ErrorReportContex
 import { ProfileEditModal, MemoriesModal, ShareToPalForgeModal, CreatePalOptionsModal } from './Modal';
 import { Settings as EditIcon, Share2 } from 'react-feather';
 import useDeepLinks from '../hooks/useDeepLinks';
-// @ts-ignore
+// @ts-expect-error SVG import with React component syntax not recognized by TypeScript
 import BrainIcon from '../assets/brain.svg?react';
 
 function Profiles() {
@@ -190,7 +190,7 @@ function Profiles() {
         </div>
       ))}
       <div className="profile-box empty" onClick={() => setShowCreateOptions(true)}>
-        <span>+</span>
+        <span>+ New Pal</span>
       </div>
 
       {editingProfile && (

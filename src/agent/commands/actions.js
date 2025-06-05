@@ -82,7 +82,7 @@ export const actionsList = [
   {
     name: "!followPlayer",
     description:
-      "Endlessly follow the given player. Will defend that player if self_defense mode is on.",
+      "Endlessly follow the given player. You do NOT need to call this a second time, it will automatically continue following the player. To stop following, use !stop.",
     params: {
       player_name: "(string) The name of the player to follow."
     },

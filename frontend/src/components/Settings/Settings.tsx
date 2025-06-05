@@ -62,17 +62,26 @@ function Settings() {
   });
   const deviceInitialized = useRef(false);
   
-  // Auto-expand settings if there are empty required fields
+  // Auto-expand settings if there are empty required fields (only check on initial load)
   useEffect(() => {
     const emptyFields = validateUserSettings(userSettings);
     if (emptyFields.length > 0 && !isExpanded) {
       setIsExpanded(true);
     }
+    // Auto-collapse if no problems detected
+    if (emptyFields.length === 0 && isExpanded) {
+      setIsExpanded(false);
+    }
+    
     // Auto-expand voice input section if key_binding is empty
     if (!userSettings.key_binding && !voiceInputExpanded) {
       setVoiceInputExpanded(true);
     }
-  }, [userSettings, isExpanded, voiceInputExpanded]);
+    // Auto-collapse voice input section if key_binding is set
+    if (userSettings.key_binding && voiceInputExpanded) {
+      setVoiceInputExpanded(false);
+    }
+  }, []);
   
   // Safely access host using a defensive approach
   useEffect(() => {
