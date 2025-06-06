@@ -10,13 +10,6 @@ const electron = isElectron ? window.require('electron') : null;
 const ipcRenderer = electron?.ipcRenderer;
 const shell = electron?.shell;
 
-// --- START HACK: Throttle Supabase token refresh ---
-let lastRefreshAttemptTimestamp = 0;
-// Set a reasonable minimum interval, e.g., 60 seconds, 
-// potentially longer if needed (like 5 minutes = 300000ms)
-const MIN_REFRESH_INTERVAL_MS = 60 * 1000; 
-// --- END HACK ---
-
 interface SupabaseProviderProps {
   children: ReactNode;
 }
@@ -31,67 +24,73 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
       }
     });
 
-    // --- START HACK: Override the internal _callRefreshToken method ---
-    try { // Add try-catch for safety during override
-        const originalCallRefreshToken = client.auth['_callRefreshToken'].bind(client.auth);
+    // // --- START HACK: Override the internal _callRefreshToken method ---
+    // let lastRefreshAttemptTimestamp = 0;
+    // // Set a reasonable minimum interval, e.g., 60 seconds, 
+    // // potentially longer if needed (like 5 minutes = 300000ms)
+    // const MIN_REFRESH_INTERVAL_MS = 60 * 1000; 
 
-        // Important: Ensure this override happens *after* client initialization
-        // but before any potential refresh calls. Usually placing it right after
-        // createClient is sufficient.
+    // try { // Add try-catch for safety during override
+    //     const originalCallRefreshToken = client.auth['_callRefreshToken'].bind(client.auth);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        client.auth['_callRefreshToken'] = async function(...args: any[]) {
-          const now = Date.now();
+    //     // Important: Ensure this override happens *after* client initialization
+    //     // but before any potential refresh calls. Usually placing it right after
+    //     // createClient is sufficient.
+
+    //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    //     client.auth['_callRefreshToken'] = async function(...args: any[]) {
+    //       const now = Date.now();
           
-          if (now - lastRefreshAttemptTimestamp < MIN_REFRESH_INTERVAL_MS) {
-            console.warn(`Supabase Auth: Refresh token request throttled. Min interval: ${MIN_REFRESH_INTERVAL_MS}ms. Last attempt: ${new Date(lastRefreshAttemptTimestamp)}`);
-            // Return the expected structure for a failed refresh or empty session
-            // Adjust based on CallRefreshTokenResult type if it differs
-             return { data: null, error: new Error('Refresh throttled client-side to prevent loop.') }; 
-          }
+    //       if (now - lastRefreshAttemptTimestamp < MIN_REFRESH_INTERVAL_MS) {
+    //         console.warn(`Supabase Auth: Refresh token request throttled. Min interval: ${MIN_REFRESH_INTERVAL_MS}ms. Last attempt: ${new Date(lastRefreshAttemptTimestamp)}`);
+    //         // Return the expected structure for a failed refresh or empty session
+    //         // Adjust based on CallRefreshTokenResult type if it differs
+    //          return { data: null, error: new Error('Refresh throttled client-side to prevent loop.') }; 
+    //       }
 
-          console.log(`Supabase Auth: Initiating refresh token request at: ${new Date(now)}`);
-          lastRefreshAttemptTimestamp = now; // Record the start time of *this* attempt
+    //       console.log(`Supabase Auth: Initiating refresh token request at: ${new Date(now)}`);
+    //       lastRefreshAttemptTimestamp = now; // Record the start time of *this* attempt
 
-          try {
-              // Call the original function
-              const result = await originalCallRefreshToken(...args);
+    //       try {
+    //           // Call the original function
+    //           const result = await originalCallRefreshToken(...args);
               
-              // Check if it was successful (adjust condition based on actual result structure)
-              if (result && result.data && result.data.session) {
-                   console.log(`Supabase Auth: Refresh token successful at: ${new Date()}`);
-                   // Keep lastRefreshAttemptTimestamp as the time this successful attempt *started*
-              } else {
-                  // Refresh failed, provide comprehensive error logging
-                  console.error('Supabase Auth: Refresh token attempt failed.');
-                  console.error('Supabase Auth: Complete result object:', JSON.stringify(result, null, 2));
-                  console.error('Supabase Auth: Result data:', result ? JSON.stringify(result.data, null, 2) : 'No result object');
-                  console.error('Supabase Auth: Result error:', result && result.error ? JSON.stringify(result.error, null, 2) : 'No error property in result');
-                  console.error('Supabase Auth: Result structure breakdown:', {
-                    hasResult: !!result,
-                    hasData: !!(result && result.data),
-                    hasSession: !!(result && result.data && result.data.session),
-                    hasError: !!(result && result.error),
-                    resultKeys: result ? Object.keys(result) : 'No result object',
-                    dataKeys: (result && result.data) ? Object.keys(result.data) : 'No data object'
-                  });
-              }
-              return result;
-          } catch(e) {
-               lastRefreshAttemptTimestamp = 0; // Reset on unexpected error
-               console.error('Supabase Auth: Unexpected error during _callRefreshToken override:', e);
-               throw e; // Re-throw original error
-          }
-        };
-        console.log("Supabase Auth: _callRefreshToken override applied successfully.");
+    //           // Check if it was successful (adjust condition based on actual result structure)
+    //           if (result && result.data && result.data.session) {
+    //                console.log(`Supabase Auth: Refresh token successful at: ${new Date()}`);
+    //                // Keep lastRefreshAttemptTimestamp as the time this successful attempt *started*
+    //           } else {
+    //               // Refresh failed, provide comprehensive error logging
+    //               console.error('Supabase Auth: Refresh token attempt failed.');
+    //               console.error('Supabase Auth: Complete result object:', JSON.stringify(result, null, 2));
+    //               console.error('Supabase Auth: Result data:', result ? JSON.stringify(result.data, null, 2) : 'No result object');
+    //               console.error('Supabase Auth: Result error:', result && result.error ? JSON.stringify(result.error, null, 2) : 'No error property in result');
+    //               console.error('Supabase Auth: Result structure breakdown:', {
+    //                 hasResult: !!result,
+    //                 hasData: !!(result && result.data),
+    //                 hasSession: !!(result && result.data && result.data.session),
+    //                 hasError: !!(result && result.error),
+    //                 resultKeys: result ? Object.keys(result) : 'No result object',
+    //                 dataKeys: (result && result.data) ? Object.keys(result.data) : 'No data object'
+    //               });
+    //           }
+    //           return result;
+    //       } catch(e) {
+    //            lastRefreshAttemptTimestamp = 0; // Reset on unexpected error
+    //            console.error('Supabase Auth: Unexpected error during _callRefreshToken override:', e);
+    //            throw e; // Re-throw original error
+    //       }
+    //     };
+    //     console.log("Supabase Auth: _callRefreshToken override applied successfully.");
 
-    } catch (overrideError) {
-        console.error("Supabase Auth: Failed to override _callRefreshToken. Refresh loop protection inactive.", overrideError);
-    }
-    // --- END HACK ---
+    // } catch (overrideError) {
+    //     console.error("Supabase Auth: Failed to override _callRefreshToken. Refresh loop protection inactive.", overrideError);
+    // }
+    // // --- END HACK ---
 
     return client;
   });
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPaying, setIsPaying] = useState(false);
