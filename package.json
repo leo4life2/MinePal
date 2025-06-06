@@ -91,7 +91,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "include": "build/installer.nsh"
+      
     },
     "linux": {
       "target": "AppImage",
