@@ -8,6 +8,8 @@
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
+    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
     "axios": "^1.8.4",
     "cors": "^2.8.5",
     "electron-updater": "^6.3.9",
@@ -23,6 +25,7 @@
     "mineflayer-collectblock": "file:libs/mineflayer-collectblock",
     "mineflayer-pathfinder": "file:mineflayer-pathfinder",
     "mineflayer-pvp": "file:libs/mineflayer-pvp",
+    "multer": "^2.0.1",
     "patch-package": "^8.0.0",
     "pidusage": "^3.0.2",
     "prismarine-item": "^1.14.0",
@@ -93,7 +96,6 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "include": "build/installer.nsh"
-      
     },
     "linux": {
       "target": "AppImage",

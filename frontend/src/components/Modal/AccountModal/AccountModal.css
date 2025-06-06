@@ -113,17 +113,18 @@
   border-radius: 0;
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 12px 16px;
+  gap: 4px;
+  padding: 12px 8px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   color: #666;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 500;
 }
 
@@ -152,6 +153,11 @@
 
 .account-tab svg {
   flex-shrink: 0;
+}
+
+.account-tab span {
+  white-space: nowrap;
+  text-align: center;
 }
 
 .palforge-icon {
@@ -792,4 +798,157 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
-} 
+}
+
+/* Backup & Restore Tab Styles */
+.backup-tab-panel {
+  animation: fadeIn 0.2s ease;
+  width: 100%;
+}
+
+.backup-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.backup-title {
+  color: var(--text-color);
+  margin: 0 0 8px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.backup-subtitle {
+  color: #666;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+[data-theme='dark'] .backup-subtitle {
+  color: #999;
+}
+
+.backup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.backup-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: #fff;
+  transition: all 0.2s ease;
+}
+
+[data-theme='dark'] .backup-item {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+.backup-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(44, 24, 16, 0.05);
+}
+
+[data-theme='dark'] .backup-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.backup-item-info {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.backup-item-title {
+  color: var(--text-color);
+  margin: 0 0 6px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.backup-item-description {
+  color: #666;
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+[data-theme='dark'] .backup-item-description {
+  color: #999;
+}
+
+.backup-button, .restore-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.backup-button:hover:not(:disabled), .restore-button:hover:not(:disabled) {
+  background: #2c1810;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(44, 24, 16, 0.15);
+}
+
+.backup-button:disabled, .restore-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.restore-upload-container {
+  position: relative;
+}
+
+.restore-file-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.backup-restore-success {
+  color: #0ea5e9;
+  margin: 8px 0 0 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+[data-theme='dark'] .backup-restore-success {
+  color: #3b82f6;
+}
+
+@media (max-width: 600px) {
+  .backup-item {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .backup-item-info {
+    margin-right: 0;
+    margin-bottom: 16px;
+  }
+  
+  .backup-button, .restore-button {
+    align-self: center;
+    min-width: 160px;
+  }
+}

@@ -13,6 +13,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ACTION_SAMPLING_RATE } from './src/constants.js';
+import archiver from 'archiver';
+import multer from 'multer';
+import AdmZip from 'adm-zip';
 
 const logFile = path.join(electronApp.getPath('userData'), 'app.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -823,6 +826,248 @@ function startServer() {
         }
     });
     // --- End Supabase Logging Endpoints ---
+
+    // --- Backup and Restore Endpoints ---
+    // Create temp directory for uploads if it doesn't exist
+    const tempDir = path.join(userDataDir, 'temp');
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // Configure multer for file uploads
+    const upload = multer({ 
+        dest: tempDir,
+        limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+    });
+
+    app.get('/backup', (req, res) => {
+        logToFile('API: GET /backup called');
+        
+        const profilesDir = path.join(userDataDir, 'profiles');
+        const botsDir = path.join(userDataDir, 'bots');
+        
+        // Check if directories exist
+        if (!fs.existsSync(profilesDir) && !fs.existsSync(botsDir)) {
+            return res.status(404).json({ error: "No pal data found to backup" });
+        }
+
+        // Set response headers for file download
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `minepal-backup-${timestamp}.zip`;
+        
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        // Create archive
+        const archive = archiver('zip', {
+            zlib: { level: 9 } // Sets the compression level
+        });
+
+        // Handle archive errors
+        archive.on('error', (err) => {
+            logToFile(`Backup archive error: ${err.message}`);
+            res.status(500).json({ error: "Failed to create backup" });
+        });
+
+        // Pipe archive data to response
+        archive.pipe(res);
+
+        // Add profiles directory if it exists
+        if (fs.existsSync(profilesDir)) {
+            archive.directory(profilesDir, 'profiles');
+            logToFile('Added profiles directory to backup');
+        }
+
+        // Add bots directory if it exists
+        if (fs.existsSync(botsDir)) {
+            archive.directory(botsDir, 'bots');
+            logToFile('Added bots directory to backup');
+        }
+
+        // Finalize the archive
+        archive.finalize();
+        logToFile('Backup archive created and sent');
+    });
+    
+    // Helper function to generate unique directory name with _backup suffix
+    const getUniqueDirectoryName = (originalPath) => {
+        if (!fs.existsSync(originalPath)) {
+            return originalPath;
+        }
+        
+        const baseName = path.basename(originalPath);
+        const dir = path.dirname(originalPath);
+        const newBaseName = `${baseName}_backup`;
+        
+        return path.join(dir, newBaseName);
+    };
+
+    // Helper function to generate unique profile name with _backup suffix
+    const getUniqueProfileName = (originalPath) => {
+        if (!fs.existsSync(originalPath)) {
+            return { path: originalPath, nameChanged: false };
+        }
+        
+        const ext = path.extname(originalPath);
+        const baseName = path.basename(originalPath, ext);
+        const dir = path.dirname(originalPath);
+        const newBaseName = `${baseName}_backup${ext}`;
+        
+        return { 
+            path: path.join(dir, newBaseName), 
+            nameChanged: true,
+            originalName: baseName,
+            newName: `${baseName}_backup`
+        };
+    };
+
+    app.post('/restore', upload.single('backup'), async (req, res) => {
+        logToFile('API: POST /restore called');
+        
+        if (!req.file) {
+            return res.status(400).json({ error: "No backup file provided" });
+        }
+
+        const tempFilePath = req.file.path;
+        const profilesDir = path.join(userDataDir, 'profiles');
+        const botsDir = path.join(userDataDir, 'bots');
+
+        try {
+            // Create directories if they don't exist
+            if (!fs.existsSync(profilesDir)) {
+                fs.mkdirSync(profilesDir, { recursive: true });
+            }
+            if (!fs.existsSync(botsDir)) {
+                fs.mkdirSync(botsDir, { recursive: true });
+            }
+
+            // Extract the uploaded zip file
+            const zip = new AdmZip(tempFilePath);
+            const zipEntries = zip.getEntries();
+
+            let profilesRestored = 0;
+            let botsRestored = 0;
+
+            // First, collect all top-level directories in bots/ to handle directory conflicts
+            const botDirectories = new Set();
+            const botDirectoryMappings = new Map(); // original -> renamed
+
+            zipEntries.forEach((entry) => {
+                if (entry.entryName.startsWith('bots/') && !entry.isDirectory) {
+                    const relativePath = entry.entryName.substring('bots/'.length);
+                    const topLevelDir = relativePath.split('/')[0];
+                    if (topLevelDir && !botDirectories.has(topLevelDir)) {
+                        botDirectories.add(topLevelDir);
+                        
+                        // Check for directory conflict and create mapping
+                        const originalBotPath = path.join(botsDir, topLevelDir);
+                        const finalBotPath = getUniqueDirectoryName(originalBotPath);
+                        const finalBotName = path.basename(finalBotPath);
+                        
+                        botDirectoryMappings.set(topLevelDir, finalBotName);
+                        
+                        if (originalBotPath !== finalBotPath) {
+                            logToFile(`Bot directory conflict resolved: ${topLevelDir} -> ${finalBotName}`);
+                        }
+                    }
+                }
+            });
+
+            // Now process all entries
+            zipEntries.forEach((entry) => {
+                const entryPath = entry.entryName;
+                
+                if (entry.isDirectory) {
+                    return; // Skip directories, they'll be created automatically
+                }
+
+                if (entryPath.startsWith('profiles/')) {
+                    // Extract to profiles directory
+                    const relativePath = entryPath.substring('profiles/'.length);
+                    const originalTargetPath = path.join(profilesDir, relativePath);
+                    
+                    // Get unique path and name info
+                    const profileInfo = getUniqueProfileName(originalTargetPath);
+                    
+                    // Create directory if needed
+                    const targetDir = path.dirname(profileInfo.path);
+                    if (!fs.existsSync(targetDir)) {
+                        fs.mkdirSync(targetDir, { recursive: true });
+                    }
+                    
+                    let fileContent = entry.getData();
+                    
+                    // If we had to rename the profile, update the JSON content
+                    if (profileInfo.nameChanged && relativePath.endsWith('.json')) {
+                        try {
+                            const jsonContent = JSON.parse(fileContent.toString());
+                            if (jsonContent.name === profileInfo.originalName) {
+                                jsonContent.name = profileInfo.newName;
+                                fileContent = Buffer.from(JSON.stringify(jsonContent, null, 4));
+                                logToFile(`Updated profile name in JSON: ${profileInfo.originalName} -> ${profileInfo.newName}`);
+                            }
+                        } catch (jsonError) {
+                            logToFile(`Warning: Could not parse JSON for profile ${relativePath}: ${jsonError.message}`);
+                        }
+                    }
+                    
+                    // Write the file
+                    fs.writeFileSync(profileInfo.path, fileContent);
+                    profilesRestored++;
+                    
+                    const finalRelativePath = path.relative(profilesDir, profileInfo.path);
+                    logToFile(`Restored profile file: ${finalRelativePath}`);
+                } else if (entryPath.startsWith('bots/')) {
+                    // Handle bot files
+                    const relativePath = entryPath.substring('bots/'.length);
+                    const pathParts = relativePath.split('/');
+                    const topLevelDir = pathParts[0];
+                    
+                    if (topLevelDir && botDirectoryMappings.has(topLevelDir)) {
+                        // Replace the top-level directory with the mapped name
+                        pathParts[0] = botDirectoryMappings.get(topLevelDir);
+                        const newRelativePath = pathParts.join('/');
+                        const targetPath = path.join(botsDir, newRelativePath);
+                        
+                        // Create directory if needed
+                        const targetDir = path.dirname(targetPath);
+                        if (!fs.existsSync(targetDir)) {
+                            fs.mkdirSync(targetDir, { recursive: true });
+                        }
+                        
+                        // Write the file
+                        fs.writeFileSync(targetPath, entry.getData());
+                        botsRestored++;
+                        
+                        logToFile(`Restored bot file: ${newRelativePath}`);
+                    }
+                }
+            });
+
+            // Clean up temporary file
+            fs.unlinkSync(tempFilePath);
+
+            logToFile(`Restore completed: ${profilesRestored} profile files, ${botsRestored} bot files restored`);
+            res.json({ 
+                message: "Backup restored successfully",
+                profilesRestored,
+                botsRestored
+            });
+
+        } catch (error) {
+            logToFile(`Restore error: ${error.message}`);
+            
+            // Clean up temporary file on error
+            try {
+                fs.unlinkSync(tempFilePath);
+            } catch (cleanupError) {
+                logToFile(`Error cleaning up temp file: ${cleanupError.message}`);
+            }
+            
+            res.status(500).json({ error: "Failed to restore backup" });
+        }
+    });
+    // --- End Backup and Restore Endpoints ---
 
     const shutdown = () => {
         logToFile('Shutting down gracefully...');

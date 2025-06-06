@@ -6,7 +6,7 @@ import defaultUserSettings from '../../utils/defaultUserSettings';
 import { UserSettingsContext } from './UserSettingsContext';
 
 export default function UserSettingsProvider({ children }: React.PropsWithChildren) {
-  const { data } = useWebRequest("settings", fetchSettings);
+  const { data, refetch } = useWebRequest("settings", fetchSettings);
   const [userSettings, setSettings] = useState<UserSettings>({ ...defaultUserSettings });
 
   const updateField = useCallback((key: keyof UserSettings, value: unknown) => {
@@ -20,7 +20,7 @@ export default function UserSettingsProvider({ children }: React.PropsWithChildr
   }, [data]);
 
   return (
-    <UserSettingsContext.Provider value={{ userSettings, updateField }}>
+    <UserSettingsContext.Provider value={{ userSettings, updateField, refresh: refetch }}>
       {children}
     </UserSettingsContext.Provider>
   );

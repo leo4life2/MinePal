@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
-import { User as UserIcon, X as CloseIcon, Award, CreditCard } from 'react-feather';
+import { useUserSettings } from '../../../contexts/UserSettingsContext/UserSettingsContext';
+import { User as UserIcon, X as CloseIcon, Award, CreditCard, Database, Download, Upload } from 'react-feather';
 import { PricingModal, ModalWrapper, AuthModal } from '..';
 import TierBox from '../../TierBox/TierBox';
-// @ts-ignore
+// @ts-expect-error - SVG import with React component syntax
 import PalForgeIcon from '../../../assets/palforge.svg?react';
 import './AccountModal.css';
 
-type Tab = 'account' | 'subscription' | 'palforge';
+type Tab = 'account' | 'subscription' | 'palforge' | 'backup';
 
 interface PublishedPal {
   id: string;
@@ -18,6 +19,7 @@ interface PublishedPal {
 
 function AccountModal() {
   const { user, signOut, isPaying, clearAuthError, userPlan, getCustomerPortal, supabase } = useSupabase();
+  const { refresh } = useUserSettings();
   const [showModal, setShowModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -29,6 +31,9 @@ function AccountModal() {
   const [showUnpublishModal, setShowUnpublishModal] = useState(false);
   const [palToUnpublish, setPalToUnpublish] = useState<PublishedPal | null>(null);
   const [unpublishingPalId, setUnpublishingPalId] = useState<string | null>(null);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [restoreSuccess, setRestoreSuccess] = useState<{ profilesRestored: number; botsRestored: number } | null>(null);
 
   // Fetch published pals when user changes or PalForge tab is active
   useEffect(() => {
@@ -171,6 +176,78 @@ function AccountModal() {
     });
   };
 
+  const handleBackup = async () => {
+    setBackupLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('http://localhost:10101/backup');
+      if (!response.ok) {
+        throw new Error('Failed to create backup');
+      }
+      
+      // Get the filename from the response headers
+      const contentDisposition = response.headers.get('content-disposition');
+      const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] || 'minepal-backup.zip';
+      
+      // Create a blob from the response
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Error creating backup:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create backup');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setRestoreLoading(true);
+    setError(null);
+    setRestoreSuccess(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('backup', file);
+
+      const response = await fetch('http://localhost:10101/restore', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to restore backup');
+      }
+
+      const result = await response.json();
+      setRestoreSuccess({
+        profilesRestored: result.profilesRestored,
+        botsRestored: result.botsRestored
+      });
+      
+      // Refresh the settings to update the UI with the restored data
+      await refresh();
+    } catch (err) {
+      console.error('Error restoring backup:', err);
+      setError(err instanceof Error ? err.message : 'Failed to restore backup');
+    } finally {
+      setRestoreLoading(false);
+      // Reset the file input
+      event.target.value = '';
+    }
+  };
+
   return (
     <div className="account-container">
       <button 
@@ -218,6 +295,13 @@ function AccountModal() {
                 >
                   <PalForgeIcon className="palforge-icon" />
                   <span>PalForge</span>
+                </button>
+                <button 
+                  className={`account-tab ${activeTab === 'backup' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('backup')}
+                >
+                  <Database size={16} />
+                  <span>Backup</span>
                 </button>
               </div>
             </div>
@@ -298,7 +382,7 @@ function AccountModal() {
                     <div className="palforge-loading">Loading published pals...</div>
                   ) : publishedPals.length === 0 ? (
                     <div className="palforge-empty">
-                      <p>You haven't published any pals yet.</p>
+                      <p>You haven&apos;t published any pals yet.</p>
                       <p className="palforge-empty-subtitle">Share your pals with the community to see them here!</p>
                     </div>
                   ) : (
@@ -324,6 +408,57 @@ function AccountModal() {
                       ))}
                     </div>
                   )}
+
+                  {error && <div className="error-message">{error}</div>}
+                </div>
+              )}
+
+              {activeTab === 'backup' && (
+                <div className="backup-tab-panel">
+                  <div className="backup-header">
+                    <h4 className="backup-title">Backup & Restore</h4>
+                    {restoreSuccess && (
+                      <p className="backup-restore-success">✓ Backup restore success</p>
+                    )}
+                  </div>
+
+                  <div className="backup-section">
+                    <div className="backup-item">
+                      <div className="backup-item-info">
+                        <h5 className="backup-item-title">Create Backup</h5>
+                        <p className="backup-item-description">Download a zip file containing all your profiles and bot memories</p>
+                      </div>
+                      <button
+                        className="backup-button"
+                        onClick={handleBackup}
+                        disabled={backupLoading}
+                      >
+                        <Download size={16} />
+                        <span>{backupLoading ? 'Creating...' : 'Download Backup'}</span>
+                      </button>
+                    </div>
+
+                    <div className="backup-item">
+                      <div className="backup-item-info">
+                        <h5 className="backup-item-title">Restore Backup</h5>
+                        <p className="backup-item-description">Upload a backup zip file to restore your pal data (merges with existing data)</p>
+                      </div>
+                      <div className="restore-upload-container">
+                        <input
+                          type="file"
+                          accept=".zip"
+                          onChange={handleRestore}
+                          disabled={restoreLoading}
+                          className="restore-file-input"
+                          id="restore-file-input"
+                        />
+                        <label htmlFor="restore-file-input" className="restore-button">
+                          <Upload size={16} />
+                          <span>{restoreLoading ? 'Restoring...' : 'Choose Backup File'}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
 
                   {error && <div className="error-message">{error}</div>}
                 </div>
