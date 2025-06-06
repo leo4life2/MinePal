@@ -88,6 +88,11 @@
       ],
       "icon": "build/icon.ico"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
     "linux": {
       "target": "AppImage",
       "icon": "build"
