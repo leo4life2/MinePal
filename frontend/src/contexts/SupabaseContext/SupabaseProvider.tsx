@@ -24,69 +24,119 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
       }
     });
 
-    // // --- START HACK: Override the internal _callRefreshToken method ---
-    // let lastRefreshAttemptTimestamp = 0;
-    // // Set a reasonable minimum interval, e.g., 60 seconds, 
-    // // potentially longer if needed (like 5 minutes = 300000ms)
-    // const MIN_REFRESH_INTERVAL_MS = 60 * 1000; 
+    // --- START HACK: Override the internal _callRefreshToken method ---
+    let refreshAttemptCount = 0;
+    let cooldownStartTime = 0;
+    // Allow 3 unconditional refreshes, then start cooldown
+    const MAX_RAPID_REFRESHES = 3;
+    const COOLDOWN_PERIOD_MS = 60 * 1000;
+    
+    // Inflight promise tracking to prevent concurrent calls
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, prefer-const
+    let inflight: Promise<any> | null = null;
+    let last = 0;
+    const MIN = 60_000; // 60s debounce
 
-    // try { // Add try-catch for safety during override
-    //     const originalCallRefreshToken = client.auth['_callRefreshToken'].bind(client.auth);
+    try { // Add try-catch for safety during override
+        const originalCallRefreshToken = client.auth['_callRefreshToken'].bind(client.auth);
 
-    //     // Important: Ensure this override happens *after* client initialization
-    //     // but before any potential refresh calls. Usually placing it right after
-    //     // createClient is sufficient.
+        // Important: Ensure this override happens *after* client initialization
+        // but before any potential refresh calls. Usually placing it right after
+        // createClient is sufficient.
 
-    //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    //     client.auth['_callRefreshToken'] = async function(...args: any[]) {
-    //       const now = Date.now();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        client.auth['_callRefreshToken'] = async function(...args: any[]) {
+          // Prevent concurrent calls - reuse the same promise
+          if (inflight) {
+            console.log('Supabase Auth: Reusing inflight refresh promise');
+            return inflight;
+          }
           
-    //       if (now - lastRefreshAttemptTimestamp < MIN_REFRESH_INTERVAL_MS) {
-    //         console.warn(`Supabase Auth: Refresh token request throttled. Min interval: ${MIN_REFRESH_INTERVAL_MS}ms. Last attempt: ${new Date(lastRefreshAttemptTimestamp)}`);
-    //         // Return the expected structure for a failed refresh or empty session
-    //         // Adjust based on CallRefreshTokenResult type if it differs
-    //          return { data: null, error: new Error('Refresh throttled client-side to prevent loop.') }; 
-    //       }
+          const now = Date.now();
+          
+          // Debounce check
+          if (now - last < MIN) {
+            console.log('Supabase Auth: Debounced refresh, returning current session');
+            const currentSession = await this.getSession();
+            return { data: { session: currentSession?.data?.session || null }, error: null };
+          }
+          
+          last = now;
+          
+          // Allow first 3 refreshes unconditionally
+          if (refreshAttemptCount < MAX_RAPID_REFRESHES) {
+            refreshAttemptCount++;
+            console.log(`Supabase Auth: Unconditional refresh attempt ${refreshAttemptCount}/${MAX_RAPID_REFRESHES} at: ${new Date(now)}`);
+          } else {
+            // After 3 attempts, start applying cooldown
+            if (cooldownStartTime === 0) {
+              cooldownStartTime = now;
+              console.log(`Supabase Auth: Starting cooldown period at: ${new Date(now)}`);
+            }
+            
+            if (now - cooldownStartTime < COOLDOWN_PERIOD_MS) {
+              // Get current session to check status
+              const currentSession = await this.getSession();
+              const sessionStatus = currentSession?.data?.session ? 'success' : 'no session';
+              console.warn(`Supabase Auth: Refresh token request throttled. Cooldown period: ${COOLDOWN_PERIOD_MS}ms. Time remaining: ${COOLDOWN_PERIOD_MS - (now - cooldownStartTime)}ms. Session status: ${sessionStatus}`);
+              // Return current session instead of null data
+              return { data: { session: currentSession?.data?.session || null }, error: null }; 
+            }
+            
+            // Reset counters after cooldown period
+            refreshAttemptCount = 0;
+            cooldownStartTime = 0;
+          }
 
-    //       console.log(`Supabase Auth: Initiating refresh token request at: ${new Date(now)}`);
-    //       lastRefreshAttemptTimestamp = now; // Record the start time of *this* attempt
+          console.log(`Supabase Auth: Initiating refresh token request at: ${new Date(now)}`);
 
-    //       try {
-    //           // Call the original function
-    //           const result = await originalCallRefreshToken(...args);
-              
-    //           // Check if it was successful (adjust condition based on actual result structure)
-    //           if (result && result.data && result.data.session) {
-    //                console.log(`Supabase Auth: Refresh token successful at: ${new Date()}`);
-    //                // Keep lastRefreshAttemptTimestamp as the time this successful attempt *started*
-    //           } else {
-    //               // Refresh failed, provide comprehensive error logging
-    //               console.error('Supabase Auth: Refresh token attempt failed.');
-    //               console.error('Supabase Auth: Complete result object:', JSON.stringify(result, null, 2));
-    //               console.error('Supabase Auth: Result data:', result ? JSON.stringify(result.data, null, 2) : 'No result object');
-    //               console.error('Supabase Auth: Result error:', result && result.error ? JSON.stringify(result.error, null, 2) : 'No error property in result');
-    //               console.error('Supabase Auth: Result structure breakdown:', {
-    //                 hasResult: !!result,
-    //                 hasData: !!(result && result.data),
-    //                 hasSession: !!(result && result.data && result.data.session),
-    //                 hasError: !!(result && result.error),
-    //                 resultKeys: result ? Object.keys(result) : 'No result object',
-    //                 dataKeys: (result && result.data) ? Object.keys(result.data) : 'No data object'
-    //               });
-    //           }
-    //           return result;
-    //       } catch(e) {
-    //            lastRefreshAttemptTimestamp = 0; // Reset on unexpected error
-    //            console.error('Supabase Auth: Unexpected error during _callRefreshToken override:', e);
-    //            throw e; // Re-throw original error
-    //       }
-    //     };
-    //     console.log("Supabase Auth: _callRefreshToken override applied successfully.");
+          // Create and track the inflight promise
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          inflight = originalCallRefreshToken(...args).then((result: any) => {
+            inflight = null;
+            
+            // Check if it was successful (adjust condition based on actual result structure)
+            if (result && result.data && result.data.session) {
+              console.log(`Supabase Auth: Refresh token successful at: ${new Date()}`);
+              // Reset counters on successful refresh
+              refreshAttemptCount = 0;
+              cooldownStartTime = 0;
+              // Make sure every renderer sees the fresh tokens
+              this.setSession(result.data.session);
+            } else {
+              // Refresh failed, provide comprehensive error logging
+              console.error('Supabase Auth: Refresh token attempt failed.');
+              console.error('Supabase Auth: Complete result object:', JSON.stringify(result, null, 2));
+              console.error('Supabase Auth: Result data:', result ? JSON.stringify(result.data, null, 2) : 'No result object');
+              console.error('Supabase Auth: Result error:', result && result.error ? JSON.stringify(result.error, null, 2) : 'No error property in result');
+              console.error('Supabase Auth: Result structure breakdown:', {
+                hasResult: !!result,
+                hasData: !!(result && result.data),
+                hasSession: !!(result && result.data && result.data.session),
+                hasError: !!(result && result.error),
+                resultKeys: result ? Object.keys(result) : 'No result object',
+                dataKeys: (result && result.data) ? Object.keys(result.data) : 'No data object'
+              });
+            }
+            return result;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          }).catch((e: any) => {
+            inflight = null;
+            // Reset counters on unexpected error
+            refreshAttemptCount = 0;
+            cooldownStartTime = 0;
+            console.error('Supabase Auth: Unexpected error during _callRefreshToken override:', e);
+            throw e; // Re-throw original error
+          });
 
-    // } catch (overrideError) {
-    //     console.error("Supabase Auth: Failed to override _callRefreshToken. Refresh loop protection inactive.", overrideError);
-    // }
-    // // --- END HACK ---
+          return inflight;
+        };
+        console.log("Supabase Auth: _callRefreshToken override applied successfully.");
+
+    } catch (overrideError) {
+        console.error("Supabase Auth: Failed to override _callRefreshToken. Refresh loop protection inactive.", overrideError);
+    }
+    // --- END HACK ---
 
     return client;
   });
