@@ -28,7 +28,14 @@ MinePal is a desktop Minecraft companion app built with Electron that adds an AI
 
 ### Installation
 
+> [!NOTE]
+> Steps 2-4 can be skipped by running `setup.sh` script
+
 1. Clone the repository
+
+> [!WARNING]
+> This project contains submodules. Use `--recurse-submodules` when cloning. If you're getting `ERESOLVE unable to resolve dependency tree` error, it means that you did not use this flag.
+
 2. Install dependencies:
 
    ```sh
