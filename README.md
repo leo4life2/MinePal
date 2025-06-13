@@ -29,7 +29,7 @@ MinePal is a desktop Minecraft companion app built with Electron that adds an AI
 ### Installation
 
 > [!NOTE]
-> Steps 2-4 can be skipped by running `setup.sh` script
+> Steps 2-5 can be skipped by running `setup.sh` script
 
 1. Clone the repository
 
@@ -60,7 +60,14 @@ MinePal is a desktop Minecraft companion app built with Electron that adds an AI
    cd ..
    ```
 
-4. Build the app:
+4. Build the frontend:
+```sh
+cd frontend
+npm install
+npm run build
+```
+
+5. Build the app:
 
    ```sh
    npm run buildLocal

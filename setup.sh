@@ -20,5 +20,11 @@ for dir in */; do
 done
 cd ..
 
-echo "Step 3. Building election"
+echo "Step 3. Building frontend"
+cd frontend
+npm install
+npm run build
+cd ..
+
+echo "Step 4. Building election"
 npm run buildLocal
