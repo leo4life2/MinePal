@@ -82,27 +82,8 @@ if (!gotTheLock) {
     app.setAsDefaultProtocolClient('minepal')
   }
 
-  // Handle the protocol. In this case, we choose to show an existing window
-  app.on('open-url', (event, url) => {
-    event.preventDefault();
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-      // Send the URL to the renderer process
-      if (url.includes('/auth/callback')) {
-        mainWindow.webContents.send('auth-callback', url);
-      } else if (url.includes('/import/pal')) {
-        mainWindow.webContents.send('import-pal-callback', url);
-      }
-    }
-  });
-
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
-    // Someone tried to run a second instance, we should focus our window.
-    // Protocol handler for win32
-    // commandLine includes the protocol url
-    if (process.platform === 'win32') {
-      const url = commandLine.find(arg => arg.startsWith('minepal://'));
+  function handle_url(url){
+    if (mainWindow && url.startsWith('minepal://')) {
       if (url) {
         if (url.includes('/auth/callback')) {
           mainWindow.webContents.send('auth-callback', url);
@@ -110,12 +91,30 @@ if (!gotTheLock) {
           mainWindow.webContents.send('import-pal-callback', url);
         }
       }
-    }
 
-    if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
+  }
+
+  // Handle the protocol. In this case, we choose to show an existing window
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    handle_url(url);
+  });
+
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Technically, MacOS should almost never open more than one instance of the app
+    // And even if so, I think app.requestSingleInstanceLock will prevent this anyway
+    // And even if not, it's probably will not run with url or it will be dismissed at handle_url
+    // Uncomment this code if everything breaks on Mac:
+
+    // if (process.platform === 'win32' || process.platform === 'linux') {
+    const url = commandLine.find(arg => arg.startsWith('minepal://'));
+    if (url){
+      handle_url(url);
+    }
+    // }
   });
 
   app.on('ready', async () => {
