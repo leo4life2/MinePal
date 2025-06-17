@@ -87,3 +87,15 @@ npm start
 ## License
 
 MIT
+
+## Known issues
+
+Sometimes on linux it fails to fetch Minecraft version that results in execption like this in `agent.log`:
+```
+[_processingLoop] Error during prompt cycle: TypeError: Cannot read properties of undefined (reading 'blocks')
+  at MCData.getAllBlocks
+  at MCData.getAllBlockIds
+  at Module.getNearestBlocks
+```
+
+For now we don't know why this is happening, so report this in discord or by creating an Issue
