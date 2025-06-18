@@ -21,12 +21,14 @@ MinePal is a desktop Minecraft companion app built with Electron that adds an AI
 
 ## Setup
 
+This section is for building an app from source. You can skip straight to [Installation guide](#installation) if you downloaded executable from [minepal.net](https://minepal.net/)
+
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (v14 or later)
 - [Electron](https://www.electronjs.org/)
 
-### Installation
+### Building from source
 
 > [!NOTE]
 > Steps 2-5 can be skipped by running `setup.sh` script
@@ -73,20 +75,14 @@ npm run build
    npm run buildLocal
    ```
 
-### Running the App
 
-```sh
-npm start
-```
+### Instalation
 
-### Agent
-
-1. Navigate to `src/agent/`.
-2. Actions that the bot can take are in `src/agent/commands/actions.js` or `src/agent/commands/queries.js`.
+Once you're done with build, check [Installation guide](#installation) to register url schemas and setup the AppImage system-wide.
 
 ## License
 
-MIT
+[MIT](LICENSE)
 
 ## Known issues
 
