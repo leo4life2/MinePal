@@ -56,7 +56,7 @@
       "node_modules/uiohook-napi/**"
     ],
     "appId": "com.nemosai.minepal",
-    "productName": "Minepal",
+    "productName": "MinePal",
     "afterSign": "notarize.js",
     "directories": {
       "buildResources": "build"
@@ -82,7 +82,7 @@
       "entitlements": "build/entitlements.plist",
       "hardenedRuntime": true,
       "target": [
-        "default"
+        "dmg"
       ]
     },
     "win": {

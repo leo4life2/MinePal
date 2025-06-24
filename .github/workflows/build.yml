@@ -71,7 +71,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: false  # We'll handle release manually
-          args: --mac --x64
+          args: --mac --x64 dmg
         env:
           CSC_LINK: file:///Users/runner/private_keys/certs.p12
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
@@ -166,7 +166,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: false  # We'll handle release manually
-          args: --mac --arm64
+          args: --mac --arm64 dmg
         env:
           CSC_LINK: file:///Users/runner/private_keys/certs.p12
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
