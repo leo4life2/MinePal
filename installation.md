@@ -13,22 +13,22 @@ This is your lucky day! No extra installation needed. Just open the app and have
 
 Well, bad luck, yet another day of setting up your system for a new app. Well, at least it's better then setting up wine, right?
 
-### Step 1. Moving it to /bin
+### Step 1. Moving it to /usr/local/bin
 
-First of all you need to make it persistent and available from any point of your system. Just navigate to your Download/dist directory and move it to `/bin` directory
+First of all you need to make it persistent and available from any point of your system. Just navigate to your Download/dist directory and move it to `/usr/local/bin` directory
 
 ```sh
-sudo mv Minepal-*.*.*.AppImage /bin/minepal
+sudo mv Minepal-*.*.*.AppImage /usr/local/bin/minepal
 ```
 
 > [!NOTE]
-> If you're actively rebuilding AppImage and work with source code a lot - you may found it easier to create a symbolic link. Just use `sudo ln -s /absolute/path/to/project/folder/dist/Minepal-*.*.*.AppImage /bin/minepal` command to make it work
+> If you're actively rebuilding AppImage and work with source code a lot - you may found it easier to create a symbolic link. Just use `sudo ln -s /absolute/path/to/project/folder/dist/Minepal-*.*.*.AppImage /usr/local/bin/minepal` command to make it work
 
 ### Step 2. Setting up xdg
 
 Then you need to setup xdg (x desktop group) so urls from the website (auth and importing pals) will be transferred to app. This is pretty simple: all we really need is create a desktop entery, register protocol and connect protocol to an entery.
 
-#### Step 2.1 Insalling xdg-tools
+#### Step 2.1 Installing xdg-tools
 First of all make sure that `xdg-tools` are installed
 ```sh
 sudo apt install xdg-utils  # Debian/Ubuntu
@@ -42,7 +42,7 @@ Then you need to create a desktop entery for the app. You can either put it into
 ```ini
 [Desktop Entry]
 Name=MinePal
-Exec=/bin/minepal %u
+Exec=/usr/local/bin/minepal %u
 Type=Application
 Terminal=false
 MimeType=x-scheme-handler/minepal;
@@ -52,10 +52,10 @@ Categories=Utility;
 Then update your desktop database
 ```sh
 update-desktop-database ~/.local/share/applications  # For user-specific
-update-desktop-database /usr/share/applications/  # For system-wide
+sudo update-desktop-database /usr/share/applications/  # For system-wide
 ```
 
-#### Step 2.3 Registering the MIME Type
+#### Step 2.3 Install the MIME Type
 Then you need to create MIME Type and register it. Create file `minepal-protocol.xml` with next content:
 ```xml
 <?xml version="1.0"?>
@@ -67,7 +67,7 @@ Then you need to create MIME Type and register it. Create file `minepal-protocol
 </mime-info>
 ```
 
-And instill it using `xdg-mime`
+And install it using `xdg-mime`
 ```sh
 xdg-mime install minepal-protocol.xml
 ```
@@ -85,4 +85,4 @@ xdg-mime query default x-scheme-handler/minepal
 ```
 returns `minepal.desktop`, then registration is complete
 
-**And after that you're ready to play! Have fun with your minepals!**
+**You're ready to play—enjoy 🎮**

@@ -26,7 +26,7 @@ This section is for building an app from source. You can skip straight to [Insta
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (v14 or later)
-- [Electron](https://www.electronjs.org/)
+- [Electron](https://www.electronjs.org/) (v25 or later)
 
 ### Building from source
 
@@ -76,9 +76,9 @@ npm run build
    ```
 
 
-### Instalation
+### Installation
 
-Once you're done with build, check [Installation guide](#installation) to register url schemas and setup the AppImage system-wide.
+Once you're done with the build, check [Installation guide](#installation) to register url schemas and setup the AppImage system-wide.
 
 ## License
 
