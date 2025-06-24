@@ -21,7 +21,7 @@ MinePal is a desktop Minecraft companion app built with Electron that adds an AI
 
 ## Setup
 
-This section is for building an app from source. You can skip straight to [Installation guide](#installation) if you downloaded executable from [minepal.net](https://minepal.net/)
+This section is for building an app from source. You can skip straight to [Installation guide](installation.md) if you downloaded executable from [minepal.net](https://minepal.net/)
 
 ### Prerequisites
 
@@ -78,7 +78,7 @@ npm run build
 
 ### Installation
 
-Once you're done with the build, check [Installation guide](#installation) to register url schemas and setup the AppImage system-wide.
+Once you're done with the build, check [Installation guide](installation.md) to register url schemas and setup the AppImage system-wide.
 
 ## License
 
