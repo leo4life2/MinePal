@@ -88,7 +88,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: release/intel/**/*
+          files: |
+            release/intel/*.dmg
+            release/intel/*.zip
+            release/intel/*.yml
+            release/intel/*.blockmap
           tag_name: ${{ github.ref_name }}
           draft: true
           prerelease: false
@@ -177,7 +181,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: release/arm64/**/*
+          files: |
+            release/arm64/*.dmg
+            release/arm64/*.zip
+            release/arm64/*.yml
+            release/arm64/*.blockmap
           tag_name: ${{ github.ref_name }}
           draft: true
           prerelease: false
