@@ -31,3 +31,7 @@ agent-runlogs/
 node_modules*/
 
 .cursor/
+
+*.p8
+*.p12
+*.keychain
