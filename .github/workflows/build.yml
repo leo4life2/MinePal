@@ -45,11 +45,7 @@ jobs:
               cd "$dir"
               npm install
               if [ -f "./tsconfig.json" ]; then
-                if npm run | grep -q "build"; then
-                  npm run build
-                elif npm run | grep -q "prepare"; then
-                  npm run prepare
-                fi
+                npm run build
               fi
               cd -
             fi
@@ -66,38 +62,37 @@ jobs:
           security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
 
-      - name: Build/release Electron app (macOS - x64)
+      - name: Build Electron app (macOS - Intel)
         uses: samuelmeuli/action-electron-builder@v1.6.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: false  # Don't publish yet, we'll handle artifacts manually
-          args: --mac --x64  # Build for Intel architecture
+          release: false  # We'll handle release manually
+          args: --mac --x64
         env:
           CSC_LINK: file:///Users/runner/private_keys/certs.p12
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
           API_KEY_ID: ${{ vars.API_KEY_ID }}
           API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
 
-      - name: Store Intel artifacts
+      - name: Organize Intel build for release
         run: |
-          mkdir -p artifacts/intel
-          cp -r dist/* artifacts/intel/ || true
-          # Rename latest-mac.yml to prevent overwrite by ARM build
-          if [ -f "dist/latest-mac.yml" ]; then
-            cp dist/latest-mac.yml artifacts/intel/latest-mac-intel.yml
-            echo "Preserved Intel latest-mac.yml as latest-mac-intel.yml"
-          fi
-          ls -la artifacts/intel/
+          mkdir -p release/intel
+          cp -r dist/* release/intel/
+          ls -la release/intel/
 
-      - name: Upload Intel artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload Intel build to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
         with:
-          name: macos-intel-artifacts
-          path: artifacts/intel/
+          files: release/intel/**/*
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos-arm:
     runs-on: macos-latest
-    needs: build-macos-intel  # Run after Intel build to avoid conflicts
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -135,11 +130,7 @@ jobs:
               cd "$dir"
               npm install
               if [ -f "./tsconfig.json" ]; then
-                if npm run | grep -q "build"; then
-                  npm run build
-                elif npm run | grep -q "prepare"; then
-                  npm run prepare
-                fi
+                npm run build
               fi
               cd -
             fi
@@ -156,38 +147,34 @@ jobs:
           security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
 
-      - name: Download Intel artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-intel-artifacts
-          path: artifacts/intel/
-
-      - name: Build/release Electron app (macOS - arm64)
+      - name: Build Electron app (macOS - ARM)
         uses: samuelmeuli/action-electron-builder@v1.6.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: ${{ startsWith(github.ref, 'refs/tags/v') }}  # This one publishes both architectures
-          args: --mac --arm64  # Build for ARM architecture
+          release: false  # We'll handle release manually
+          args: --mac --arm64
         env:
           CSC_LINK: file:///Users/runner/private_keys/certs.p12
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
           API_KEY_ID: ${{ vars.API_KEY_ID }}
           API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
 
-      - name: Merge artifacts and prepare final release
+      - name: Organize ARM build for release
         run: |
-          mkdir -p final_artifacts
-          cp -r artifacts/intel/* final_artifacts/ || true
-          cp -r dist/* final_artifacts/ || true
-          # Preserve ARM latest-mac.yml with distinct name
-          if [ -f "dist/latest-mac.yml" ]; then
-            cp dist/latest-mac.yml final_artifacts/latest-mac-arm.yml
-            echo "Preserved ARM latest-mac.yml as latest-mac-arm.yml"
-          fi
-          # List all yml files for verification
-          echo "Available mac yml files:"
-          ls -la final_artifacts/*.yml || echo "No yml files found"
-          ls -la final_artifacts/
+          mkdir -p release/arm64
+          cp -r dist/* release/arm64/
+          ls -la release/arm64/
+
+      - name: Upload ARM build to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/arm64/**/*
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-non-macos:
     runs-on: ${{ matrix.os }}
