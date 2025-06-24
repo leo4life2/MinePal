@@ -197,7 +197,7 @@ function Settings() {
           <SettingsSection title="Basic" isExpanded={true}>
             <div className="setting-item">
               <label htmlFor="player_username" className="input-label">
-                Your Minecraft Username
+                Your Username
               </label>
               <input
                 id="player_username"
