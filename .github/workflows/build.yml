@@ -84,15 +84,17 @@ jobs:
           cp -r dist/* release/intel/
           ls -la release/intel/
 
+      - name: Create Intel release archive
+        run: |
+          cd release
+          zip -r minepal-intel-${{ github.ref_name }}.zip intel/
+          ls -la *.zip
+
       - name: Upload Intel build to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            release/intel/*.dmg
-            release/intel/*.zip
-            release/intel/*.yml
-            release/intel/*.blockmap
+          files: release/minepal-intel-${{ github.ref_name }}.zip
           tag_name: ${{ github.ref_name }}
           draft: true
           prerelease: false
@@ -177,15 +179,17 @@ jobs:
           cp -r dist/* release/arm64/
           ls -la release/arm64/
 
+      - name: Create ARM release archive
+        run: |
+          cd release
+          zip -r minepal-arm64-${{ github.ref_name }}.zip arm64/
+          ls -la *.zip
+
       - name: Upload ARM build to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            release/arm64/*.dmg
-            release/arm64/*.zip
-            release/arm64/*.yml
-            release/arm64/*.blockmap
+          files: release/minepal-arm64-${{ github.ref_name }}.zip
           tag_name: ${{ github.ref_name }}
           draft: true
           prerelease: false
