@@ -6,149 +6,173 @@ on:
       - 'v*'
 
 jobs:
-  # build-macos-intel:
-  #   runs-on: macos-latest
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v3
-  #       with:
-  #         submodules: recursive
+  build-macos-intel:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
-  #     - name: Cache node modules
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: '**/node_modules'
-  #         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-node-
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-  #     - name: Set up Node.js
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: '22'
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
 
-  #     - name: Install dependencies
-  #       run: |
-  #         npm install --include=dev
-  #         cd frontend
-  #         npm install --include=dev
+      - name: Install dependencies
+        run: |
+          npm install --include=dev
+          cd frontend
+          npm install --include=dev
 
-  #     - name: Build frontend with Vite
-  #       run: |
-  #         cd frontend
-  #         npx vite build
+      - name: Build frontend with Vite
+        run: |
+          cd frontend
+          npx vite build
 
-  #     - name: Install & Build Submodules
-  #       run: |
-  #         for dir in ./libs/*; do
-  #           if [ -f "$dir/package.json" ]; then
-  #             cd "$dir"
-  #             npm install
-  #             if [ -f "./tsconfig.json" ]; then
-  #               npm run build
-  #             fi
-  #             cd -
-  #           fi
-  #         done
+      - name: Install & Build Submodules
+        run: |
+          for dir in ./libs/*; do
+            if [ -f "$dir/package.json" ]; then
+              cd "$dir"
+              npm install
+              if [ -f "./tsconfig.json" ]; then
+                npm run build
+              fi
+              cd -
+            fi
+          done
 
-  #     - name: Prepare for code signing
-  #       run: |
-  #         mkdir -p ~/private_keys/
-  #         echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
-  #         echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
-  #         security create-keychain -p "" build.keychain
-  #         security default-keychain -s build.keychain
-  #         security unlock-keychain -p "" build.keychain
-  #         security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
-  #         security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+      - name: Prepare for code signing
+        run: |
+          mkdir -p ~/private_keys/
+          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
+          echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
 
-  #     - name: Build/release Electron app (macOS - x64)
-  #       uses: samuelmeuli/action-electron-builder@v1.6.0
-  #       with:
-  #         github_token: ${{ secrets.GITHUB_TOKEN }}
-  #         release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-  #         publish: always
-  #         args: --mac --x64  # Build for Intel architecture
-  #       env:
-  #         CSC_LINK: file:///Users/runner/private_keys/certs.p12
-  #         CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
-  #         API_KEY_ID: ${{ vars.API_KEY_ID }}
-  #         API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
+      - name: Build/release Electron app (macOS - x64)
+        uses: samuelmeuli/action-electron-builder@v1.6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: false  # Don't publish yet, we'll handle artifacts manually
+          args: --mac --x64  # Build for Intel architecture
+        env:
+          CSC_LINK: file:///Users/runner/private_keys/certs.p12
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          API_KEY_ID: ${{ vars.API_KEY_ID }}
+          API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
 
-  # build-macos-arm:
-  #   runs-on: macos-latest
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v3
-  #       with:
-  #         submodules: recursive
+      - name: Store Intel artifacts
+        run: |
+          mkdir -p artifacts/intel
+          cp -r dist/* artifacts/intel/ || true
+          ls -la artifacts/intel/
 
-  #     - name: Cache node modules
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: '**/node_modules'
-  #         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-node-
+      - name: Upload Intel artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-intel-artifacts
+          path: artifacts/intel/
 
-  #     - name: Set up Node.js
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: '22'
+  build-macos-arm:
+    runs-on: macos-latest
+    needs: build-macos-intel  # Run after Intel build to avoid conflicts
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
-  #     - name: Install dependencies
-  #       run: |
-  #         npm install --include=dev
-  #         cd frontend
-  #         npm install --include=dev
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-  #     - name: Build frontend with Vite
-  #       run: |
-  #         cd frontend
-  #         npx vite build
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
 
-  #     - name: Install & Build Submodules
-  #       run: |
-  #         for dir in ./libs/*; do
-  #           if [ -f "$dir/package.json" ]; then
-  #             cd "$dir"
-  #             npm install
-  #             if [ -f "./tsconfig.json" ]; then
-  #               npm run build
-  #             fi
-  #             cd -
-  #           fi
-  #         done
+      - name: Install dependencies
+        run: |
+          npm install --include=dev
+          cd frontend
+          npm install --include=dev
 
-  #     - name: Prepare for code signing
-  #       run: |
-  #         mkdir -p ~/private_keys/
-  #         echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
-  #         echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
-  #         security create-keychain -p "" build.keychain
-  #         security default-keychain -s build.keychain
-  #         security unlock-keychain -p "" build.keychain
-  #         security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
-  #         security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+      - name: Build frontend with Vite
+        run: |
+          cd frontend
+          npx vite build
 
-  #     - name: Build/release Electron app (macOS - arm64)
-  #       uses: samuelmeuli/action-electron-builder@v1.6.0
-  #       with:
-  #         github_token: ${{ secrets.GITHUB_TOKEN }}
-  #         release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-  #         publish: always
-  #         args: --mac --arm64  # Build for ARM architecture
-  #       env:
-  #         CSC_LINK: file:///Users/runner/private_keys/certs.p12
-  #         CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
-  #         API_KEY_ID: ${{ vars.API_KEY_ID }}
-  #         API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
+      - name: Install & Build Submodules
+        run: |
+          for dir in ./libs/*; do
+            if [ -f "$dir/package.json" ]; then
+              cd "$dir"
+              npm install
+              if [ -f "./tsconfig.json" ]; then
+                npm run build
+              fi
+              cd -
+            fi
+          done
+
+      - name: Prepare for code signing
+        run: |
+          mkdir -p ~/private_keys/
+          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > ~/private_keys/certs.p12
+          echo "${{ secrets.NOTA_CERT }}" | base64 --decode > ~/private_keys/notarize.p8
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import ~/private_keys/certs.p12 -k build.keychain -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+      - name: Download Intel artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: macos-intel-artifacts
+          path: artifacts/intel/
+
+      - name: Build/release Electron app (macOS - arm64)
+        uses: samuelmeuli/action-electron-builder@v1.6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: ${{ startsWith(github.ref, 'refs/tags/v') }}  # This one publishes both architectures
+          args: --mac --arm64  # Build for ARM architecture
+        env:
+          CSC_LINK: file:///Users/runner/private_keys/certs.p12
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          API_KEY_ID: ${{ vars.API_KEY_ID }}
+          API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
+
+      - name: Merge artifacts and prepare final release
+        run: |
+          mkdir -p final_artifacts
+          cp -r artifacts/intel/* final_artifacts/ || true
+          cp -r dist/* final_artifacts/ || true
+          ls -la final_artifacts/
 
   build-non-macos:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest]
+        os: [windows-latest, ubuntu-latest]
 
     steps:
       - name: Checkout code
