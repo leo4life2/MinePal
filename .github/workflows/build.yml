@@ -82,6 +82,11 @@ jobs:
         run: |
           mkdir -p artifacts/intel
           cp -r dist/* artifacts/intel/ || true
+          # Rename latest-mac.yml to prevent overwrite by ARM build
+          if [ -f "dist/latest-mac.yml" ]; then
+            cp dist/latest-mac.yml artifacts/intel/latest-mac-intel.yml
+            echo "Preserved Intel latest-mac.yml as latest-mac-intel.yml"
+          fi
           ls -la artifacts/intel/
 
       - name: Upload Intel artifacts
@@ -174,6 +179,14 @@ jobs:
           mkdir -p final_artifacts
           cp -r artifacts/intel/* final_artifacts/ || true
           cp -r dist/* final_artifacts/ || true
+          # Preserve ARM latest-mac.yml with distinct name
+          if [ -f "dist/latest-mac.yml" ]; then
+            cp dist/latest-mac.yml final_artifacts/latest-mac-arm.yml
+            echo "Preserved ARM latest-mac.yml as latest-mac-arm.yml"
+          fi
+          # List all yml files for verification
+          echo "Available mac yml files:"
+          ls -la final_artifacts/*.yml || echo "No yml files found"
           ls -la final_artifacts/
 
   build-non-macos:
