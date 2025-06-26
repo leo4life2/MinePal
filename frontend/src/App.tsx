@@ -14,6 +14,7 @@ import ThemeProvider from './contexts/ThemeContext/ThemeProvider';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
 import pkg from '../../package.json';
 import { useState } from 'react';
+import { ChevronLeft, ChevronRight, Sliders, Star, User } from 'react-feather';
 
 export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -34,7 +35,7 @@ export default function App() {
                 <div className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
                   <div className="sidebar-header">
                     <button className="sidebar-toggle" onClick={toggleSidebar}>
-                      {isSidebarCollapsed ? '→' : '←'}
+                      {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                     </button>
                   </div>
                   
@@ -44,21 +45,21 @@ export default function App() {
                         className={`sidebar-item ${activeSection === 'Controls' ? 'active' : ''}`}
                         onClick={() => setActiveSection('Controls')}
                       >
-                        <span className="sidebar-icon">⚙️</span>
+                        <Sliders className="sidebar-icon" size={16} />
                         {!isSidebarCollapsed && <span>Controls</span>}
                       </button>
                       <button 
                         className={`sidebar-item ${activeSection === 'Imagine' ? 'active' : ''}`}
                         onClick={() => setActiveSection('Imagine')}
                       >
-                        <span className="sidebar-icon">✨</span>
+                        <Star className="sidebar-icon" size={16} />
                         {!isSidebarCollapsed && <span>Imagine</span>}
                       </button>
                     </div>
                     
                     <div className="sidebar-bottom">
                       <button className="sidebar-item">
-                        <span className="sidebar-icon">👤</span>
+                        <User className="sidebar-icon" size={16} />
                         {!isSidebarCollapsed && <span>Account</span>}
                       </button>
                     </div>

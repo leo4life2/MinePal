@@ -139,9 +139,10 @@ body {
 }
 
 .sidebar-icon {
-  font-size: 16px;
   min-width: 20px;
-  text-align: center;
+  width: 16px;
+  height: 16px;
+  transition: stroke 0.3s ease;
 }
 
 .sidebar.collapsed .sidebar-item {
