@@ -55,7 +55,7 @@ function createWindow() {
         },
     });
 
-    if (process.env.NODE_ENV === 'dev' && false) { // i do this manually
+    if (process.env.NODE_ENV === 'dev') { // i do this manually
         mainWindow.loadURL('http://localhost:5173');
     } else {
         const indexPath = path.join(app.getAppPath(), 'frontend', 'dist', 'index.html');
