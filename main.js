@@ -47,7 +47,7 @@ async function checkAndCreateProfilesDir() {
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 650,
+        width: 850,
         height: 850,
         webPreferences: {
             nodeIntegration: true,
