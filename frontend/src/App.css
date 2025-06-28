@@ -179,7 +179,6 @@ body {
   display: flex;
   justify-content: center;
   overflow-y: auto;
-  padding: 40px 0;
 }
 
 .main-content.sidebar-collapsed {
@@ -218,6 +217,97 @@ h1 small {
   opacity: 0.6;
 }
 
+/* Imagine Page Image Upload Styles */
+.imagine-image-upload-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.imagine-image-upload-box {
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+  max-width: 50px;
+  border: 3px dashed var(--hover-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  flex-grow: 0;
+  opacity: 0.5;
+}
+
+.imagine-image-upload-box:hover {
+  opacity: 1;
+}
+
+.imagine-image-upload-box.dragging {
+  opacity: 1;
+}
+
+.imagine-image-upload-box.has-image {
+  cursor: default;
+  padding: 0;
+}
+
+.imagine-upload-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hover-color);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.imagine-image-preview-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.imagine-image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.imagine-remove-image-button {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  color: white;
+}
+
+.imagine-remove-image-button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.imagine-remove-image-button:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+
+
 /* Imagine Page */
 .imagine-page {
   width: 100%;
@@ -242,14 +332,55 @@ h1 small {
 }
 
 /* Credits Display */
+.credits-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.credits-plus-button {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #ca6a16 0%, #a85411 100%);
+  border: none;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+  z-index: 2;
+  margin-right: -8px; /* Overlap with credits display */
+}
+
+.credits-plus-button svg {
+  width: 18px; /* Ensure SVG has explicit size */
+  height: 18px; /* Ensure SVG has explicit size */
+  flex-shrink: 0; /* Prevent flex from shrinking the SVG */
+  stroke: currentColor; /* Ensure icon color is applied */
+  stroke-width: 3; /* Make the plus sign fatter */
+}
+
+.credits-plus-button:hover {
+  background: linear-gradient(135deg, var(--secondary-color) 0%, #ca6a16 100%);
+  transform: scale(1.05);
+}
+
 .credits-display {
   display: flex;
   align-items: center;
   gap: 8px;
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 6px 10px 6px 18px; /* Extra left padding for overlap */
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
   font-size: 16px;
   font-weight: 500;
-  color: var(--text-color);
-  opacity: 0.8;
+}
+
+.dark .credits-display {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .credits-icon {
@@ -257,7 +388,8 @@ h1 small {
 }
 
 .credits-text {
-  color: var(--secondary-color);
+  color: white;
+  font-weight: 600;
 }
 
 
@@ -315,10 +447,6 @@ h1 small {
   margin: 20px 0;
 }
 
-.textarea-container {
-  position: relative;
-}
-
 .imagine-prompt-textarea {
   width: 100%;
   min-height: 180px;
@@ -346,34 +474,10 @@ h1 small {
   box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.1);
 }
 
-.custom-placeholder {
-  position: absolute;
-  top: 15px;
-  left: 15px;
-  right: 15px;
-  color: var(--text-color);
-  opacity: 0.6;
-  font-style: italic;
-  font-size: 16px;
-  font-family: inherit;
-  line-height: 1.5;
-  pointer-events: none;
-  white-space: pre-line;
-}
-
-.custom-placeholder div {
-  margin-bottom: 4px;
-}
-
-.custom-placeholder div:last-child {
-  margin-bottom: 0;
-}
-
 /* Pal Selector */
 .pal-selector-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 20px;
   margin: 20px 0;
 }
