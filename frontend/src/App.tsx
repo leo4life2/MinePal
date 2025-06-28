@@ -1,17 +1,12 @@
 import './App.css';
-import Settings from './components/Settings/Settings';
-import Actions from './components/Actions/Actions';
 import UserSettingsProvider from './contexts/UserSettingsContext/UserSettingsProvider';
 import AgentProvider from './contexts/AgentContext/AgentProvider';
 import ErrorReportProvider from './contexts/ErrorReportContext/ErrorReportProvider';
 import SupabaseProvider from './contexts/SupabaseContext/SupabaseProvider';
-import ErrorDisplay from './components/ErrorDisplay';
-import Profiles from './components/Profiles';
-import Footer from './components/Footer/Footer';
-import settingNotes from './utils/settingsNotes';
-import Announcement from './components/Announcement';
 import ThemeProvider from './contexts/ThemeContext/ThemeProvider';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
+import ControlsPage from './components/ControlsPage';
+import ImaginePage from './components/ImaginePage';
 import pkg from '../../package.json';
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Sliders, Star, BookOpen } from 'react-feather';
@@ -79,30 +74,12 @@ export default function App() {
                 <div className={`main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
               <div className="container">
                 <ThemeToggle />
-                <h1>
+                                    <h1>
                       MinePal {activeSection} <small>v{pkg.version}</small>
-                </h1>
+                    </h1>
                     
-                    {activeSection === 'Controls' && (
-                      <>
-                <Announcement />
-                <label htmlFor="profiles" className="input-label">
-                  Choose Your Pals
-                  {settingNotes.pal_message && <span className="setting-note"> ({settingNotes.pal_message})</span>}
-                </label>
-                <Profiles />
-                <Settings />
-                <Actions />
-                <ErrorDisplay />
-                <Footer />
-                      </>
-                    )}
-                    
-                    {activeSection === 'Imagine' && (
-                      <div className="imagine-section">
-                        <p>Imagine section - Coming soon!</p>
-                      </div>
-                    )}
+                    {activeSection === 'Controls' && <ControlsPage />}
+                    {activeSection === 'Imagine' && <ImaginePage />}
                   </div>
                 </div>
               </div>
