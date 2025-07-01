@@ -541,7 +541,9 @@ h1 small {
 .imagine-button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  flex: 1;
   padding: 12px 20px;
   background: var(--primary-color);
   color: white;
