@@ -76,7 +76,7 @@ export const actionsList = [
         player_name: "(string) The name of the player to teleport to.",
     },
     perform: wrapExecution(async (agent, player_name) => {
-        return await skills.teleportToPlayer(agent.bot, player_name);
+        return await skills.teleportToPlayer(agent.bot, player_name, agent);
     }),
   },
   {
@@ -523,6 +523,24 @@ export const actionsList = [
     perform: wrapExecution(async (agent) => {
       // This is a placebo for the LLM to know that the actions are complete.
       return "Giving up on the current task and going idle.";
+    }),
+  },
+  {
+    name: "!generateStructure",
+    description: "Generate a structure from a predefined template by executing Minecraft commands.",
+    params: {
+      structure_id: "(number) The ID of the structure template to generate."
+    },
+    perform: wrapExecution(async (agent, structure_id) => {
+      return await skills.generateStructure(agent.bot, structure_id, agent);
+    }),
+  },
+  {
+    name: "!checkCheats",
+    description: "Check if cheats are enabled on the server by attempting to teleport to the owner.",
+    params: {},
+    perform: wrapExecution(async (agent) => {
+      return await skills.checkCheats(agent.bot, agent.owner, agent);
     }),
   },
   // {

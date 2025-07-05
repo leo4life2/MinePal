@@ -10,6 +10,7 @@ import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
 import * as world from "./library/world.js";
 import { emote } from './library/skills.js';
+import * as skills from './library/skills.js';
 
 // --- Silence Timer Constants ---
 const MEAN_1 = 27; // Base mean silence duration in seconds for the first silence
@@ -226,6 +227,7 @@ export class Agent {
         this.ownerHurtCooldownActive = false; // Cooldown flag for owner hurt event
         this.botHurtCooldownActive = false; // Cooldown flag for bot hurt event
         this.reportedRareBlocks = new Set(); // Cache for reported rare block locations (stores "x,y,z")
+        this.cheatsEnabled = false; // Track whether cheats are enabled on the server
 
         // --- Prompting State Management ---
         this.promptingState = 'idle'; // 'idle', 'prompting', 'executing'
@@ -494,6 +496,10 @@ export class Agent {
             }
             const initialSystemMessage = prefix + suffix;
 
+            // Check if cheats are enabled by attempting to teleport to owner
+            await skills.checkCheats(this.bot, this.owner, this);
+
+            // This is where we make the bot say the first line on join of the server
             await this.handleMessage('system', initialSystemMessage)
             
             // Handle auto-message on join
