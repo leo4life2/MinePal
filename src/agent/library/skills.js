@@ -1870,32 +1870,35 @@ export async function goToPlayer(bot, username, distance = 1) {
   log(bot, `You have reached ${username}.`);
 }
 
-export async function teleportToPlayer(bot, username) {
+export async function teleportToPlayer(bot, username, agent) {
   /**
    * Teleport to the given player.
    * @param {MinecraftBot} bot, reference to the minecraft bot.
    * @param {string} username, the username of the player to teleport to.
+   * @param {Agent} agent - Reference to the agent instance.
    * @returns {Promise<boolean>} true if the player was found and teleported to, false otherwise.
    * @example
-   * await skills.teleportToPlayer(bot, "player");
+   * await skills.teleportToPlayer(bot, "player", agent);
    **/
   if (!username) {
     log(bot, `No username provided.`);
     return false;
   }
+
+  if (!agent.cheatsEnabled) {
+    log(bot, "Cannot teleport: Cheats are not enabled for you.");
+    return false;
+  }
+
   bot.chat("/tp @s " + username);
   await new Promise((resolve) => setTimeout(resolve, 500)); // wait for tp to complete
+  
   let player = bot.players[username]?.entity;
-  if (!player) {
-    log(bot, `username ${username} not found, teleporting to owner.`);
-  }
-  if (
-    bot.entity.position.distanceTo(player.position) <= NEAR_DISTANCE
-  ) {
+  if (player && bot.entity.position.distanceTo(player.position) <= 0.5) {
     log(bot, `Teleported to ${username}.`);
     return true;
   } else {
-    log(bot, "Cannot teleport, is cheats on?");
+    log(bot, "Teleport failed - you're not next to the player.");
     return false;
   }
 }
@@ -2985,6 +2988,142 @@ export async function unequip(bot, destination) {
 }
 
 // --- End Container Interaction Skills ---
+
+export async function checkCheats(bot, ownerUsername, agent) {
+  /**
+   * Check if cheats are enabled on the server by attempting to teleport to the owner.
+   * Updates the agent's cheatsEnabled instance variable.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {string} ownerUsername - The username of the owner to teleport to.
+   * @param {Agent} agent - Reference to the agent instance.
+   * @returns {Promise<string>} A message indicating the result.
+   */
+  try {
+
+    bot.chat(`/tp @s ${ownerUsername}`);
+    await new Promise((resolve) => setTimeout(resolve, 25)); // Wait for teleport
+
+    const ownerEntity = bot.players[ownerUsername]?.entity;
+    if (ownerEntity && bot.entity.position.distanceTo(ownerEntity.position) <= 0.5) {
+      agent.cheatsEnabled = true;
+      const distance = bot.entity.position.distanceTo(ownerEntity.position);
+      const message = `Cheats are ENABLED for you.`;
+      log(bot, message);
+      return message;
+    } else {
+      agent.cheatsEnabled = false;
+      const message = `Cheats are DISABLED for you.`;
+      log(bot, message);
+      return message;
+    }
+
+  } catch (err) {
+    const message = `Failed to check cheats: ${err.message}`;
+    log(bot, message);
+    return message;
+  }
+}
+
+export async function generateStructure(bot, structure_id, agent) {
+  /**
+   * Generate a structure from a JSON template by executing Minecraft commands.
+   * @param {MinecraftBot} bot - Reference to the minecraft bot.
+   * @param {number} structure_id - The ID of the structure to generate (currently unused in prototype).
+   * @param {Agent} agent - Reference to the agent instance.
+   * @returns {Promise<string>} A message indicating success or failure.
+   * @example
+   * await skills.generateStructure(bot, 1, agent);
+   */
+  try {
+    // Check if cheats are enabled using the agent's instance variable
+    if (!agent.cheatsEnabled) {
+      const message = "Cannot generate structure: Cheats are not enabled for you. Structure generation requires operator permissions or cheats to be enabled.";
+      log(bot, message);
+      return message;
+    }
+
+    // Read the sandbox_output.json file
+    const jsonFilePath = path.join(__dirname, 'sandbox_output.json');
+    
+    if (!fs.existsSync(jsonFilePath)) {
+      const message = `Structure template file not found at ${jsonFilePath}. Please ensure sandbox_output.json exists in the library directory.`;
+      log(bot, message);
+      return message;
+    }
+
+    const data = fs.readFileSync(jsonFilePath, 'utf8');
+    const operations = JSON.parse(data);
+
+    if (!Array.isArray(operations)) {
+      const message = "Invalid structure template format. Expected a JSON array of operations.";
+      log(bot, message);
+      return message;
+    }
+    
+    // Get bot's current position as the origin for the structure
+    const botPos = bot.entity.position;
+    const originX = Math.floor(botPos.x);
+    const originY = Math.floor(botPos.y);
+    const originZ = Math.floor(botPos.z);
+    
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Execute each operation
+    for (let i = 0; i < operations.length; i++) {
+      const operation = operations[i];
+      
+      if (bot.interrupt_code) {
+        log(bot, "Structure generation interrupted.");
+        break;
+      }
+
+      try {
+        let command = "";
+        
+        if (operation.op === "fill") {
+          // Format: /fill x1 y1 z1 x2 y2 z2 block
+          // Add bot's position to make it relative to bot
+          const [x1, y1, z1] = operation.from;
+          const [x2, y2, z2] = operation.to;
+          const worldX1 = originX + x1;
+          const worldY1 = originY + y1;
+          const worldZ1 = originZ + z1;
+          const worldX2 = originX + x2;
+          const worldY2 = originY + y2;
+          const worldZ2 = originZ + z2;
+          command = `/fill ${worldX1} ${worldY1} ${worldZ1} ${worldX2} ${worldY2} ${worldZ2} ${operation.block}`;
+        } else if (operation.op === "setBlock") {
+          // Format: /setblock x y z block
+          // Add bot's position to make it relative to bot
+          const worldX = originX + operation.x;
+          const worldY = originY + operation.y;
+          const worldZ = originZ + operation.z;
+          command = `/setblock ${worldX} ${worldY} ${worldZ} ${operation.block}`;
+        } else {
+          errorCount++;
+          continue;
+        }
+
+        // Execute the command
+        bot.chat(command);
+        successCount++;
+        
+      } catch (err) {
+        errorCount++;
+      }
+    }
+
+    const message = `Structure generation completed. Successfully executed ${successCount} operations${errorCount > 0 ? `, with ${errorCount} errors` : ''}.`;
+    log(bot, message);
+    return message;
+
+  } catch (err) {
+    const message = `Failed to generate structure: ${err.message}`;
+    log(bot, message);
+    return message;
+  }
+}
 
 // --- Emote Skills ---
 
