@@ -7,6 +7,7 @@ import { plugin as collectblock } from 'mineflayer-collectblock';
 import { loader as autoEat } from 'mineflayer-auto-eat';
 import plugin from 'mineflayer-armor-manager';
 import protocolForge from 'minecraft-protocol-forge';
+import mc from 'minecraft-protocol';
 
 const armorManager = plugin;
 
@@ -30,7 +31,8 @@ class MCData {
     }
 
     initBot(name) {
-        this.bot = createBot({
+        // Create the minecraft-protocol client manually to set up listeners before connection
+        const client = mc.createClient({
             username: name,
             host: this.settings.host,
             port: this.settings.port,
@@ -38,12 +40,26 @@ class MCData {
             version: false,
         });
 
-        // Create bot gets the version of the game for us
-        // Now we set mcdata and prismarine_items to the correct version
-        this.bot._client.once('version_detected', (version) => {
-            console.log('Joining game of version: ', version);
+        // Set up the version_detected listener BEFORE the connection starts
+        client.once('version_detected', (version) => {
+            console.log('[MCData] Joining game of version: ', version);
             this.mcdata = minecraftData(version);
             this.Item = prismarine_items(version);
+            // Store version on the client for mineflayer to use
+            client.version = version;
+        });
+
+        // Now create the bot with the pre-configured client
+        this.bot = createBot({
+            client: client,
+            username: name,
+            host: this.settings.host,
+            port: this.settings.port,
+            auth: this.settings.auth,
+        });
+
+        // Store the version on bot for compatibility
+        this.bot._client.on('version_detected', (version) => {
             this.bot.minecraft_version = version;
         });
 
