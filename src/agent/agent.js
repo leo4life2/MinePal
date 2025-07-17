@@ -1355,7 +1355,7 @@ export class Agent {
                         let execute_res;
                         try {
                             execute_res = await executeCommand(this, command);
-                            console.log(`[_processPromptCycle] Command ${command_name} finished. Result:`, execute_res);
+                            console.log(`[_processPromptCycle] Command ${command} finished. Result:`, execute_res);
                             if (execute_res !== undefined && execute_res !== null) {
                                 this.history.add('system', `[EXEC_RES | ${timeStr}] Output of action ${command_name}: ${truncCommandMessage(String(execute_res))}`);
                             }

@@ -6,6 +6,7 @@ import { queryList } from "../commands/queries.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import axios from 'axios';
 
 const NEAR_DISTANCE = 4.5;
 const MID_DISTANCE = 8;
@@ -3026,9 +3027,9 @@ export async function checkCheats(bot, ownerUsername, agent) {
 
 export async function generateStructure(bot, structure_id, agent) {
   /**
-   * Generate a structure from a JSON template by executing Minecraft commands.
+   * Generate a structure from Supabase by executing Minecraft commands.
    * @param {MinecraftBot} bot - Reference to the minecraft bot.
-   * @param {number} structure_id - The ID of the structure to generate (currently unused in prototype).
+   * @param {number} structure_id - The ID of the structure to generate from the Supabase structures table.
    * @param {Agent} agent - Reference to the agent instance.
    * @returns {Promise<string>} A message indicating success or failure.
    * @example
@@ -3042,20 +3043,26 @@ export async function generateStructure(bot, structure_id, agent) {
       return message;
     }
 
-    // Read the sandbox_output.json file
-    const jsonFilePath = path.join(__dirname, 'sandbox_output.json');
-    
-    if (!fs.existsSync(jsonFilePath)) {
-      const message = `Structure template file not found at ${jsonFilePath}. Please ensure sandbox_output.json exists in the library directory.`;
+    // Fetch structure data from local API
+    let structureResponse;
+    try {
+      structureResponse = await axios.get(`http://localhost:10101/structure/${structure_id}`);
+    } catch (error) {
+      if (error.response?.status === 404) {
+        const message = `Structure ID ${structure_id} does not exist. Please check the ID and try again.`;
+        log(bot, message);
+        return message;
+      }
+      const message = `Failed to fetch structure ${structure_id}: ${error.response?.data?.error || error.message}`;
       log(bot, message);
       return message;
     }
-
-    const data = fs.readFileSync(jsonFilePath, 'utf8');
-    const operations = JSON.parse(data);
-
-    if (!Array.isArray(operations)) {
-      const message = "Invalid structure template format. Expected a JSON array of operations.";
+    
+    const operations = structureResponse.data.buildscript;
+    const structurePrompt = structureResponse.data.prompt;
+    
+    if (!operations || !Array.isArray(operations)) {
+      const message = `Invalid structure data format for ${structure_id}. Expected buildscript to be an array of operations.`;
       log(bot, message);
       return message;
     }
@@ -3101,6 +3108,7 @@ export async function generateStructure(bot, structure_id, agent) {
           const worldZ = originZ + operation.z;
           command = `/setblock ${worldX} ${worldY} ${worldZ} ${operation.block}`;
         } else {
+          console.warn(`[generateStructure] Unknown operation type: ${operation.op}`);
           errorCount++;
           continue;
         }
@@ -3109,13 +3117,27 @@ export async function generateStructure(bot, structure_id, agent) {
         bot.chat(command);
         successCount++;
         
+        // Small delay between commands to avoid spam
+        await new Promise(resolve => setTimeout(resolve, 1));
       } catch (err) {
+        console.error(`[generateStructure] Error executing operation ${i}:`, err);
         errorCount++;
       }
     }
 
-    const message = `Structure generation completed. Successfully executed ${successCount} operations${errorCount > 0 ? `, with ${errorCount} errors` : ''}.`;
+    // Update the generations counter via API
+    try {
+      await axios.post(`http://localhost:10101/structure/${structure_id}/increment-generations`);
+    } catch (updateErr) {
+      console.error(`[generateStructure] Error updating generations counter:`, updateErr.response?.data?.error || updateErr.message);
+    }
+
+    const message = `Structure ${structure_id} generation completed. Successfully executed ${successCount} operations${errorCount > 0 ? `, with ${errorCount} errors` : ''}.`;
     log(bot, message);
+    
+    // Tell the bot what it just built
+    log(bot, `You just built: ${structurePrompt}`);
+    
     return message;
 
   } catch (err) {

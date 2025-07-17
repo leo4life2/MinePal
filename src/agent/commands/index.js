@@ -74,7 +74,7 @@ function numRequiredParams(command) {
     if (!command.params) return 0;
     let requiredCount = 0;
     for (const paramDesc of Object.values(command.params)) {
-        if (!paramDesc.toLowerCase().includes('(optional)')) {
+        if (!paramDesc.toLowerCase().includes('optional)')) {
             requiredCount++;
         }
     }
@@ -85,9 +85,38 @@ export async function executeCommand(agent, message) {
     let parsed = parseCommandMessage(message);
     if (parsed) {
         const command = getCommand(parsed.commandName);
+        
+        // Validate that the command exists
+        if (!command) {
+            return `Command ${parsed.commandName} does not exist`;
+        }
+        
         console.log('Executing command:', command.name);
         console.log('Agent:', agent.name);
         console.log('Arguments:', JSON.stringify(parsed.args, null, 2));
+
+        // Validate argument count
+        const requiredParams = numRequiredParams(command);
+        const providedArgs = parsed.args.length;
+        
+        // Get total param count (required + optional)
+        const totalParams = command.params ? Object.keys(command.params).length : 0;
+        
+        // Check if we have too few arguments (less than required)
+        if (providedArgs < requiredParams) {
+            const paramNames = command.params ? Object.keys(command.params) : [];
+            const paramDescriptions = paramNames.map(name => `${name}: ${command.params[name]}`).join('\n  ');
+            return `Command ${command.name} requires ${requiredParams} argument(s) but got ${providedArgs}. ` +
+                   `Expected format: ${command.name}(${paramNames.join(', ')})\n` +
+                   `Parameters:\n  ${paramDescriptions}`;
+        }
+        
+        // Check if we have too many arguments
+        if (providedArgs > totalParams) {
+            const paramNames = command.params ? Object.keys(command.params) : [];
+            return `Command ${command.name} accepts at most ${totalParams} argument(s) but got ${providedArgs}. ` +
+                   `Expected format: ${command.name}(${paramNames.join(', ')})`;
+        }
 
         let result;
         let isSuccess = true;
@@ -121,7 +150,7 @@ export async function executeCommand(agent, message) {
         }
         return result;
     } else
-        return `Command is incorrectly formatted`;
+        return `Command is incorrectly formatted. Commands should be in the format: !commandName(arg1, arg2, ...) or !commandName() for no arguments.`;
 }
 
 export function getCommandDocs() {

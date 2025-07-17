@@ -825,6 +825,122 @@ function startServer() {
             res.status(500).json({ error: "Internal server error while logging agent session." });
         }
     });
+    // --- Structure Management Endpoints ---
+    app.get('/structure/:id', async (req, res) => {
+        const { id } = req.params;
+
+        try {
+            if (!supabase) {
+                logToFile('Supabase client not initialized for structure fetch');
+                return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
+            }
+
+            const { data: structureData, error } = await supabase
+                .from('structures')
+                .select('buildscript, prompt')
+                .eq('id', id)
+                .single();
+
+            if (error) {
+                // Handle specific case where structure ID doesn't exist
+                if (error.message?.includes('JSON object requested, multiple (or no) rows returned') || 
+                    error.code === 'PGRST116') {
+                    return res.status(404).json({ error: `Structure ID ${id} does not exist` });
+                }
+                logToFile(`Supabase error fetching structure ${id}: ${error.message}`);
+                return res.status(500).json({ error: `Database error: ${error.message}` });
+            }
+
+            if (!structureData) {
+                return res.status(404).json({ error: `Structure ID ${id} does not exist` });
+            }
+
+            res.json({ 
+                buildscript: structureData.buildscript,
+                prompt: structureData.prompt 
+            });
+        } catch (error) {
+            logToFile(`Error in /structure/${id}: ${error.message}`);
+            res.status(500).json({ error: "Internal server error while fetching structure." });
+        }
+    });
+
+    app.post('/structure/:id/increment-generations', async (req, res) => {
+        const { id } = req.params;
+
+        try {
+            if (!supabase) {
+                logToFile('Supabase client not initialized for increment-generations');
+                return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
+            }
+
+            // First, get the current generations value
+            const { data: structureData, error: fetchError } = await supabase
+                .from('structures')
+                .select('generations')
+                .eq('id', id)
+                .single();
+            
+            if (fetchError) {
+                logToFile(`Supabase error fetching current generations for structure ${id}:`);
+                logToFile(`  Error code: ${fetchError.code}`);
+                logToFile(`  Error message: ${fetchError.message}`);
+                logToFile(`  Error details: ${JSON.stringify(fetchError.details)}`);
+                logToFile(`  Error hint: ${fetchError.hint}`);
+                return res.status(500).json({ 
+                    error: `Database error fetching structure: ${fetchError.message}`,
+                    details: {
+                        code: fetchError.code,
+                        hint: fetchError.hint
+                    }
+                });
+            }
+            
+            if (!structureData) {
+                logToFile(`Structure ${id} not found when trying to increment generations`);
+                return res.status(404).json({ error: `Structure ${id} not found` });
+            }
+            
+            // Increment and update
+            const newGenerations = (structureData.generations || 0) + 1;
+            
+            const { error: updateError } = await supabase
+                .from('structures')
+                .update({ generations: newGenerations })
+                .eq('id', id);
+
+            if (updateError) {
+                logToFile(`Supabase error updating generations for structure ${id}:`);
+                logToFile(`  Error code: ${updateError.code}`);
+                logToFile(`  Error message: ${updateError.message}`);
+                logToFile(`  Error details: ${JSON.stringify(updateError.details)}`);
+                logToFile(`  Error hint: ${updateError.hint}`);
+                return res.status(500).json({ 
+                    error: `Database error updating generations: ${updateError.message}`,
+                    details: {
+                        code: updateError.code,
+                        hint: updateError.hint
+                    }
+                });
+            }
+
+            res.json({ 
+                message: `Generations counter incremented for structure ${id}`,
+                newCount: newGenerations
+            });
+        } catch (error) {
+            logToFile(`Unexpected error in /structure/${id}/increment-generations:`);
+            logToFile(`  Error name: ${error.name}`);
+            logToFile(`  Error message: ${error.message}`);
+            logToFile(`  Error stack: ${error.stack}`);
+            res.status(500).json({ 
+                error: `Internal server error while incrementing generations: ${error.message}`,
+                type: error.name
+            });
+        }
+    });
+    // --- End Structure Management Endpoints ---
+
     // --- End Supabase Logging Endpoints ---
 
     // --- Backup and Restore Endpoints ---
