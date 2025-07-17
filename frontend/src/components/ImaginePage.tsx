@@ -12,7 +12,6 @@ const ImaginePage = () => {
   const credits = imagineCredits ?? 0;
   const [mode, setMode] = useState<'Normal' | 'Detailed'>('Normal');
   const [prompt, setPrompt] = useState('');
-  const [selectedPal, setSelectedPal] = useState('Steve');
   const [isImagining, setIsImagining] = useState(false);
   // @ts-expect-error - selectedImage will be used for image upload feature later
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -47,13 +46,15 @@ const ImaginePage = () => {
 
 
   const creditCost = mode === 'Normal' ? 1 : 3;
-  const mockPals = ['Steve', 'Alex', 'Builder1']; // Mock pal list
 
   // Fake progress animation effect
   useEffect(() => {
     if (isImagining) {
+      // Different durations based on mode
+      const totalDuration = mode === 'Normal' ? 50 : 70;
+      
       setProgress(0);
-      setTimeRemaining(60);
+      setTimeRemaining(totalDuration);
       
       let elapsed = 0;
       progressIntervalRef.current = setInterval(() => {
@@ -61,17 +62,17 @@ const ImaginePage = () => {
         
         // Sharp logarithmic curve - starts very slow, gradually speeds up, then slows down
         // Using a sigmoid-like function for more natural feel
-        const normalizedTime = elapsed / 60; // Normalize to 0-1 over 60 seconds
+        const normalizedTime = elapsed / totalDuration; // Normalize to 0-1 over total duration
         const sigmoidProgress = 95 * (1 / (1 + Math.exp(-8 * (normalizedTime - 0.5))));
         const fakeProgress = Math.min(95, sigmoidProgress);
         setProgress(fakeProgress);
         
         // Time remaining follows the same curve (inverse of progress)
-        // At 0% progress: 60s remaining
-        // At 50% progress: ~25s remaining  
+        // At 0% progress: totalDuration remaining
+        // At 50% progress: ~half remaining  
         // At 95% progress: gets stuck around 3-8s
         const progressRatio = fakeProgress / 100;
-        const baseRemaining = 60 * (1 - progressRatio);
+        const baseRemaining = totalDuration * (1 - progressRatio);
         
         // Add some stickiness at the end - gets stuck between 3-8 seconds
         let remaining;
@@ -105,7 +106,7 @@ const ImaginePage = () => {
         clearInterval(progressIntervalRef.current);
       }
     };
-  }, [isImagining]);
+  }, [isImagining, mode]);
 
   const handleImagine = async () => {
     if (credits >= creditCost && prompt.trim()) {
@@ -316,22 +317,6 @@ const ImaginePage = () => {
               style={{ display: 'none' }}
             />
           </div>
-        </div>
-
-        {/* Pal Selector */}
-        <div className="pal-selector-row">
-          <label className="input-label pal-label">
-            <span>Generate on Pal?</span>
-          </label>
-          <select 
-            value={selectedPal} 
-            onChange={(e) => setSelectedPal(e.target.value)}
-            className="pal-select"
-          >
-            {mockPals.map(pal => (
-              <option key={pal} value={pal}>{pal}</option>
-            ))}
-          </select>
         </div>
 
         {/* Imagine Button Row */}
