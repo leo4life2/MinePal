@@ -71,9 +71,9 @@ const LIVE_PRICING_PLANS: PricingPlan[] = [
   }
 ];
 
-export const PRICING_PLANS = process.env.NODE_ENV === 'dev' ? TEST_PRICING_PLANS : LIVE_PRICING_PLANS;
+export const PRICING_PLANS = import.meta.env.DEV ? TEST_PRICING_PLANS : LIVE_PRICING_PLANS;
 
 const PROD_BACKEND_HOST = 'api.minepal.net';
 const DEV_BACKEND_HOST = 'staging.minepal.net:11111';
-const BACKEND_HOST = process.env.NODE_ENV === 'dev' ? DEV_BACKEND_HOST : PROD_BACKEND_HOST;
+const BACKEND_HOST = import.meta.env.DEV ? DEV_BACKEND_HOST : PROD_BACKEND_HOST;
 export const HTTPS_BACKEND_URL = `https://${BACKEND_HOST}`;

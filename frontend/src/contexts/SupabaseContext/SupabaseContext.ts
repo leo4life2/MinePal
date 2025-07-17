@@ -15,6 +15,7 @@ export interface SupabaseContextType {
   isPaying: boolean;
   tierQuota: number | null;
   requestsRemaining: number | null;
+  imagineCredits: number | null;
   stripeData: StripeData;
   authError: string | null;
   signInWithProvider: (provider: 'discord' | 'google') => Promise<void>;

@@ -331,6 +331,15 @@ h1 small {
   font-weight: 600;
 }
 
+.imagine-description {
+  margin: -10px 0 20px 0;
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 400;
+  opacity: 0.8;
+  line-height: 1.5;
+}
+
 /* Credits Display */
 .credits-container {
   display: flex;
@@ -567,7 +576,57 @@ h1 small {
   transform: none;
 }
 
-/* Status Display */
+/* Progress bar state */
+.imagine-button.imagining {
+  position: relative;
+  overflow: hidden;
+  background: rgba(var(--primary-color-rgb), 0.15);
+  border: 1px solid var(--primary-color);
+}
+
+.imagine-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--primary-color);
+  transition: width 0.5s ease-out;
+  z-index: 1;
+}
+
+.imagine-progress-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.imagine-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(var(--primary-color-rgb), 0.3);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.imagine-progress-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.imagine-time-remaining {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+/* Status Display - Removed in favor of in-button progress bar */
+/* 
 .status-display {
   padding: 15px;
   border-radius: 8px;
@@ -589,7 +648,6 @@ h1 small {
   color: var(--success-color);
 }
 
-/* Spinner */
 .spinner {
   width: 16px;
   height: 16px;
@@ -598,6 +656,7 @@ h1 small {
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+*/
 
 @keyframes spin {
   0% { transform: rotate(0deg); }
@@ -787,4 +846,100 @@ body {
   font-size: 0.8em;
   color: #888;
   font-style: italic;
+}
+
+/* Imagine Success Modal */
+.imagine-success-modal {
+  width: 500px;
+  max-width: 90vw;
+  position: relative;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.imagine-success-modal .success-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.imagine-success-modal .success-icon {
+  width: 60px;
+  height: 60px;
+  background: var(--primary-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.imagine-success-modal .success-content h3 {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.imagine-success-modal .success-content p {
+  margin: 0;
+  color: var(--text-color);
+  opacity: 0.8;
+  font-size: 1rem;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+.imagine-success-modal .structure-link-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+.imagine-success-modal .structure-link-section label {
+  color: var(--text-color);
+  font-weight: 600;
+  text-align: left;
+  font-size: 14px;
+}
+
+.imagine-success-modal .structure-link-container {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.imagine-success-modal .structure-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  word-break: break-all;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.imagine-success-modal .structure-link:hover {
+  text-decoration: underline;
+}
+
+.imagine-success-modal .done-button {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 32px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.imagine-success-modal .done-button:hover {
+  background: var(--hover-color);
+  transform: translateY(-1px);
 }

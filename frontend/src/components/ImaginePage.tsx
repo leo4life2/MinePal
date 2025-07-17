@@ -1,15 +1,26 @@
-import { useState } from 'react';
-import { LifeBuoy, Play, Plus, X } from 'react-feather';
+import { useState, useEffect, useRef } from 'react';
+import { LifeBuoy, Play, Plus, X, Check } from 'react-feather';
+import { useSupabase } from '../contexts/SupabaseContext/useSupabase';
+import { HTTPS_BACKEND_URL } from '../constants';
+import { ModalWrapper } from './Modal';
 
 const ImaginePage = () => {
-  const [credits] = useState(42); // Mock credits
+  const { imagineCredits, supabase } = useSupabase();
+  const credits = imagineCredits ?? 0;
   const [mode, setMode] = useState<'Normal' | 'Detailed'>('Normal');
   const [prompt, setPrompt] = useState('');
   const [selectedPal, setSelectedPal] = useState('Steve');
   const [isImagining, setIsImagining] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error - selectedImage will be used for image upload feature later
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [structureId, setStructureId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(60); // 60 seconds initial estimate
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const detailedPrompts = [
     "A floating crystal observatory made of amethyst blocks and tinted glass, suspended 200 blocks above a misty swamp with glowing sea lantern constellations and hanging gardens of glowberries cascading down like ethereal waterfalls",
@@ -32,13 +43,131 @@ const ImaginePage = () => {
   const creditCost = mode === 'Normal' ? 1 : 3;
   const mockPals = ['Steve', 'Alex', 'Builder1']; // Mock pal list
 
-  const handleImagine = () => {
+  // Fake progress animation effect
+  useEffect(() => {
+    if (isImagining) {
+      setProgress(0);
+      setTimeRemaining(60);
+      
+      let elapsed = 0;
+      progressIntervalRef.current = setInterval(() => {
+        elapsed += 0.5; // Update every 500ms
+        
+        // Sharp logarithmic curve - starts very slow, gradually speeds up, then slows down
+        // Using a sigmoid-like function for more natural feel
+        const normalizedTime = elapsed / 60; // Normalize to 0-1 over 60 seconds
+        const sigmoidProgress = 95 * (1 / (1 + Math.exp(-8 * (normalizedTime - 0.5))));
+        const fakeProgress = Math.min(95, sigmoidProgress);
+        setProgress(fakeProgress);
+        
+        // Time remaining follows the same curve (inverse of progress)
+        // At 0% progress: 60s remaining
+        // At 50% progress: ~25s remaining  
+        // At 95% progress: gets stuck around 3-8s
+        const progressRatio = fakeProgress / 100;
+        const baseRemaining = 60 * (1 - progressRatio);
+        
+        // Add some stickiness at the end - gets stuck between 3-8 seconds
+        let remaining;
+        if (fakeProgress >= 90) {
+          remaining = Math.max(3, Math.min(8, Math.round(baseRemaining + Math.random() * 2)));
+        } else if (fakeProgress >= 80) {
+          remaining = Math.max(8, Math.round(baseRemaining));
+        } else {
+          remaining = Math.max(0, Math.round(baseRemaining));
+        }
+        
+        setTimeRemaining(remaining);
+        
+        // Stop updating if we're at 95% progress
+        if (fakeProgress >= 95) {
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+          }
+        }
+      }, 500);
+    } else {
+      // Clear interval when not imagining
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, [isImagining]);
+
+  const handleImagine = async () => {
     if (credits >= creditCost && prompt.trim()) {
       setIsImagining(true);
-      // Mock completion after 3 seconds
-      setTimeout(() => {
+      setError(null); // Clear any previous errors
+      
+      try {
+        // Get the current session for JWT
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+          throw new Error('No authentication token available');
+        }
+
+        const response = await fetch(`${HTTPS_BACKEND_URL}/imagine`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            buildPrompt: prompt,
+            mode: mode.toLowerCase() // Convert "Normal"/"Detailed" to "normal"/"detailed"
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`API request failed: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Imagine result:', result);
+        
+        // Handle successful response
+        if (result.success && result.structure?.id) {
+          // Jump to 100% completion
+          setProgress(100);
+          setTimeRemaining(0);
+          
+          // Small delay to show completion before modal
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          setStructureId(result.structure.id);
+          setShowSuccessModal(true);
+          setError(null);
+        } else {
+          throw new Error('Invalid response format');
+        }
+        
+      } catch (err) {
+        console.error('Error calling imagine API:', err);
+        
+        let errorMessage = 'An unknown error occurred while imagining the structure.';
+        
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (typeof err === 'object' && err !== null && 'response' in err) {
+          const responseError = err as { response?: { data?: { error?: string } } };
+          if (responseError.response?.data?.error) {
+            errorMessage = responseError.response.data.error;
+          }
+        }
+        
+        setError(errorMessage);
+        setShowSuccessModal(false);
+      } finally {
         setIsImagining(false);
-      }, 3000);
+      }
     }
   };
 
@@ -98,6 +227,9 @@ const ImaginePage = () => {
       {/* Imagine Form */}
       <div className="imagine-section">
         <h3 className="section-title">Imagine Structure</h3>
+        <p className="imagine-description">
+          Imagine once, build forever. Every creation goes public on PalForge, free for anyone to use.
+        </p>
         
         {/* Mode Selector */}
         <div className="mode-selector">
@@ -187,12 +319,36 @@ const ImaginePage = () => {
         {/* Imagine Button Row */}
         <div className="imagine-button-row">
           <button 
-            className="imagine-button"
+            className={`imagine-button ${isImagining ? 'imagining' : ''}`}
             onClick={handleImagine}
             disabled={isImagining || credits < creditCost || !prompt.trim()}
           >
-            <Play size={16} />
-            {isImagining ? 'Imagining...' : 'Imagine'}
+            {isImagining ? (
+              <>
+                {/* Progress bar background */}
+                <div 
+                  className="imagine-progress-bar" 
+                  style={{ width: `${progress}%` }}
+                />
+                {/* Content on top of progress bar */}
+                <div className="imagine-progress-content">
+                  <div className="imagine-spinner"></div>
+                  <span className="imagine-progress-text">
+                    {progress < 100 ? `${Math.round(progress)}%` : 'Complete!'}
+                  </span>
+                  {timeRemaining > 0 && (
+                    <span className="imagine-time-remaining">
+                      ~{timeRemaining}s
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <Play size={16} />
+                Imagine
+              </>
+            )}
           </button>
           <div className="credits-container">
             <button className="credits-plus-button">
@@ -205,17 +361,51 @@ const ImaginePage = () => {
           </div>
         </div>
 
-        {/* Status Display */}
-        {isImagining && (
-          <div className="status-display imagining">
-            <div className="spinner"></div>
-            <span>Imagining...</span>
-          </div>
+        {/* Error Display */}
+        {error && (
+          <div className="error-message">{error}</div>
         )}
-
 
       </div>
 
+      {/* Success Modal */}
+      {showSuccessModal && structureId && (
+        <ModalWrapper onClose={() => setShowSuccessModal(false)}>
+          <div className="modal-content imagine-success-modal">
+            <button className="modal-close-icon" onClick={() => setShowSuccessModal(false)}>
+              <X size={18} />
+            </button>
+            
+            <div className="success-content">
+              <div className="success-icon">
+                <Check size={24} />
+              </div>
+              <h3>Imagine Complete!</h3>
+              <p>Your imagined structure&apos;s ID is {structureId}, tell your pal to generate it in game!</p>
+              
+              <div className="structure-link-section">
+                <label>View Structure:</label>
+                <div className="structure-link-container">
+                  <a 
+                    href={`https://minepal.net/palforge/structures/${structureId}`}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="structure-link"
+                  >
+                    minepal.net/palforge/structures/{structureId}
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="done-button" onClick={() => setShowSuccessModal(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </ModalWrapper>
+      )}
       
     </div>
   );

@@ -527,7 +527,7 @@ export const actionsList = [
   },
   {
     name: "!generateStructure",
-    description: "Generate a structure from a predefined template by executing Minecraft commands.",
+    description: "Generate a structure from PalForge. Use like !generateStructure(ID) -- must be in this format.",
     params: {
       structure_id: "(number) The ID of the structure template to generate."
     },

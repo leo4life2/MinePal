@@ -146,6 +146,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
   const [isPaying, setIsPaying] = useState(false);
   const [tierQuota, setTierQuota] = useState<number | null>(null);
   const [requestsRemaining, setRequestsRemaining] = useState<number | null>(null);
+  const [imagineCredits, setImagineCredits] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [userPlan, setUserPlan] = useState<TierType>('FREE');
   const [stripeData, setStripeData] = useState<StripeData>({
@@ -177,7 +178,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     try {
       const { data, error } = await supabase
         .from('user_subscription')
-        .select('stripe_subscription_id, tier_quota, stripe_customer_id, stripe_subscription_item_id, requests_remaining')
+        .select('stripe_subscription_id, tier_quota, stripe_customer_id, stripe_subscription_item_id, requests_remaining, imagine_credits')
         .eq('user_id', userId)
         .single();
         
@@ -186,6 +187,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
         setIsPaying(false);
         setTierQuota(null);
         setRequestsRemaining(null);
+        setImagineCredits(null);
         setUserPlan('FREE');
         setStripeData({
           customerId: null,
@@ -201,7 +203,8 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
         tier_quota, 
         requests_remaining, 
         stripe_customer_id, 
-        stripe_subscription_item_id 
+        stripe_subscription_item_id,
+        imagine_credits
       } = data;
       
       // Determine userPlan based on tier_quota
@@ -221,6 +224,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
       setIsPaying(stripe_subscription_id !== null && stripe_subscription_id !== "" && stripe_subscription_id !== undefined);
       setTierQuota(tier_quota ?? null);
       setRequestsRemaining(requests_remaining ?? null);
+      setImagineCredits(imagine_credits ?? null);
       setStripeData({
         customerId: stripe_customer_id ?? null,
         subscriptionId: stripe_subscription_id ?? null,
@@ -232,6 +236,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
       setIsPaying(false);
       setTierQuota(null);
       setRequestsRemaining(null);
+      setImagineCredits(null);
       setUserPlan('FREE');
       setStripeData({
         customerId: null,
@@ -276,6 +281,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
         setIsPaying(false);
         setTierQuota(null);
         setRequestsRemaining(null);
+        setImagineCredits(null);
         setUserPlan('FREE');
         setStripeData({ customerId: null, subscriptionId: null, subscriptionItemId: null });
       }
@@ -442,6 +448,7 @@ export default function SupabaseProvider({ children }: SupabaseProviderProps) {
     isPaying,
     tierQuota,
     requestsRemaining,
+    imagineCredits,
     stripeData,
     signOut,
     signInWithProvider,
