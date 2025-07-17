@@ -826,6 +826,87 @@ function startServer() {
         }
     });
     // --- Structure Management Endpoints ---
+    app.post('/imagine', express.json(), async (req, res) => {
+        logToFile('API: POST /imagine called');
+        const { buildPrompt, mode } = req.body;
+
+        if (!buildPrompt || !mode) {
+            return res.status(400).json({ error: "'buildPrompt' and 'mode' fields are required." });
+        }
+
+        try {
+            if (!supabase) {
+                logToFile('Supabase client not initialized for imagine');
+                return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
+            }
+
+            // Get the JWT token for backend authentication
+            const token = await getJWT(electronApp.getPath('userData'));
+            if (!token) {
+                logToFile('No JWT available for imagine API request');
+                return res.status(401).json({ error: 'No authentication token available' });
+            }
+
+            // Call the backend imagine API
+            const response = await axios.post(
+                `${HTTPS_BACKEND_URL}/imagine`,
+                { buildPrompt, mode },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 120000 // 2 minute timeout for imagine requests
+                }
+            );
+
+            const backendResult = response.data;
+            
+            if (!backendResult.success || !backendResult.structure?.id) {
+                logToFile(`Backend imagine API returned invalid response: ${JSON.stringify(backendResult)}`);
+                return res.status(500).json({ error: 'Invalid response from imagine service' });
+            }
+
+            // Fetch the complete structure data from Supabase including description and reasoning
+            const { data: structureData, error: fetchError } = await supabase
+                .from('structures')
+                .select('id, description_text, reasoning_text')
+                .eq('id', backendResult.structure.id)
+                .single();
+
+            if (fetchError) {
+                logToFile(`Supabase error fetching structure ${backendResult.structure.id}: ${fetchError.message}`);
+                return res.status(500).json({ error: `Database error: ${fetchError.message}` });
+            }
+
+            if (!structureData) {
+                logToFile(`Structure ${backendResult.structure.id} not found in database after creation`);
+                return res.status(404).json({ error: `Structure ${backendResult.structure.id} not found` });
+            }
+
+            // Return the complete structure data
+            res.json({
+                success: true,
+                structure: {
+                    id: structureData.id,
+                    descriptionText: structureData.description_text,
+                    reasoningText: structureData.reasoning_text
+                }
+            });
+
+        } catch (error) {
+            logToFile(`Error in /imagine: ${error.message}`);
+            if (error.response) {
+                logToFile(`Backend response status: ${error.response.status}`);
+                logToFile(`Backend response data: ${JSON.stringify(error.response.data)}`);
+                return res.status(error.response.status).json({ 
+                    error: error.response.data?.error || 'Backend service error' 
+                });
+            }
+            res.status(500).json({ error: "Internal server error while processing imagine request." });
+        }
+    });
+
     app.get('/structure/:id', async (req, res) => {
         const { id } = req.params;
 

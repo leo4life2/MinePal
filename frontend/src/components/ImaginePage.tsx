@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { LifeBuoy, Play, Plus, X, Check } from 'react-feather';
+import { LifeBuoy, Play, Plus, X, Check, AlignLeft, ChevronDown, ChevronUp } from 'react-feather';
 import { useSupabase } from '../contexts/SupabaseContext/useSupabase';
 import { HTTPS_BACKEND_URL } from '../constants';
 import { ModalWrapper } from './Modal';
+// @ts-expect-error SVG import with React component syntax not recognized by TypeScript
+import BrainIcon from '../assets/brain.svg?react';
+import './ImaginePage.css';
 
 const ImaginePage = () => {
   const { imagineCredits, supabase } = useSupabase();
@@ -17,6 +20,9 @@ const ImaginePage = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [structureId, setStructureId] = useState<number | null>(null);
+  const [descriptionText, setDescriptionText] = useState<string>('');
+  const [reasoningText, setReasoningText] = useState<string>('');
+  const [isThoughtProcessExpanded, setIsThoughtProcessExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(60); // 60 seconds initial estimate
@@ -127,7 +133,17 @@ const ImaginePage = () => {
         });
 
         if (!response.ok) {
-          throw new Error(`API request failed: ${response.status}`);
+          // Try to get the error message from the response body
+          let errorMessage = `API request failed: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch {
+            // If we can't parse the response, stick with the generic message
+          }
+          throw new Error(errorMessage);
         }
 
         const result = await response.json();
@@ -143,6 +159,8 @@ const ImaginePage = () => {
           await new Promise(resolve => setTimeout(resolve, 500));
           
           setStructureId(result.structure.id);
+          setDescriptionText(result.structure.descriptionText || '');
+          setReasoningText(result.structure.reasoningText || '');
           setShowSuccessModal(true);
           setError(null);
         } else {
@@ -370,9 +388,15 @@ const ImaginePage = () => {
 
       {/* Success Modal */}
       {showSuccessModal && structureId && (
-        <ModalWrapper onClose={() => setShowSuccessModal(false)}>
+        <ModalWrapper onClose={() => {
+          setShowSuccessModal(false);
+          setIsThoughtProcessExpanded(false);
+        }}>
           <div className="modal-content imagine-success-modal">
-            <button className="modal-close-icon" onClick={() => setShowSuccessModal(false)}>
+            <button className="modal-close-icon" onClick={() => {
+              setShowSuccessModal(false);
+              setIsThoughtProcessExpanded(false);
+            }}>
               <X size={18} />
             </button>
             
@@ -381,7 +405,35 @@ const ImaginePage = () => {
                 <Check size={24} />
               </div>
               <h3>Imagine Complete!</h3>
-              <p>Your imagined structure&apos;s ID is {structureId}, tell your pal to generate it in game!</p>
+              <div className="structure-id-message">
+                Your imagined structure&apos;s ID is <span className="structure-id-highlight">{structureId}</span> , tell your pal to generate it in game!
+              </div>
+              
+              {descriptionText && (
+                <div className="structure-description">
+                  <div className="structure-description-header">
+                    <AlignLeft size={17} />
+                    <span>Description</span>
+                  </div>
+                  <div className="structure-description-content">{descriptionText}</div>
+                </div>
+              )}
+              
+              {reasoningText && (
+                <div className="thought-process">
+                  <div 
+                    className="thought-process-header clickable"
+                    onClick={() => setIsThoughtProcessExpanded(!isThoughtProcessExpanded)}
+                  >
+                    <BrainIcon width={17} height={17} />
+                    <span>Thought Process</span>
+                    {isThoughtProcessExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                  {isThoughtProcessExpanded && (
+                    <div className="thought-process-content">{reasoningText}</div>
+                  )}
+                </div>
+              )}
               
               <div className="structure-link-section">
                 <label>View Structure:</label>
@@ -398,8 +450,11 @@ const ImaginePage = () => {
               </div>
             </div>
 
-            <div className="modal-actions">
-              <button className="done-button" onClick={() => setShowSuccessModal(false)}>
+            <div className="imagine-modal-actions">
+              <button className="done-button" onClick={() => {
+                setShowSuccessModal(false);
+                setIsThoughtProcessExpanded(false);
+              }}>
                 Done
               </button>
             </div>
