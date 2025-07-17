@@ -7,8 +7,17 @@ import { ModalWrapper } from './Modal';
 import BrainIcon from '../assets/brain.svg?react';
 import './ImaginePage.css';
 
+interface Structure {
+  id: number;
+  prompt: string;
+  mode: string;
+  created_at: string;
+  description_text?: string;
+  reasoning_text?: string;
+}
+
 const ImaginePage = () => {
-  const { imagineCredits, supabase } = useSupabase();
+  const { imagineCredits, supabase, user } = useSupabase();
   const credits = imagineCredits ?? 0;
   const [mode, setMode] = useState<'Normal' | 'Detailed'>('Normal');
   const [prompt, setPrompt] = useState('');
@@ -26,6 +35,11 @@ const ImaginePage = () => {
   const [progress, setProgress] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(60); // 60 seconds initial estimate
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [structures, setStructures] = useState<Structure[]>([]);
+  const [loadingStructures, setLoadingStructures] = useState(false);
+  const [structuresError, setStructuresError] = useState<string | null>(null);
+  const [selectedStructure, setSelectedStructure] = useState<Structure | null>(null);
+  const [showStructureModal, setShowStructureModal] = useState(false);
 
   const detailedPrompts = [
     "A floating crystal observatory made of amethyst blocks and tinted glass, suspended 200 blocks above a misty swamp with glowing sea lantern constellations and hanging gardens of glowberries cascading down like ethereal waterfalls",
@@ -46,6 +60,40 @@ const ImaginePage = () => {
 
 
   const creditCost = mode === 'Normal' ? 1 : 3;
+
+  // Fetch user's structures when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      fetchStructures();
+    }
+  }, [user]);
+
+  const fetchStructures = async () => {
+    if (!user) return;
+    
+    setLoadingStructures(true);
+    setStructuresError(null);
+    try {
+      const { data, error } = await supabase
+        .from('structures')
+        .select('id, prompt, mode, created_at, description_text, reasoning_text')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching structures:', error);
+        setStructuresError('Failed to load your previous structures');
+        return;
+      }
+
+      setStructures(data || []);
+    } catch (err) {
+      console.error('Failed to fetch structures:', err);
+      setStructuresError('Failed to load your previous structures');
+    } finally {
+      setLoadingStructures(false);
+    }
+  };
 
   // Fake progress animation effect
   useEffect(() => {
@@ -164,6 +212,9 @@ const ImaginePage = () => {
           setReasoningText(result.structure.reasoningText || '');
           setShowSuccessModal(true);
           setError(null);
+          
+          // Refresh the structures list
+          await fetchStructures();
         } else {
           throw new Error('Invalid response format');
         }
@@ -371,6 +422,52 @@ const ImaginePage = () => {
 
       </div>
 
+      {/* Previous Structures Section */}
+      {user && (
+        <div className="previous-structures-section">
+          <h3 className="section-title">Your Previous Imagines</h3>
+          
+          {loadingStructures ? (
+            <div className="structures-loading">Loading your structures...</div>
+          ) : structuresError ? (
+            <div className="structures-error">{structuresError}</div>
+          ) : structures.length === 0 ? (
+            <div className="structures-empty">
+              <p>You haven&apos;t imagined any structures yet.</p>
+            </div>
+          ) : (
+            <div className="structures-grid">
+              {structures.map((structure) => (
+                <div 
+                  key={structure.id} 
+                  className="structure-card"
+                  onClick={() => {
+                    setSelectedStructure(structure);
+                    setShowStructureModal(true);
+                    setIsThoughtProcessExpanded(false);
+                  }}
+                >
+                  <div className="structure-card-header">
+                    <span className="structure-id">#{structure.id}</span>
+                    <span className={`structure-mode-tag ${structure.mode.toLowerCase()}`}>
+                      {structure.mode}
+                    </span>
+                  </div>
+                  <p className="structure-prompt">{structure.prompt}</p>
+                  <span className="structure-date">
+                    {new Date(structure.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Success Modal */}
       {showSuccessModal && structureId && (
         <ModalWrapper onClose={() => {
@@ -398,7 +495,7 @@ const ImaginePage = () => {
                 <div className="structure-description">
                   <div className="structure-description-header">
                     <AlignLeft size={17} />
-                    <span>Description</span>
+                    <span>Notes from MinePal AI</span>
                   </div>
                   <div className="structure-description-content">{descriptionText}</div>
                 </div>
@@ -411,7 +508,7 @@ const ImaginePage = () => {
                     onClick={() => setIsThoughtProcessExpanded(!isThoughtProcessExpanded)}
                   >
                     <BrainIcon width={17} height={17} />
-                    <span>Thought Process</span>
+                    <span>AI Thought Process</span>
                     {isThoughtProcessExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
                   {isThoughtProcessExpanded && (
@@ -438,6 +535,80 @@ const ImaginePage = () => {
             <div className="imagine-modal-actions">
               <button className="done-button" onClick={() => {
                 setShowSuccessModal(false);
+                setIsThoughtProcessExpanded(false);
+              }}>
+                Done
+              </button>
+            </div>
+          </div>
+        </ModalWrapper>
+      )}
+      
+      {/* Structure View Modal */}
+      {showStructureModal && selectedStructure && (
+        <ModalWrapper onClose={() => {
+          setShowStructureModal(false);
+          setIsThoughtProcessExpanded(false);
+        }}>
+          <div className="modal-content imagine-success-modal">
+            <button className="modal-close-icon" onClick={() => {
+              setShowStructureModal(false);
+              setIsThoughtProcessExpanded(false);
+            }}>
+              <X size={18} />
+            </button>
+            
+            <div className="success-content">
+              <h3 className="structure-modal-title">#{selectedStructure.id}</h3>
+              
+              <div className="structure-modal-prompt">
+                {selectedStructure.prompt}
+              </div>
+              
+              {selectedStructure.description_text && (
+                <div className="structure-description">
+                  <div className="structure-description-header">
+                    <AlignLeft size={17} />
+                    <span>Notes From MinePal AI</span>
+                  </div>
+                  <div className="structure-description-content">{selectedStructure.description_text}</div>
+                </div>
+              )}
+              
+              {selectedStructure.reasoning_text && (
+                <div className="thought-process">
+                  <div 
+                    className="thought-process-header clickable"
+                    onClick={() => setIsThoughtProcessExpanded(!isThoughtProcessExpanded)}
+                  >
+                    <BrainIcon width={17} height={17} />
+                    <span>AI Thought Process</span>
+                    {isThoughtProcessExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                  {isThoughtProcessExpanded && (
+                    <div className="thought-process-content">{selectedStructure.reasoning_text}</div>
+                  )}
+                </div>
+              )}
+              
+              <div className="structure-link-section">
+                <label>View Structure:</label>
+                <div className="structure-link-container">
+                  <a 
+                    href={`https://minepal.net/palforge/structures/${selectedStructure.id}`}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="structure-link"
+                  >
+                    minepal.net/palforge/structures/{selectedStructure.id}
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="imagine-modal-actions">
+              <button className="done-button" onClick={() => {
+                setShowStructureModal(false);
                 setIsThoughtProcessExpanded(false);
               }}>
                 Done

@@ -24,7 +24,7 @@ const ModalWrapper: React.FC<ModalWrapperProps> = ({ onClose, children }) => {
 
   return (
     <div 
-      className="modal" 
+      className="modal modal-wrapper-centered" 
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >

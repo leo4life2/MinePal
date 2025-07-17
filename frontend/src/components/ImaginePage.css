@@ -357,6 +357,20 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Global Modal Centering (applies to all modals via ModalWrapper) */
+.modal-wrapper-centered .modal-content {
+  /* Default shift for expanded sidebar (half of 165px = 82.5px) */
+  margin-left: 82.5px;
+  margin-right: -82.5px;
+}
+
+/* Adjust for collapsed sidebar (half of 60px = 30px) */
+.app-layout:has(.sidebar.collapsed) .modal-wrapper-centered .modal-content,
+body:has(.sidebar.collapsed) .modal-wrapper-centered .modal-content {
+  margin-left: 30px;
+  margin-right: -30px;
+}
+
 /* Imagine Success Modal */
 .imagine-success-modal {
   width: 600px;
@@ -364,16 +378,6 @@
   position: relative;
   text-align: center;
   padding: 2rem 0;
-  /* Default shift for expanded sidebar (half of 165px = 82.5px) */
-  margin-left: 82.5px;
-  margin-right: -82.5px;
-}
-
-/* Adjust for collapsed sidebar (half of 60px = 30px) */
-.app-layout:has(.sidebar.collapsed) .imagine-success-modal,
-body:has(.sidebar.collapsed) .imagine-success-modal {
-  margin-left: 30px;
-  margin-right: -30px;
 }
 
 .imagine-success-modal .success-content {
@@ -623,4 +627,172 @@ body:has(.sidebar.collapsed) .imagine-success-modal {
 .imagine-success-modal .structure-description-content::-webkit-scrollbar-thumb:hover,
 .imagine-success-modal .thought-process-content::-webkit-scrollbar-thumb:hover {
   background: rgba(var(--primary-color-rgb), 0.5);
+}
+
+/* Previous Structures Section */
+.previous-structures-section {
+  margin-top: 40px;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.structures-loading,
+.structures-error,
+.structures-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.structures-error {
+  color: #e74c3c;
+  opacity: 1;
+}
+
+.structures-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .structures-grid {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .structures-grid {
+    gap: 10px;
+  }
+}
+
+.structure-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+[data-theme='dark'] .structure-card {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.structure-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.structure-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.structure-id {
+  font-weight: 700;
+  color: var(--primary-color);
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.structure-mode-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.structure-mode-tag.normal {
+  background: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+}
+
+.structure-mode-tag.detailed {
+  background: rgba(155, 89, 182, 0.15);
+  color: #9b59b6;
+}
+
+[data-theme='dark'] .structure-mode-tag.normal {
+  background: rgba(52, 152, 219, 0.25);
+  color: #5dade2;
+}
+
+[data-theme='dark'] .structure-mode-tag.detailed {
+  background: rgba(155, 89, 182, 0.25);
+  color: #bb8fce;
+}
+
+.structure-prompt {
+  color: var(--text-color);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.structure-date {
+  font-size: 12px;
+  color: var(--text-color);
+  opacity: 0.6;
+}
+
+/* Structure Modal Title */
+.structure-modal-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary-color);
+  font-family: 'Courier New', monospace;
+  margin: 0 0 24px 0;
+  padding-top: 10px;
+  text-align: center;
+}
+
+/* Structure Modal Prompt */
+.structure-modal-prompt {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-color);
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 24px;
+  max-width: 460px;
+  width: 100%;
+}
+
+[data-theme='dark'] .structure-modal-prompt {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 480px) {
+  .structure-card {
+    padding: 12px;
+  }
+  
+  .structure-prompt {
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+  }
+  
+  .structure-mode-tag {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
 } 

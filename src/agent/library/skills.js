@@ -3116,9 +3116,6 @@ export async function generateStructure(bot, structure_id, agent) {
         // Execute the command
         bot.chat(command);
         successCount++;
-        
-        // Small delay between commands to avoid spam
-        await new Promise(resolve => setTimeout(resolve, 1));
       } catch (err) {
         console.error(`[generateStructure] Error executing operation ${i}:`, err);
         errorCount++;
