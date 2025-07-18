@@ -16,15 +16,22 @@ interface Structure {
   reasoning_text?: string;
 }
 
+interface ImagineRequest {
+  buildPrompt: string;
+  mode: string;
+  imageBase64?: string;
+  mediaType?: string;
+}
+
 const ImaginePage = () => {
   const { imagineCredits, supabase, user } = useSupabase();
   const credits = imagineCredits ?? 0;
   const [mode, setMode] = useState<'Normal' | 'Detailed'>('Normal');
   const [prompt, setPrompt] = useState('');
   const [isImagining, setIsImagining] = useState(false);
-  // @ts-expect-error - selectedImage will be used for image upload feature later
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageMediaType, setImageMediaType] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [structureId, setStructureId] = useState<number | null>(null);
@@ -169,16 +176,25 @@ const ImaginePage = () => {
           throw new Error('No authentication token available');
         }
 
+        // Build request body
+        const requestBody: ImagineRequest = {
+          buildPrompt: prompt,
+          mode: mode.toLowerCase() // Convert "Normal"/"Detailed" to "normal"/"detailed"
+        };
+
+        // Add image data if available
+        if (imageBase64 && imageMediaType) {
+          requestBody.imageBase64 = imageBase64;
+          requestBody.mediaType = imageMediaType;
+        }
+
         const response = await fetch(`${HTTPS_BACKEND_URL}/imagine`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
           },
-          body: JSON.stringify({
-            buildPrompt: prompt,
-            mode: mode.toLowerCase() // Convert "Normal"/"Detailed" to "normal"/"detailed"
-          })
+          body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
@@ -242,21 +258,70 @@ const ImaginePage = () => {
   };
 
   const handleImageSelect = (file: File) => {
-    if (file && (file.type === 'image/jpeg' || file.type === 'image/png')) {
-      if (file.size > 15 * 1024 * 1024) {
-        alert('File size must be under 15MB');
-        return;
-      }
-      
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
+    // Only allow jpeg, jpg, and png
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const mediaType = file.type === 'image/jpg' ? 'image/jpeg' : file.type; // Normalize jpg to jpeg
+    
+    if (!allowedTypes.includes(mediaType)) {
       alert('Please select a JPG or PNG file');
+      return;
     }
+    
+    if (file.size > 15 * 1024 * 1024) {
+      alert('File size must be under 15MB');
+      return;
+    }
+    
+    setImageBase64(null); // Clear previous image data
+    setImageMediaType(mediaType);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Check if we need to scale down
+        const maxDimension = 1024;
+        const longSide = Math.max(img.width, img.height);
+        
+        if (longSide > maxDimension) {
+          // Calculate scale factor
+          const scale = maxDimension / longSide;
+          const newWidth = Math.round(img.width * scale);
+          const newHeight = Math.round(img.height * scale);
+          
+          // Create canvas for scaling
+          const canvas = document.createElement('canvas');
+          canvas.width = newWidth;
+          canvas.height = newHeight;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            // Draw scaled image
+            ctx.drawImage(img, 0, 0, newWidth, newHeight);
+            
+            // Convert to base64
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const scaledReader = new FileReader();
+                scaledReader.onloadend = () => {
+                  const base64String = (scaledReader.result as string).split(',')[1];
+                  setImageBase64(base64String);
+                  setImagePreview(scaledReader.result as string);
+                };
+                scaledReader.readAsDataURL(blob);
+              }
+            }, mediaType, 0.9); // Use 0.9 quality for good balance
+          }
+        } else {
+          // Image is already small enough, use as is
+          setImagePreview(e.target?.result as string);
+          const base64String = (e.target?.result as string).split(',')[1];
+          setImageBase64(base64String);
+        }
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,8 +351,9 @@ const ImaginePage = () => {
   };
 
   const removeImage = () => {
-    setSelectedImage(null);
     setImagePreview(null);
+    setImageBase64(null);
+    setImageMediaType(null);
   };
 
 

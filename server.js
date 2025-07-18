@@ -828,7 +828,7 @@ function startServer() {
     // --- Structure Management Endpoints ---
     app.post('/imagine', express.json(), async (req, res) => {
         logToFile('API: POST /imagine called');
-        const { buildPrompt, mode } = req.body;
+        const { buildPrompt, mode, imageBase64, mediaType } = req.body;
 
         if (!buildPrompt || !mode) {
             return res.status(400).json({ error: "'buildPrompt' and 'mode' fields are required." });
@@ -847,10 +847,20 @@ function startServer() {
                 return res.status(401).json({ error: 'No authentication token available' });
             }
 
+            // Build request body
+            const requestBody = { buildPrompt, mode };
+            
+            // Add optional image data if provided
+            if (imageBase64 && mediaType) {
+                requestBody.imageBase64 = imageBase64;
+                requestBody.mediaType = mediaType;
+                logToFile(`Including image data in imagine request with mediaType: ${mediaType}`);
+            }
+
             // Call the backend imagine API
             const response = await axios.post(
                 `${HTTPS_BACKEND_URL}/imagine`,
-                { buildPrompt, mode },
+                requestBody,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,
