@@ -14,7 +14,7 @@ This is your lucky day! No extra installation needed. Just open the app and have
 Well, bad luck, yet another day of setting up your system for a new app. Well, at least it's better then setting up wine, right?
 
 ## Simple Method
-This is a SH script that automatically runs the manual instructions for you. It autodetects your OS type, and installs into your user. Before running, make sure the Minepal .AppImage is in the current working directory and hasn't been renamed since download. If it was, simply make it start with `Minepal` and end with `.AppImage`
+This is a SH script that automatically runs the manual instructions for you. It autodetects your OS type, and installs system-wide. Before running, make sure the Minepal .AppImage is in the current working directory and hasn't been renamed since download. If it was, simply make it start with `Minepal` and end with `.AppImage`
 > [!WARNING]
 > Don't use this when you're repeatedly recompiling the app. Use manual install
 ```sh
