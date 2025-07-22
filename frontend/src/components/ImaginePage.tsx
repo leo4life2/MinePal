@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { LifeBuoy, Play, Plus, X, Check, AlignLeft, ChevronDown, ChevronUp } from 'react-feather';
 import { useSupabase } from '../contexts/SupabaseContext/useSupabase';
 import { HTTPS_BACKEND_URL } from '../constants';
-import { ModalWrapper } from './Modal';
+import { ModalWrapper, ImagineCreditsModal } from './Modal';
 // @ts-expect-error SVG import with React component syntax not recognized by TypeScript
 import BrainIcon from '../assets/brain.svg?react';
 import './ImaginePage.css';
@@ -47,6 +47,7 @@ const ImaginePage = () => {
   const [structuresError, setStructuresError] = useState<string | null>(null);
   const [selectedStructure, setSelectedStructure] = useState<Structure | null>(null);
   const [showStructureModal, setShowStructureModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
 
   const detailedPrompts = [
     "A floating crystal observatory made of amethyst blocks and tinted glass, suspended 200 blocks above a misty swamp with glowing sea lantern constellations and hanging gardens of glowberries cascading down like ethereal waterfalls",
@@ -267,6 +268,12 @@ const ImaginePage = () => {
         }
         
         setError(errorMessage);
+        
+        // If it's an insufficient credits error, also open the credits modal
+        if (errorMessage.startsWith('Insufficient imagine credits')) {
+          setShowCreditsModal(true);
+        }
+        
         setShowSuccessModal(false);
       } finally {
         setIsImagining(false);
@@ -503,7 +510,7 @@ const ImaginePage = () => {
             )}
           </button>
           <div className="credits-container">
-            <button className="credits-plus-button">
+            <button className="credits-plus-button" onClick={() => setShowCreditsModal(true)}>
               <Plus size={16} />
             </button>
             <div className="credits-display">
@@ -714,6 +721,13 @@ const ImaginePage = () => {
             </div>
           </div>
         </ModalWrapper>
+      )}
+      
+      {/* Credits Modal */}
+      {showCreditsModal && (
+        <ImagineCreditsModal
+          onClose={() => setShowCreditsModal(false)}
+        />
       )}
       
     </div>

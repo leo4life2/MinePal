@@ -73,6 +73,39 @@ const LIVE_PRICING_PLANS: PricingPlan[] = [
 
 export const PRICING_PLANS = import.meta.env.DEV ? TEST_PRICING_PLANS : LIVE_PRICING_PLANS;
 
+// Imagine Credit Packages
+export interface CreditPackage {
+  id: number;
+  name: string;
+  credits: number;
+  price: number;
+  priceId?: string; // Stripe price ID (optional for now)
+}
+
+export const IMAGINE_CREDIT_PACKAGES: CreditPackage[] = [
+  {
+    id: 1,
+    name: 'Starter Pack',
+    credits: 20,
+    price: 9,
+    // priceId: 'price_xxx', // To be added when Stripe is set up
+  },
+  {
+    id: 2,
+    name: 'Popular Pack',
+    credits: 60,
+    price: 24,
+    // priceId: 'price_xxx', // To be added when Stripe is set up
+  },
+  {
+    id: 3,
+    name: 'Mega Pack',
+    credits: 150,
+    price: 45,
+    // priceId: 'price_xxx', // To be added when Stripe is set up
+  }
+];
+
 const PROD_BACKEND_HOST = 'api.minepal.net';
 const DEV_BACKEND_HOST = 'staging.minepal.net:11111';
 const BACKEND_HOST = import.meta.env.DEV ? DEV_BACKEND_HOST : PROD_BACKEND_HOST;
