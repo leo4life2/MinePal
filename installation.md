@@ -50,6 +50,7 @@ sudo update-desktop-database /usr/share/applications/
 xdg-mime install minepal-protocol.xml
 xdg-mime default minepal.desktop x-scheme-handler/minepal
 [ "$(xdg-mime query default x-scheme-handler/minepal)" = "minepal.desktop" ] && \
+    rm -rf 'minepal-protocol.xml'
     echo "Installation successful. You should now be able to login. Enjoy!"
 ```
 ## Manual Installation
