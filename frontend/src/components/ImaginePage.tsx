@@ -163,6 +163,23 @@ const ImaginePage = () => {
     };
   }, [isImagining, mode]);
 
+  const compressImageToSize = async (canvas: HTMLCanvasElement, mediaType: string, maxSizeBytes: number): Promise<Blob> => {
+    return new Promise((resolve) => {
+      let quality = 0.9;
+      const tryCompress = () => {
+        canvas.toBlob((blob) => {
+          if (blob && (blob.size <= maxSizeBytes || quality <= 0.1)) {
+            resolve(blob);
+          } else {
+            quality -= 0.1;
+            tryCompress();
+          }
+        }, mediaType, quality);
+      };
+      tryCompress();
+    });
+  };
+
   const handleImagine = async () => {
     if (credits >= creditCost && prompt.trim()) {
       setIsImagining(true);
@@ -278,10 +295,11 @@ const ImaginePage = () => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         // Check if we need to scale down
         const maxDimension = 1024;
         const longSide = Math.max(img.width, img.height);
+        const maxFileSize = 750 * 1024; // 750kb
         
         if (longSide > maxDimension) {
           // Calculate scale factor
@@ -299,24 +317,38 @@ const ImaginePage = () => {
             // Draw scaled image
             ctx.drawImage(img, 0, 0, newWidth, newHeight);
             
-            // Convert to base64
-            canvas.toBlob((blob) => {
-              if (blob) {
-                const scaledReader = new FileReader();
-                scaledReader.onloadend = () => {
-                  const base64String = (scaledReader.result as string).split(',')[1];
-                  setImageBase64(base64String);
-                  setImagePreview(scaledReader.result as string);
-                };
-                scaledReader.readAsDataURL(blob);
-              }
-            }, mediaType, 0.9); // Use 0.9 quality for good balance
+            // Compress to under 750kb
+            const compressedBlob = await compressImageToSize(canvas, mediaType, maxFileSize);
+            
+            const scaledReader = new FileReader();
+            scaledReader.onloadend = () => {
+              const base64String = (scaledReader.result as string).split(',')[1];
+              setImageBase64(base64String);
+              setImagePreview(scaledReader.result as string);
+            };
+            scaledReader.readAsDataURL(compressedBlob);
           }
         } else {
-          // Image is already small enough, use as is
-          setImagePreview(e.target?.result as string);
-          const base64String = (e.target?.result as string).split(',')[1];
-          setImageBase64(base64String);
+          // Image is already small enough dimensionally, but check file size
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            
+            // Compress to under 750kb
+            const compressedBlob = await compressImageToSize(canvas, mediaType, maxFileSize);
+            
+            const unscaledReader = new FileReader();
+            unscaledReader.onloadend = () => {
+              const base64String = (unscaledReader.result as string).split(',')[1];
+              setImageBase64(base64String);
+              setImagePreview(unscaledReader.result as string);
+            };
+            unscaledReader.readAsDataURL(compressedBlob);
+          }
         }
       };
       img.src = e.target?.result as string;
@@ -418,7 +450,7 @@ const ImaginePage = () => {
                   e.stopPropagation();
                   removeImage();
                 }}>
-                  <X size={12} />
+                  <X size={16} />
                 </button>
               </div>
             ) : (
