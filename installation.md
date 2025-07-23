@@ -17,6 +17,7 @@ Well, bad luck, yet another day of setting up your system for a new app. Well, a
 This is a SH script that automatically runs the manual instructions for you. It autodetects your OS type, and installs system-wide. Before running, make sure the Minepal .AppImage is in the current working directory and hasn't been renamed since download. If it was, simply make it start with `Minepal` and end with `.AppImage`. The script is pulled from the repo ("install_linux.sh")
 > [!WARNING]
 > Don't use this when you're repeatedly recompiling the app. Do manual install.
+
 `curl https://raw.githubusercontent.com/leo4life2/MinePal/refs/heads/install_linux.sh | sh`
 
 ## Manual Installation
