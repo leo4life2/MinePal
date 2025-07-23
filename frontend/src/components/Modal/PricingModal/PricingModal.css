@@ -101,6 +101,8 @@
   color: var(--primary-color);
   margin: 4px 0;
   font-size: 1rem;
+  display: flex;
+  align-items: center;
 }
 
 .plan-value {
@@ -238,6 +240,31 @@
 .pal-voice-feature svg:last-child {
   margin-left: 2px;
   opacity: 0.7;
+}
+
+.imagine-credits-feature {
+  color: #6366F1;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  gap: 5px;
+}
+
+.imagine-credits-feature svg {
+  margin-right: 2px;
+}
+
+.expiration-note {
+  font-size: 0.75rem;
+  color: #999;
+  font-weight: normal;
+  margin-left: 6px;
+}
+
+[data-theme='dark'] .expiration-note {
+  color: #666;
 }
 
 @media (max-width: 480px) {

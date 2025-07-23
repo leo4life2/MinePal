@@ -213,8 +213,8 @@ function Actions() {
               {loadingSubscription ? 
                 'Loading...' : 
                 (requestsRemaining !== null && tierQuota !== null) ? 
-                  `${tierQuota - requestsRemaining}/${tierQuota} responses used this month` : 
-                  '0/200 responses used this month'
+                  `${tierQuota - requestsRemaining}/${tierQuota} chat credits used this month` : 
+                  '0/200 chat credits used this month'
               }
             </div>
             <button 
@@ -230,7 +230,7 @@ function Actions() {
             </button>
           </div>
           <div className="quota-refresh-notice">
-            responses refresh at the beginning of each month
+            chat credits refresh at the beginning of each month
           </div>
         </div>
       )}

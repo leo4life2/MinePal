@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PRICING_PLANS, PricingPlan, HTTPS_BACKEND_URL } from '../../../constants';
-import { X as CloseIcon, Music, ExternalLink } from 'react-feather';
+import { X as CloseIcon, Mic, Star, ExternalLink } from 'react-feather';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
 import './PricingModal.css';
 import { ModalWrapper } from '..';
@@ -21,12 +21,6 @@ function PricingModal({ onClose }: PricingModalProps) {
   const [error, setError] = useState<string | null>(null);
   const { user } = useSupabase();
   
-  // Calculate price per response for each plan
-  const calculatePricePerResponse = (plan: PricingPlan) => {
-    const pricePerResponse = plan.price / plan.quota;
-    return pricePerResponse.toFixed(4);
-  };
-
   useEffect(() => {
     const checkScreenSize = () => {
       setIsMobileView(window.innerWidth <= 480);
@@ -114,7 +108,6 @@ function PricingModal({ onClose }: PricingModalProps) {
         
         <div className="pricing-plans">
           {PRICING_PLANS.map((plan) => {
-            const pricePerResponse = calculatePricePerResponse(plan);
             return (
               <div 
                 key={plan.id} 
@@ -122,8 +115,18 @@ function PricingModal({ onClose }: PricingModalProps) {
                 onClick={() => handlePlanSelect(plan)}
               >
                 <div className="plan-details">
-                  <h3 className="plan-name">{plan.name}</h3>
-                  <div className="plan-quota">{plan.quota} responses/mo</div>
+                  <h3 className="plan-name">Monthly {plan.name}</h3>
+                  <div className="plan-quota">
+                    {plan.quota} chat credits
+                    <span className="expiration-note">(expires monthly)</span>
+                  </div>
+                  {plan.imagineCredits && (
+                    <div className="imagine-credits-feature">
+                      <Star size={14} />
+                      {plan.imagineCredits} Imagine credit{plan.imagineCredits > 1 ? 's' : ''}
+                      <span className="expiration-note">(won&apos;t expire)</span>
+                    </div>
+                  )}
                   {plan.features && plan.features.includes('Pal Voice') && (
                     <a 
                       href="https://minepal.net/pal-voice" 
@@ -138,14 +141,11 @@ function PricingModal({ onClose }: PricingModalProps) {
                         }
                       }}
                     >
-                      <Music size={14} />
+                      <Mic size={14} />
                       Includes Pal Voice
                       <ExternalLink size={12} />
                     </a>
                   )}
-                  <div className="plan-value">
-                    <span className="price-per-response">${pricePerResponse}</span> per response
-                  </div>
                 </div>
                 <div className="plan-price-container">
                   <div className="plan-price">
@@ -163,7 +163,7 @@ function PricingModal({ onClose }: PricingModalProps) {
           <ul>
             <li>Quota refreshes monthly</li>
             <li>Upgrade, downgrade, or cancel anytime</li>
-            <li>Responses immediately refreshed upon subscription</li>
+            <li>Chat credits immediately refreshed upon subscription</li>
           </ul>
         </div>
         

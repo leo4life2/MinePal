@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { IMAGINE_CREDIT_PACKAGES, CreditPackage } from '../../../constants';
+import { IMAGINE_CREDIT_PACKAGES, CreditPackage, HTTPS_BACKEND_URL } from '../../../constants';
 import { X as CloseIcon, LifeBuoy } from 'react-feather';
 import { useSupabase } from '../../../contexts/SupabaseContext/useSupabase';
 import './ImagineCreditsModal.css';
 import { ModalWrapper } from '..';
+
+// Get electron shell
+const isElectron = window && window.process && window.process.type;
+const electron = isElectron ? window.require('electron') : null;
+const shell = electron?.shell;
 
 interface ImagineCreditsModalProps {
   onClose: () => void;
@@ -44,18 +49,7 @@ function ImagineCreditsModal({ onClose }: ImagineCreditsModalProps) {
     setError(null);
     
     try {
-      // TODO: Replace with actual Stripe checkout session creation
-      console.log('Purchase package:', selectedPackage);
-      
-      // Placeholder for Stripe integration
-      setTimeout(() => {
-        alert(`Stripe integration coming soon! You selected: ${selectedPackage.credits} credits for $${selectedPackage.price}`);
-        setIsProcessing(false);
-      }, 1000);
-      
-      // When Stripe is ready, use similar logic to PricingModal:
-      /*
-      const response = await fetch(`${HTTPS_BACKEND_URL}/api/create-imagine-checkout-session`, {
+      const response = await fetch(`${HTTPS_BACKEND_URL}/api/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,20 +61,29 @@ function ImagineCreditsModal({ onClose }: ImagineCreditsModalProps) {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to create checkout session');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || 
+          `Failed to create checkout session (${response.status})`
+        );
       }
       
       const { url } = await response.json();
       
+      // Open the checkout URL in external browser if in Electron
       if (shell) {
         shell.openExternal(url);
+      } else {
+        console.log('Not in Electron environment, would open:', url);
+        // In browser dev environment
       }
       
+      // Close modal after opening checkout
       onClose();
-      */
     } catch (error) {
       console.error('Error processing purchase:', error);
       setError(error instanceof Error ? error.message : 'Failed to process purchase. Please try again later.');
+    } finally {
       setIsProcessing(false);
     }
   };

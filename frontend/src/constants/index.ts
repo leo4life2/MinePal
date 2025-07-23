@@ -15,6 +15,7 @@ export interface PricingPlan {
   quota: number;
   priceId: string; // Stripe price ID
   features?: string[]; // Adding features array
+  imagineCredits?: number; // Adding imagine credits per month
 }
 
 const TEST_PRICING_PLANS: PricingPlan[] = [
@@ -24,7 +25,8 @@ const TEST_PRICING_PLANS: PricingPlan[] = [
     price: 2.99,
     quota: 1800,
     priceId: 'price_1R0YEFAbdM8AcunxnUxj07sw',
-    features: []
+    features: [],
+    imagineCredits: 1
   },
   {
     id: 2,
@@ -32,7 +34,8 @@ const TEST_PRICING_PLANS: PricingPlan[] = [
     price: 7.99,
     quota: 5400,
     priceId: 'price_1R0YFHAbdM8AcunxY1rm8fkw',
-    features: ['Pal Voice']
+    features: ['Pal Voice'],
+    imagineCredits: 3
   },
   {
     id: 3,
@@ -40,7 +43,8 @@ const TEST_PRICING_PLANS: PricingPlan[] = [
     price: 13.99,
     quota: 10500,
     priceId: 'price_1R0YFYAbdM8AcunxKH04jHck',
-    features: ['Pal Voice']
+    features: ['Pal Voice'],
+    imagineCredits: 6
   }
 ];
 
@@ -51,7 +55,8 @@ const LIVE_PRICING_PLANS: PricingPlan[] = [
     price: 2.99,
     quota: 1800,
     priceId: 'price_1R2MrRAbdM8AcunxfX4snQNi',
-    features: []
+    features: [],
+    imagineCredits: 1
   },
   {
     id: 2,
@@ -59,7 +64,8 @@ const LIVE_PRICING_PLANS: PricingPlan[] = [
     price: 7.99,
     quota: 5400,
     priceId: 'price_1R2MrTAbdM8AcunxqGPVw0ZR',
-    features: ['Pal Voice']
+    features: ['Pal Voice'],
+    imagineCredits: 3
   },
   {
     id: 3,
@@ -67,7 +73,8 @@ const LIVE_PRICING_PLANS: PricingPlan[] = [
     price: 13.99,
     quota: 10500,
     priceId: 'price_1R2MrVAbdM8AcunxMUql3BtU',
-    features: ['Pal Voice']
+    features: ['Pal Voice'],
+    imagineCredits: 6
   }
 ];
 
@@ -82,29 +89,55 @@ export interface CreditPackage {
   priceId?: string; // Stripe price ID (optional for now)
 }
 
-export const IMAGINE_CREDIT_PACKAGES: CreditPackage[] = [
+const TEST_IMAGINE_CREDIT_PACKAGES: CreditPackage[] = [
   {
     id: 1,
     name: 'Starter Pack',
     credits: 20,
     price: 9,
-    // priceId: 'price_xxx', // To be added when Stripe is set up
+    priceId: 'price_1RnqUWAbdM8Acunxi3YPjgZ9',
   },
   {
     id: 2,
     name: 'Popular Pack',
     credits: 60,
     price: 24,
-    // priceId: 'price_xxx', // To be added when Stripe is set up
+    priceId: 'price_1RnqV2AbdM8Acunx6kCFk8ZU',
   },
   {
     id: 3,
     name: 'Mega Pack',
     credits: 150,
     price: 45,
-    // priceId: 'price_xxx', // To be added when Stripe is set up
+    priceId: 'price_1RnqVSAbdM8AcunxHdTTNzee',
   }
 ];
+
+const LIVE_IMAGINE_CREDIT_PACKAGES: CreditPackage[] = [
+  {
+    id: 1,
+    name: 'Starter Pack',
+    credits: 20,
+    price: 9,
+    priceId: 'price_1RnttcAbdM8AcunxmN7rNkG9',
+  },
+  {
+    id: 2,
+    name: 'Popular Pack',
+    credits: 60,
+    price: 24,
+    priceId: 'price_1RntteAbdM8AcunxhzRV4qFn',
+  },
+  {
+    id: 3,
+    name: 'Mega Pack',
+    credits: 150,
+    price: 45,
+    priceId: 'price_1RntthAbdM8Acunx3ciCxEZ5',
+  }
+];
+
+export const IMAGINE_CREDIT_PACKAGES = import.meta.env.DEV ? TEST_IMAGINE_CREDIT_PACKAGES : LIVE_IMAGINE_CREDIT_PACKAGES;
 
 const PROD_BACKEND_HOST = 'api.minepal.net';
 const DEV_BACKEND_HOST = 'staging.minepal.net:11111';
