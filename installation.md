@@ -14,45 +14,11 @@ This is your lucky day! No extra installation needed. Just open the app and have
 Well, bad luck, yet another day of setting up your system for a new app. Well, at least it's better then setting up wine, right?
 
 ## Simple Method
-This is a SH script that automatically runs the manual instructions for you. It autodetects your OS type, and installs system-wide. Before running, make sure the Minepal .AppImage is in the current working directory and hasn't been renamed since download. If it was, simply make it start with `Minepal` and end with `.AppImage`
+This is a SH script that automatically runs the manual instructions for you. It autodetects your OS type, and installs system-wide. Before running, make sure the Minepal .AppImage is in the current working directory and hasn't been renamed since download. If it was, simply make it start with `Minepal` and end with `.AppImage`. The script is pulled from the repo ("install_linux.sh")
 > [!WARNING]
-> Don't use this when you're repeatedly recompiling the app. Use manual install
-```sh
-#!/usr/bin/sh
-source /etc/os-release
-APPIMAGE=$(/usr/bin/ls | grep -i Minepal | grep .AppImage)
-sudo mv "$APPIMAGE" /usr/local/bin/minepal
-case "$ID $ID_LIKE" in
-    *fedora*) sudo dnf install -y xdg-utils ;;
-    *arch*)   sudo pacman --noconfirm -S xdg-utils ;;
-    *debian*) sudo apt install -y xdg-utils ;;
-esac
-mkdir -p ~/.local/share/applications
-cat > ~/.local/share/applications/minepal.desktop <<EOF
-[Desktop Entry]
-Name=MinePal
-Exec=/usr/local/bin/minepal %u
-Type=Application
-Terminal=false
-MimeType=x-scheme-handler/minepal;
-Categories=Utility;
-EOF
-cat > minepal-protocol.xml <<EOF
-<?xml version="1.0"?>
-<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
-  <mime-type type="x-scheme-handler/minepal">
-    <comment>MinePal custom protocol</comment>
-    <glob pattern="minepal:*"/>
-  </mime-type>
-</mime-info>
-EOF
-sudo update-desktop-database /usr/share/applications/
-xdg-mime install minepal-protocol.xml
-xdg-mime default minepal.desktop x-scheme-handler/minepal
-[ "$(xdg-mime query default x-scheme-handler/minepal)" = "minepal.desktop" ] && \
-    rm -rf 'minepal-protocol.xml'
-    echo "Installation successful. You should now be able to login. Enjoy!"
-```
+> Don't use this when you're repeatedly recompiling the app. Do manual install.
+`curl https://raw.githubusercontent.com/leo4life2/MinePal/refs/heads/install_linux.sh | sh`
+
 ## Manual Installation
 If the script fails for whatever reason, you can manually install Minepal.
 ### Step 1. Moving it to /usr/local/bin
