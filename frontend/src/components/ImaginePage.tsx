@@ -5,6 +5,7 @@ import { HTTPS_BACKEND_URL } from '../constants';
 import { ModalWrapper, ImagineCreditsModal } from './Modal';
 // @ts-expect-error SVG import with React component syntax not recognized by TypeScript
 import BrainIcon from '../assets/brain.svg?react';
+import RefreshIcon from '../assets/refresh.svg';
 import './ImaginePage.css';
 
 interface Structure {
@@ -24,7 +25,7 @@ interface ImagineRequest {
 }
 
 const ImaginePage = () => {
-  const { imagineCredits, supabase, user } = useSupabase();
+  const { imagineCredits, supabase, user, refreshSubscription } = useSupabase();
   const credits = imagineCredits ?? 0;
   const [mode, setMode] = useState<'Normal' | 'Detailed'>('Normal');
   const [prompt, setPrompt] = useState('');
@@ -48,6 +49,7 @@ const ImaginePage = () => {
   const [selectedStructure, setSelectedStructure] = useState<Structure | null>(null);
   const [showStructureModal, setShowStructureModal] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [loadingRefresh, setLoadingRefresh] = useState(false);
 
   const detailedPrompts = [
     "A floating crystal observatory made of amethyst blocks and tinted glass, suspended 200 blocks above a misty swamp with glowing sea lantern constellations and hanging gardens of glowberries cascading down like ethereal waterfalls",
@@ -395,6 +397,16 @@ const ImaginePage = () => {
     setImageMediaType(null);
   };
 
+  const handleRefreshCredits = async () => {
+    setLoadingRefresh(true);
+    try {
+      await refreshSubscription();
+    } catch (err) {
+      console.error('Failed to refresh credits:', err);
+    } finally {
+      setLoadingRefresh(false);
+    }
+  };
 
 
   return (
@@ -517,6 +529,18 @@ const ImaginePage = () => {
               <span className="credits-text">{credits}</span>
               <LifeBuoy className="credits-icon" size={18} />
             </div>
+            <button 
+              className="credits-refresh-button" 
+              onClick={handleRefreshCredits}
+              disabled={loadingRefresh}
+              title="Refresh credits"
+            >
+              <img 
+                src={RefreshIcon} 
+                alt="Refresh" 
+                className={loadingRefresh ? "refresh-icon spinning" : "refresh-icon"} 
+              />
+            </button>
           </div>
         </div>
 

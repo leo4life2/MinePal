@@ -163,6 +163,41 @@
   transform: scale(1.05);
 }
 
+.credits-refresh-button {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  width: 30px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  margin-left: 8px;
+}
+
+.credits-refresh-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.credits-refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.credits-refresh-button .refresh-icon {
+  width: 16px;
+  height: 16px;
+  filter: invert(0.7);
+  margin-left: 0.5px;
+}
+
+.credits-refresh-button .refresh-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
 .credits-display {
   display: flex;
   align-items: center;

@@ -38,5 +38,5 @@ export default defineConfig({
   esbuild: {
     keepNames: true,
   },
-  mode: 'development'
+  // mode: 'development'
 });
