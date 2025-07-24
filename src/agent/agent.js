@@ -4,7 +4,7 @@ import { Coder } from './coder.js';
 import { Prompter } from './prompter.js';
 import { initModes } from './modes.js';
 import MCData from '../utils/mcdata.js';
-import { containsCommand, commandExists, executeCommand, truncCommandMessage } from './commands/index.js';
+import { containsCommand, commandExists, executeCommand, truncCommandMessage, getAllCommands } from './commands/index.js';
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
@@ -294,6 +294,66 @@ export class Agent {
     }
 
     /**
+     * Calculate Levenshtein distance between two strings
+     * @param {string} s1 - First string
+     * @param {string} s2 - Second string
+     * @returns {number} The edit distance
+     */
+    _levenshteinDistance(s1, s2) {
+        const m = s1.length;
+        const n = s2.length;
+        const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+        
+        for (let i = 0; i <= m; i++) dp[i][0] = i;
+        for (let j = 0; j <= n; j++) dp[0][j] = j;
+        
+        for (let i = 1; i <= m; i++) {
+            for (let j = 1; j <= n; j++) {
+                if (s1[i - 1] === s2[j - 1]) {
+                    dp[i][j] = dp[i - 1][j - 1];
+                } else {
+                    dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+                }
+            }
+        }
+        
+        return dp[m][n];
+    }
+
+    /**
+     * Find similar commands based on string similarity
+     * @param {string} attemptedCommand - The command that was attempted (with !)
+     * @returns {string[]} Array of similar command names
+     */
+    _findSimilarCommands(attemptedCommand) {
+        const allCommands = getAllCommands();
+        const commandDistances = [];
+        
+        // Calculate distance for each command
+        for (const command of allCommands) {
+            const distance = this._levenshteinDistance(
+                attemptedCommand.toLowerCase(), 
+                command.name.toLowerCase()
+            );
+            commandDistances.push({ name: command.name, distance });
+        }
+        
+        // Sort by distance
+        commandDistances.sort((a, b) => a.distance - b.distance);
+        
+        // Return top 3 suggestions that are reasonably close
+        const suggestions = [];
+        for (let i = 0; i < Math.min(3, commandDistances.length); i++) {
+            // Only suggest if edit distance is reasonable (less than half the length)
+            if (commandDistances[i].distance <= attemptedCommand.length / 2 + 2) {
+                suggestions.push(commandDistances[i].name);
+            }
+        }
+        
+        return suggestions;
+    }
+
+    /**
      * Prunes system messages from the history before the last assistant message.
      * Operates directly on this.history.turns.
      */
@@ -479,9 +539,57 @@ export class Agent {
             const eventname = this.settings.profiles.length > 1 ? 'whisper' : 'chat'; // Updated to use instance variable
             
             // Set up listener for owner messages
-            this.bot.on(eventname, (username, message) => {
+            this.bot.on(eventname, async (username, message) => {
                 if (username === this.name) return;
                 if (ignore_messages.some((m) => message.startsWith(m))) return;
+                
+                // Check if message is from owner and is a pure command
+                if (username === this.owner && message.startsWith('!') && message.match(/^![a-zA-Z_]+\([^)]*\)$/)) {
+                    // Extract command name for acknowledgment
+                    const command_name = containsCommand(message);
+                    
+                    // If it matches command pattern but isn't valid, provide suggestions
+                    if (!command_name || !commandExists(command_name)) {
+                        // Extract the attempted command name from the message
+                        const attemptedCommand = message.match(/^!([a-zA-Z_]+)/)?.[1];
+                        if (attemptedCommand) {
+                            // Find similar commands using simple string similarity
+                            const suggestions = this._findSimilarCommands(`!${attemptedCommand}`);
+                            
+                            let errorMessage = `Command !${attemptedCommand} not found.`;
+                            if (suggestions.length > 0) {
+                                errorMessage += ` Did you mean: ${suggestions.join(', ')}?`;
+                            }
+                            await this.bot.chat(errorMessage);
+                        } else {
+                            await this.bot.chat("Invalid command format.");
+                        }
+                        return; // Skip normal message handling even for invalid commands
+                    }
+                    
+                    // Valid command - execute it
+                    // Acknowledge the command
+                    await this.bot.chat(`Executing command: ${command_name}`);
+                    
+                    try {
+                        // Execute the command directly
+                        const execute_res = await executeCommand(this, message);
+                        console.log(`[Direct Command] Owner command ${message} finished. Result:`, execute_res);
+                        
+                        // Optionally report the result back
+                        if (execute_res !== undefined && execute_res !== null) {
+                            const truncatedResult = truncCommandMessage(String(execute_res));
+                            if (truncatedResult && truncatedResult.trim() !== '') {
+                                await this.sendMessage(`Result: ${truncatedResult}`, true);
+                            }
+                        }
+                    } catch (execError) {
+                        console.error(`[Direct Command] Error executing owner command ${command_name}:`, execError);
+                        await this.sendMessage(`Error executing ${command_name}: ${execError.message}`, true);
+                    }
+                    return; // Skip normal message handling
+                }
+                
                 this.handleMessage(username, message);
             });
 

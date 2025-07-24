@@ -153,6 +153,10 @@ export async function executeCommand(agent, message) {
         return `Command is incorrectly formatted. Commands should be in the format: !commandName(arg1, arg2, ...) or !commandName() for no arguments.`;
 }
 
+export function getAllCommands() {
+    return commandList.filter(cmd => cmd.callable !== false);
+}
+
 export function getCommandDocs() {
     let docs = `\n*COMMAND DOCS\n You can use the following commands to perform actions and get information about the world. 
     Use the commands with the syntax: !commandName or !commandName("arg1", 1.2, ...) if the command takes arguments.\n
