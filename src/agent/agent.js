@@ -354,6 +354,63 @@ export class Agent {
     }
 
     /**
+     * Show paginated help for commands
+     * @param {number} page - The page number to show
+     */
+    async _showHelp(page) {
+        const allCommands = getAllCommands();
+        const commandsPerPage = 6;
+        const totalPages = Math.ceil(allCommands.length / commandsPerPage);
+        
+        // Validate page number
+        if (page < 1 || page > totalPages) {
+            this.bot.chat(`Invalid page. Please use a page between 1 and ${totalPages}.`);
+            return;
+        }
+        
+        // Calculate slice indices
+        const startIdx = (page - 1) * commandsPerPage;
+        const endIdx = Math.min(startIdx + commandsPerPage, allCommands.length);
+        const commandsOnPage = allCommands.slice(startIdx, endIdx);
+        
+        // Send header
+        this.bot.chat(`=== Commands Help (Page ${page}/${totalPages}) ===`);
+        
+        // Add a small delay between messages to avoid spam
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Send each command as a separate message
+        for (const command of commandsOnPage) {
+            let commandLine = command.name;
+            
+            // Add parameter info if available
+            if (command.params && Object.keys(command.params).length > 0) {
+                const paramNames = Object.keys(command.params);
+                commandLine += `(${paramNames.join(', ')})`;
+            } else {
+                commandLine += `()`;
+            }
+            
+            // Add description (truncate if too long to fit in one chat line)
+            const description = command.description.length > 80 
+                ? command.description.substring(0, 77) + '...' 
+                : command.description;
+            commandLine += ` - ${description}`;
+            
+            this.bot.chat(commandLine);
+            
+            // Small delay to avoid chat spam
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        // Add navigation hint
+        if (totalPages > 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            this.bot.chat(`Use !help(${page < totalPages ? page + 1 : 1}) for ${page < totalPages ? 'next' : 'first'} page.`);
+        }
+    }
+
+    /**
      * Prunes system messages from the history before the last assistant message.
      * Operates directly on this.history.turns.
      */
@@ -543,51 +600,67 @@ export class Agent {
                 if (username === this.name) return;
                 if (ignore_messages.some((m) => message.startsWith(m))) return;
                 
-                // Check if message is from owner and is a pure command
-                if (username === this.owner && message.startsWith('!') && message.match(/^![a-zA-Z_]+\([^)]*\)$/)) {
-                    // Extract command name for acknowledgment
-                    const command_name = containsCommand(message);
-                    
-                    // If it matches command pattern but isn't valid, provide suggestions
-                    if (!command_name || !commandExists(command_name)) {
-                        // Extract the attempted command name from the message
-                        const attemptedCommand = message.match(/^!([a-zA-Z_]+)/)?.[1];
-                        if (attemptedCommand) {
-                            // Find similar commands using simple string similarity
-                            const suggestions = this._findSimilarCommands(`!${attemptedCommand}`);
-                            
-                            let errorMessage = `Command !${attemptedCommand} not found.`;
-                            if (suggestions.length > 0) {
-                                errorMessage += ` Did you mean: ${suggestions.join(', ')}?`;
-                            }
-                            await this.bot.chat(errorMessage);
-                        } else {
-                            await this.bot.chat("Invalid command format.");
-                        }
-                        return; // Skip normal message handling even for invalid commands
-                    }
-                    
-                    // Valid command - execute it
-                    // Acknowledge the command
-                    await this.bot.chat(`Executing command: ${command_name}`);
-                    
-                    try {
-                        // Execute the command directly
-                        const execute_res = await executeCommand(this, message);
-                        console.log(`[Direct Command] Owner command ${message} finished. Result:`, execute_res);
+                // Check if message is from owner and looks like a command
+                if (username === this.owner && message.startsWith('!')) {
+                    // Special handling for !help command (with or without parentheses)
+                    if (message === '!help' || message.match(/^!help\(\d*\)$/)) {
+                        let page = 1;
                         
-                        // Optionally report the result back
-                        if (execute_res !== undefined && execute_res !== null) {
-                            const truncatedResult = truncCommandMessage(String(execute_res));
-                            if (truncatedResult && truncatedResult.trim() !== '') {
-                                await this.sendMessage(`Result: ${truncatedResult}`, true);
-                            }
+                        if (message !== '!help') {
+                            const pageMatch = message.match(/^!help\((\d*)\)$/);
+                            page = pageMatch && pageMatch[1] ? parseInt(pageMatch[1]) : 1;
                         }
-                    } catch (execError) {
-                        console.error(`[Direct Command] Error executing owner command ${command_name}:`, execError);
-                        await this.sendMessage(`Error executing ${command_name}: ${execError.message}`, true);
+                        
+                        await this._showHelp(page);
+                        return; // Skip normal message handling
                     }
-                    return; // Skip normal message handling
+                    
+                    // Check if it's a command pattern
+                    if (message.match(/^![a-zA-Z_]+\([^)]*\)$/)) {
+                        // Extract command name for acknowledgment
+                        const command_name = containsCommand(message);
+                        
+                        // If it matches command pattern but isn't valid, provide suggestions
+                        if (!command_name || !commandExists(command_name)) {
+                            // Extract the attempted command name from the message
+                            const attemptedCommand = message.match(/^!([a-zA-Z_]+)/)?.[1];
+                            if (attemptedCommand) {
+                                // Find similar commands using simple string similarity
+                                const suggestions = this._findSimilarCommands(`!${attemptedCommand}`);
+                                
+                                let errorMessage = `Command !${attemptedCommand} not found.`;
+                                if (suggestions.length > 0) {
+                                    errorMessage += ` Did you mean: ${suggestions.join(', ')}?`;
+                                }
+                                await this.bot.chat(errorMessage);
+                            } else {
+                                await this.bot.chat("Invalid command format.");
+                            }
+                            return; // Skip normal message handling even for invalid commands
+                        }
+                        
+                        // Valid command - execute it
+                        // Acknowledge the command
+                        await this.bot.chat(`Executing command: ${command_name}`);
+                        
+                        try {
+                            // Execute the command directly
+                            const execute_res = await executeCommand(this, message);
+                            console.log(`[Direct Command] Owner command ${message} finished. Result:`, execute_res);
+                            
+                            // Optionally report the result back
+                            if (execute_res !== undefined && execute_res !== null) {
+                                const truncatedResult = truncCommandMessage(String(execute_res));
+                                if (truncatedResult && truncatedResult.trim() !== '') {
+                                    await this.sendMessage(`Result: ${truncatedResult}`, true);
+                                }
+                            }
+                        } catch (execError) {
+                            console.error(`[Direct Command] Error executing owner command ${command_name}:`, execError);
+                            await this.sendMessage(`Error executing ${command_name}: ${execError.message}`, true);
+                        }
+                        return; // Skip normal message handling
+                    }
                 }
                 
                 this.handleMessage(username, message);

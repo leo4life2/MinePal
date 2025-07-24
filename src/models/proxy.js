@@ -289,12 +289,21 @@ export class Proxy {
                     let responseDataText;
                     if (err.response.data instanceof ArrayBuffer) {
                         responseDataText = Buffer.from(err.response.data).toString();
+                    } else if (Buffer.isBuffer(err.response.data)) {
+                        responseDataText = err.response.data.toString();
                     } else {
                         responseDataText = err.response.data; // Could be string or object already
                     }
   
                       try {
                          console.log("[Proxy] Response data text:", responseDataText);
+                         
+                         // Handle case where responseDataText is a Buffer-like object
+                         if (typeof responseDataText === 'object' && responseDataText !== null && 
+                             responseDataText.type === 'Buffer' && Array.isArray(responseDataText.data)) {
+                             responseDataText = Buffer.from(responseDataText.data).toString();
+                         }
+                         
                           const parsedErrorData = (typeof responseDataText === 'string' && responseDataText.startsWith('{')) ? JSON.parse(responseDataText) : responseDataText;
                           if (typeof parsedErrorData === 'object' && parsedErrorData !== null && parsedErrorData.error) {
                             if (typeof parsedErrorData.error === 'string') {
@@ -306,10 +315,10 @@ export class Proxy {
                             errorDetailText = parsedErrorData;
                         } else {
                             // Keep it simple if no clear error string is found in a known structure
-                            errorDetailText = (typeof responseDataText === 'string') ? responseDataText.substring(0, 200) : "Complex error object received.";
+                            errorDetailText = (typeof responseDataText === 'string') ? responseDataText : JSON.stringify(responseDataText);
                         }
                     } catch (parseError) {
-                        errorDetailText = (typeof responseDataText === 'string') ? responseDataText.substring(0, 200) : "Could not parse error data string.";
+                        errorDetailText = (typeof responseDataText === 'string') ? responseDataText : JSON.stringify(responseDataText);
                     }
                 }
                 errorResponseMessage += `Status ${err.response.status}: ${errorDetailText}`;
