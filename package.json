@@ -82,7 +82,8 @@
       "entitlements": "build/entitlements.plist",
       "hardenedRuntime": true,
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ]
     },
     "win": {
