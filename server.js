@@ -739,40 +739,41 @@ function startServer() {
         logToFile('API: POST /log-action-event called');
         const { action, is_success, fail_reason, props } = req.body;
 
+        // No-op implementation - commented out Supabase logging
         try {
-            if (!supabase) {
-                logToFile('Supabase client not initialized.');
-                return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
-            }
-            // --- Sampling Logic ---
-            if (is_success === true && Math.random() >= ACTION_SAMPLING_RATE) {
-                return res.status(200).json({ message: "Action event sampled out." });
-            }
-            // --- End Sampling Logic ---
+            // if (!supabase) {
+            //     logToFile('Supabase client not initialized.');
+            //     return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
+            // }
+            // // --- Sampling Logic ---
+            // if (is_success === true && Math.random() >= ACTION_SAMPLING_RATE) {
+            //     return res.status(200).json({ message: "Action event sampled out." });
+            // }
+            // // --- End Sampling Logic ---
 
-            // Get user ID
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            if (userError || !user) {
-                logToFile(`Supabase user error: ${userError?.message || 'User not found'}`);
-                return res.status(401).json({ error: "Could not retrieve authenticated user." });
-            }
+            // // Get user ID
+            // const { data: { user }, error: userError } = await supabase.auth.getUser();
+            // if (userError || !user) {
+            //     logToFile(`Supabase user error: ${userError?.message || 'User not found'}`);
+            //     return res.status(401).json({ error: "Could not retrieve authenticated user." });
+            // }
 
-            const eventData = {
-                user_id: user.id,
-                action,
-                is_success: is_success !== undefined ? is_success : null,
-                fail_reason: fail_reason || null,
-                props: props || null
-            };
+            // const eventData = {
+            //     user_id: user.id,
+            //     action,
+            //     is_success: is_success !== undefined ? is_success : null,
+            //     fail_reason: fail_reason || null,
+            //     props: props || null
+            // };
 
-            const { error: insertError } = await supabase
-                .from('action_events')
-                .insert(eventData);
+            // const { error: insertError } = await supabase
+            //     .from('action_events')
+            //     .insert(eventData);
 
-            if (insertError) {
-                logToFile(`Supabase insert error (action_events): ${insertError.message}`);
-                return res.status(500).json({ error: `Failed to log action event: ${insertError.message}` });
-            }
+            // if (insertError) {
+            //     logToFile(`Supabase insert error (action_events): ${insertError.message}`);
+            //     return res.status(500).json({ error: `Failed to log action event: ${insertError.message}` });
+            // }
 
             res.status(201).json({ message: "Action event logged successfully." });
         } catch (error) {
@@ -789,35 +790,36 @@ function startServer() {
             return res.status(400).json({ error: "'play_time_sec' and 'stop_reason' fields are required." });
         }
 
+        // No-op implementation - commented out Supabase logging
         try {
-            if (!supabase) {
-                logToFile('Supabase client not initialized.');
-                return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
-            }
-            // Get user ID
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            if (userError || !user) {
-                logToFile(`Supabase user error: ${userError?.message || 'User not found'}`);
-                return res.status(401).json({ error: "Could not retrieve authenticated user." });
-            }
+            // if (!supabase) {
+            //     logToFile('Supabase client not initialized.');
+            //     return res.status(401).json({ error: 'Supabase client not initialized. Please authenticate first.' });
+            // }
+            // // Get user ID
+            // const { data: { user }, error: userError } = await supabase.auth.getUser();
+            // if (userError || !user) {
+            //     logToFile(`Supabase user error: ${userError?.message || 'User not found'}`);
+            //     return res.status(401).json({ error: "Could not retrieve authenticated user." });
+            // }
 
-            const sessionData = {
-                user_id: user.id,
-                agent_version: appVersion,
-                play_time_sec,
-                stop_reason,
-                crash_reason: crash_reason || null,
-                metadata: metadata || null
-            };
+            // const sessionData = {
+            //     user_id: user.id,
+            //     agent_version: appVersion,
+            //     play_time_sec,
+            //     stop_reason,
+            //     crash_reason: crash_reason || null,
+            //     metadata: metadata || null
+            // };
 
-            const { error: insertError } = await supabase
-                .from('agent_sessions')
-                .insert(sessionData);
+            // const { error: insertError } = await supabase
+            //     .from('agent_sessions')
+            //     .insert(sessionData);
 
-            if (insertError) {
-                logToFile(`Supabase insert error (agent_sessions): ${insertError.message}`);
-                return res.status(500).json({ error: `Failed to log agent session: ${insertError.message}` });
-            }
+            // if (insertError) {
+            //     logToFile(`Supabase insert error (agent_sessions): ${insertError.message}`);
+            //     return res.status(500).json({ error: `Failed to log agent session: ${insertError.message}` });
+            // }
 
             res.status(201).json({ message: "Agent session logged successfully." });
         } catch (error) {
