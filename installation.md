@@ -5,14 +5,23 @@ This is an ultimate guide to setup your system to make MinePal work correctly
 > [!NOTE]
 > This guide implies that you have already downloaded the app. If not - you can [download it from the official website](https://minepal.net/) or [build it from source](README.md#building-from-source)
 
-## Windows & Mac
+# Windows & Mac
 
 This is your lucky day! No extra installation needed. Just open the app and have a nice time playing with your MinePal!
 
-## Linux
+# Linux
 
 Well, bad luck, yet another day of setting up your system for a new app. Well, at least it's better then setting up wine, right?
 
+## Simple Method
+This is a SH script that automatically runs the manual instructions for you. It autodetects your OS type, and installs system-wide. Before running, make sure the Minepal .AppImage is in the current working directory and hasn't been renamed since download. If it was, simply make it start with `Minepal` and end with `.AppImage`. The script is pulled from the repo ("install_linux.sh")
+> [!WARNING]
+> Don't use this when you're repeatedly recompiling the app. Do manual install.
+
+`curl https://raw.githubusercontent.com/leo4life2/MinePal/refs/heads/install_linux.sh | sh`
+
+## Manual Installation
+If the script fails for whatever reason, you can manually install Minepal.
 ### Step 1. Moving it to /usr/local/bin
 
 First of all you need to make it persistent and available from any point of your system. Just navigate to your Download/dist directory and move it to `/usr/local/bin` directory
@@ -22,11 +31,11 @@ sudo mv Minepal-*.*.*.AppImage /usr/local/bin/minepal
 ```
 
 > [!NOTE]
-> If you're actively rebuilding AppImage and work with source code a lot - you may found it easier to create a symbolic link. Just use `sudo ln -s /absolute/path/to/project/folder/dist/Minepal-*.*.*.AppImage /usr/local/bin/minepal` command to make it work
+> If you're actively rebuilding AppImage and work with source code a lot - you may find it easier to create a symbolic link. Just use `sudo ln -s /absolute/path/to/project/folder/dist/Minepal-*.*.*.AppImage /usr/local/bin/minepal` command to make it work
 
 ### Step 2. Setting up xdg
 
-Then you need to setup xdg (x desktop group) so urls from the website (auth and importing pals) will be transferred to app. This is pretty simple: all we really need is create a desktop entery, register protocol and connect protocol to an entery.
+Then you need to setup xdg (x desktop group) so urls from the website (auth and importing pals) will be transferred to app. This is pretty simple: all we really need is create a desktop entry, register protocol and connect protocol to an entry.
 
 #### Step 2.1 Installing xdg-tools
 First of all make sure that `xdg-tools` are installed
