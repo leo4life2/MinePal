@@ -31,6 +31,9 @@ function inject(bot) {
   let lastNodeTime = performance.now();
   let returningPos = null;
   let stopPathing = false;
+  let lastStallTime = performance.now();
+  let lastStallPos = null;
+  let currentDigPos = null;
   const physics = new Physics(bot);
   const lockPlaceBlock = new Lock();
   const lockEquipItem = new Lock();
@@ -38,12 +41,15 @@ function inject(bot) {
 
   bot.pathfinder = {};
 
-  bot.pathfinder.thinkTimeout = 5000; // ms
+  bot.pathfinder.thinkTimeout = 2000; // ms
   bot.pathfinder.tickTimeout = 40; // ms, amount of thinking per tick (max 50 ms)
   bot.pathfinder.searchRadius = -1; // in blocks, limits of the search area, -1: don't limit the search
   bot.pathfinder.enablePathShortcut = false; // disabled by default as it can cause bugs in specific configurations
   bot.pathfinder.LOSWhenPlacingBlocks = true;
   bot.pathfinder.sneak = false;
+  // Stall detection (position-based): if pathing but not moving, reset path
+  bot.pathfinder.stallTimeout = 2000; // ms without significant movement while pathing
+  bot.pathfinder.stallDistanceEpsilon = 0.5; // blocks
 
   bot.pathfinder.bestHarvestTool = (block) => {
     const availableTools = bot.inventory.items();
@@ -474,6 +480,9 @@ function inject(bot) {
 
   bot.on("blockUpdate", (oldBlock, newBlock) => {
     if (!oldBlock || !newBlock) return;
+    // Ignore updates caused by our own planned actions (placing/digging)
+    if (placingBlock && newBlock.position && newBlock.position.x === placingBlock.x && newBlock.position.y === placingBlock.y && newBlock.position.z === placingBlock.z) return;
+    if (currentDigPos && newBlock.position && newBlock.position.x === currentDigPos.x && newBlock.position.y === currentDigPos.y && newBlock.position.z === currentDigPos.z) return;
     if (
       isPositionNearPath(oldBlock.position, path) &&
       oldBlock.type !== newBlock.type
@@ -622,6 +631,7 @@ function inject(bot) {
         digging = true;
         const b = nextPoint.toBreak.shift();
         const block = bot.blockAt(new Vec3(b.x, b.y, b.z), false);
+        currentDigPos = block ? block.position.clone() : null;
         const tool = bot.pathfinder.bestHarvestTool(block);
         fullStop();
 
@@ -634,6 +644,7 @@ function inject(bot) {
             .then(function () {
               lastNodeTime = performance.now();
               digging = false;
+              currentDigPos = null;
             });
         };
 
@@ -722,25 +733,31 @@ function inject(bot) {
 
               // Spam placeBlock while jumping
               const placeBlockInterval = setInterval(() => {
+                if (!placingBlock) {
+                  clearInterval(placeBlockInterval);
+                  return;
+                }
                 bot
                   .placeBlock(
                     refBlock,
-                    new Vec3(placingBlock.dx, placingBlock.dy, placingBlock.dz)
+                    new Vec3(placingBlock.dx || 0, placingBlock.dy || 0, placingBlock.dz || 0)
                   )
                   .then(function () {
                     clearInterval(placeBlockInterval); // Stop spamming once successful
                     bot.setControlState("sneak", false);
                     if (
                       bot.pathfinder.LOSWhenPlacingBlocks &&
-                      placingBlock.returnPos
+                      placingBlock && placingBlock.returnPos
                     )
                       returningPos = placingBlock.returnPos.clone();
                     
                     // Emit blockPlaced event
-                    const newBlock = bot.blockAt(
-                      new Vec3(placingBlock.x, placingBlock.y, placingBlock.z)
-                    );
+                    const newBlock = placingBlock ? bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z)) : null;
                     bot.emit('blockPlaced', refBlock, newBlock);
+                    // Placement completed; clear placing state
+                    placing = false;
+                    placingBlock = null;
+                    lastNodeTime = performance.now();
                   })
                   .catch((_ignoreError) => {
                     // Keep trying until successful
@@ -821,6 +838,29 @@ function inject(bot) {
       } else {
         bot.setControlState("forward", false);
         bot.setControlState("sprint", false);
+      }
+    }
+
+    // Position-based stall detection: if pathing but not moving for too long, reset path
+    const now = performance.now();
+    if (!lastStallPos) {
+      lastStallPos = bot.entity.position.clone();
+      lastStallTime = now;
+    } else {
+      const dxp = bot.entity.position.x - lastStallPos.x;
+      const dyp = bot.entity.position.y - lastStallPos.y;
+      const dzp = bot.entity.position.z - lastStallPos.z;
+      const distSq = dxp * dxp + dyp * dyp + dzp * dzp;
+      const eps = bot.pathfinder.stallDistanceEpsilon;
+      if (distSq > eps * eps) {
+        lastStallPos = bot.entity.position.clone();
+        lastStallTime = now;
+      } else if (path.length > 0 && !digging && !placing && (now - lastStallTime > bot.pathfinder.stallTimeout)) {
+        resetPath("stall_timeout");
+        lastNodeTime = now;
+        lastStallPos = bot.entity.position.clone();
+        lastStallTime = now;
+        return;
       }
     }
 

@@ -44,15 +44,20 @@ class Movements {
 
     // Define the set of blocks that pathfinding is allowed to break opportunistically.
     // This is primarily for clearing minor obstacles like grass, vines, etc.
-    this.allowedPathfindingBreaks = new Set([
+    const baseBreakNames = [
       "sand", "gravel", "dirt", "grass_block", "grass", "tall_grass",
-      "dead_bush", "fern", "large_fern", "leaves", "leaves2", "cobweb",
+      "dead_bush", "fern", "large_fern", "cobweb",
       "snow_layer", "vine", "seagrass", "kelp", "poppy", "dandelion",
       "red_mushroom", "brown_mushroom", "bamboo", "lily_pad", "sugar_cane",
       "cactus"
-      // Note: 'leaves' and 'leaves2' might represent specific types or require checking names ending in '_leaves'.
-      // This implementation strictly uses the provided names.
-    ].map(name => registry.blocksByName[name]?.id).filter(id => id !== undefined)); // Map names to IDs
+    ];
+    const baseIds = baseBreakNames
+      .map(name => registry.blocksByName[name]?.id)
+      .filter(id => id !== undefined);
+    const leafIds = registry.blocksArray
+      .filter(b => typeof b.name === 'string' && b.name.endsWith('_leaves'))
+      .map(b => b.id);
+    this.allowedPathfindingBreaks = new Set([...baseIds, ...leafIds]); // include all *_leaves blocks dynamically
 
     registry.blocksArray.forEach(block => {
       if (block.diggable) return

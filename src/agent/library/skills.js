@@ -1241,23 +1241,40 @@ export async function collectBlock(
     potato: 7,
   };
 
+  // Ephemeral memory of candidate target blocks across scans for this call
+  const rememberKey = (v) => `${v.x},${v.y},${v.z}`;
+  const rememberedPositions = new Map();
+  let lastSelectedKey = null;
+
   while (collected < num && retries < 3) {
     console.log(
       `Attempt ${retries + 1}: Collected ${collected}/${num} ${blockType}`
     );
+    const collectedBefore = collected;
 
     let blocks = world.getNearestBlocks(bot, blocktypes, VERY_FAR_DISTANCE);
     console.log(`Found ${blocks.length} blocks of type ${blockType}`);
+    // Update ephemeral memory with current scan
+    for (const b of blocks) {
+      if (!b || !b.position) continue;
+      const key = rememberKey(b.position);
+      if (!rememberedPositions.has(key)) rememberedPositions.set(key, b);
+    }
+    // If current scan found nothing, fallback to remembered candidates
     if (blocks.length === 0) {
-      if (collected > 0) {
-        log(
-          bot,
-          `You collected ${collected} ${blockType}, and don't see more ${blockType} around`
-        );
-        return collected;
-      } else {
-        log(bot, `No ${blockType} found around.`);
-        return false;
+      blocks = Array.from(rememberedPositions.values());
+      console.log(`Scan yielded no new blocks; using remembered candidates: ${blocks.length}`);
+      if (blocks.length === 0) {
+        if (collected > 0) {
+          log(
+            bot,
+            `You collected ${collected} ${blockType}, and don't see more ${blockType} around`
+          );
+          return collected;
+        } else {
+          log(bot, `No ${blockType} found around.`);
+          return false;
+        }
       }
     }
 
@@ -1279,8 +1296,46 @@ export async function collectBlock(
       );
     }
 
-    const block = blocks[0];
+    // Filter out stale remembered entries (no longer logs/targets) and already air
+    blocks = blocks.filter((b) => {
+      if (!b || !b.position) return false;
+      let actual;
+      try {
+        actual = bot.blockAt(b.position);
+      } catch (e) {
+        // Ghost position or unloaded chunk; drop it
+        return false;
+      }
+      if (!actual) return false;
+      const isTarget = blocktypes.includes(actual.name);
+      if (!isTarget) rememberedPositions.delete(rememberKey(b.position));
+      return isTarget;
+    });
+    // Sort by distance; prefer closest
+    blocks.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+    if (blocks.length === 0) {
+      // Nothing valid to target after filtering
+      if (collected > 0) return collected; else return false;
+    }
+    let block = blocks[0];
+    if (!block || !block.position) continue;
     console.log(`Selected block at ${block.position}, distance: ${bot.entity.position.distanceTo(block.position).toFixed(2)}`); // Log distance
+
+    // If the selected block hasn't changed and we made no progress last loop, advance retries and drop this candidate from memory
+    const selectedKey = rememberKey(block.position);
+    if (lastSelectedKey === selectedKey && collected === collectedBefore) {
+      retries++;
+      console.log(`Stuck on same target ${selectedKey}. Incrementing retries to ${retries} and removing from memory.`);
+      rememberedPositions.delete(selectedKey);
+      // Recompute blocks list without this candidate
+      blocks = blocks.filter(b => rememberKey(b.position) !== selectedKey);
+      if (blocks.length === 0) continue;
+      block = blocks[0];
+      if (!block || !block.position) continue;
+      console.log(`Fallback selected block at ${block.position}, distance: ${bot.entity.position.distanceTo(block.position).toFixed(2)}`);
+    }
+    lastSelectedKey = selectedKey;
+
     await bot.tool.equipForBlock(block);
     const itemId = bot.heldItem ? bot.heldItem.type : null;
     if (!block.canHarvest(itemId)) {
@@ -1288,9 +1343,123 @@ export async function collectBlock(
       return false;
     }
 
+    // Tree collection: perform DFS over adjacent logs to collect the entire tree (up to 256 blocks)
+    const isTreeTarget = (typeof blockType === 'string' && blockType.includes('_log')) || (block && block.name && block.name.includes('_log'));
+    if (isTreeTarget) {
+      const maxNodes = 256;
+      const directions = [new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 1, 0), new Vec3(0, -1, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)];
+      const posKey = (v) => `${v.x},${v.y},${v.z}`;
+      const visited = new Set();
+      const stack = [block];
+      const cluster = [];
+      while (stack.length > 0 && cluster.length < maxNodes) {
+        const current = stack.pop();
+        const currentBlock = bot.blockAt(current.position);
+        if (!currentBlock) continue;
+        const key = posKey(currentBlock.position);
+        if (visited.has(key)) continue;
+        if (!currentBlock.name || !currentBlock.name.includes('_log')) continue;
+        visited.add(key);
+        cluster.push(currentBlock);
+        for (const dir of directions) {
+          const neighborPos = currentBlock.position.plus(dir);
+          const neighbor = bot.blockAt(neighborPos);
+          if (!neighbor || !neighbor.name || !neighbor.name.includes('_log')) continue;
+          const nkey = posKey(neighbor.position);
+          if (!visited.has(nkey)) stack.push(neighbor);
+        }
+      }
+
+      // If the tree is tall, gather dirt first so we can pillar up
+      const minY = cluster.reduce((m, b) => Math.min(m, b.position.y), Infinity);
+      const maxY = cluster.reduce((m, b) => Math.max(m, b.position.y), -Infinity);
+      const heightDiff = maxY - minY;
+      if (Number.isFinite(heightDiff) && heightDiff > 6) {
+        const invCounts = world.getInventoryCounts(bot);
+        const haveDirt = invCounts['dirt'] || 0;
+        const targetDirt = Math.min(32, Math.max(0, heightDiff + 2));
+        const needDirt = Math.max(0, targetDirt - haveDirt);
+        if (needDirt > 0) {
+          log(bot, `Tree is tall (height ${heightDiff}). Gathering ${needDirt} dirt to pillar up.`);
+          let remainingDirt = needDirt;
+          try {
+            const currentY = Math.floor(bot.entity.position.y);
+            let candidates = world.getNearestBlocks(bot, ['dirt', 'grass_block'], VERY_FAR_DISTANCE);
+            // Prefer not going down: keep same Y or above, then sort by horizontal distance
+            candidates = candidates.filter((b) => b.position.y >= currentY);
+            candidates.sort((a, b) => {
+              const da = Math.hypot(a.position.x - bot.entity.position.x, a.position.z - bot.entity.position.z);
+              const db = Math.hypot(b.position.x - bot.entity.position.x, b.position.z - bot.entity.position.z);
+              return da - db;
+            });
+            for (const b of candidates) {
+              if (bot.interrupt_code) break;
+              if (remainingDirt <= 0) break;
+              try {
+                await bot.tool.equipForBlock(b);
+                const held = bot.heldItem ? bot.heldItem.type : null;
+                if (!b.canHarvest(held)) continue;
+                await bot.collectBlock.collect(b);
+                remainingDirt--;
+              } catch (err) {
+                console.log(`Error collecting dirt candidate at ${b.position}: ${err.message}`);
+                console.log('Stack trace:', err.stack);
+                if (err.name === 'NoChests') {
+                  log(bot, `Failed to collect dirt: Inventory full, no place to deposit.`);
+                  break;
+                }
+                // Otherwise skip this candidate
+              }
+            }
+          } catch (scanErr) {
+            console.log(`Horizontal dirt scan failed: ${scanErr.message}`);
+          }
+          if (remainingDirt > 0) {
+            const gotDirt = await collectBlock(bot, 'dirt', remainingDirt, null, false);
+            if (!gotDirt) {
+              log(bot, 'Could not gather dirt for pillaring; continuing without.');
+            }
+          }
+        }
+      }
+
+      const remainingNeeded = Math.max(0, num - collected);
+      let toCollect = cluster.slice(0, remainingNeeded);
+      toCollect.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
+      for (const logBlock of toCollect) {
+        if (bot.interrupt_code) break;
+        try {
+          await bot.tool.equipForBlock(logBlock);
+          const held = bot.heldItem ? bot.heldItem.type : null;
+          if (!logBlock.canHarvest(held)) {
+            log(bot, `Don't have right tools to harvest ${logBlock.name}.`);
+            return false;
+          }
+          await bot.collectBlock.collect(logBlock);
+          collected++;
+          if (collected >= num) break;
+        } catch (err) {
+          console.log(`Error collecting log at ${logBlock.position}: ${err.message}`);
+          console.log('Stack trace:', err.stack);
+          if (err.name === "NoChests") {
+            log(
+              bot,
+              `Failed to collect ${blockType}: Inventory full, no place to deposit.`
+            );
+            break;
+          }
+          // Otherwise skip this log and continue
+        }
+      }
+      // After finishing this tree cluster, continue to next iteration of the while loop
+      continue;
+    }
+
     try {
       await bot.collectBlock.collect(block);
       collected++;
+      // Remove from memory since it's handled
+      rememberedPositions.delete(rememberKey(block.position));
     } catch (err) {
       console.log(
         `Error collecting block at ${block.position}: ${err.message}`
@@ -1303,6 +1472,8 @@ export async function collectBlock(
         );
         break;
       } else {
+        // Drop this candidate to avoid reselecting endlessly
+        rememberedPositions.delete(rememberKey(block.position));
         retries++;
         continue;
       }
