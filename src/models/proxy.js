@@ -47,7 +47,7 @@ let minepal_response_schema = {
         },
         say_in_game: { 
             type: "string",
-            description: "Short, casual in-game message directed at players in owner's specified language."
+            description: "Short, casual in-game message directed at players in owner's specified language. Never ask follow-ups or offers, never end your messages with unsolicited prompts like 'want me to ...?'"
         },
         emote: {
             type: "string",
