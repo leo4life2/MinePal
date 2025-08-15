@@ -49,7 +49,7 @@ function inject(bot) {
   bot.pathfinder.sneak = false;
   // Stall detection (position-based): if pathing but not moving, reset path
   bot.pathfinder.stallTimeout = 2000; // ms without significant movement while pathing
-  bot.pathfinder.stallDistanceEpsilon = 0.5; // blocks
+  bot.pathfinder.stallDistanceEpsilon = 2; // blocks
 
   bot.pathfinder.bestHarvestTool = (block) => {
     const availableTools = bot.inventory.items();
