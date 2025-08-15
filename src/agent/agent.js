@@ -1511,10 +1511,8 @@ export class Agent {
             await this.sendMessage(chatMessage, true);
         }
 
-        this.promptingState = `executing ${command}`; // indicates executing a command
-
-        // Process Command
         if (command) {
+            this.promptingState = `executing ${command}`; // indicates executing a command
             try {
                 // Handle Slash Commands (just send to chat)
                 if (command.startsWith('/')) {
@@ -1553,6 +1551,7 @@ export class Agent {
                 this._ensureSilenceTimerRunning(); // Ensure timer restarts after execution attempt
             }
         } else {
+             this.promptingState = 'idle';
              this._ensureSilenceTimerRunning(); // Ensure timer restarts if no command was run
         }
 
