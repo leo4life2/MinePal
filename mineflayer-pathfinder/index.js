@@ -634,6 +634,8 @@ function inject(bot) {
         currentDigPos = block ? block.position.clone() : null;
         const tool = bot.pathfinder.bestHarvestTool(block);
         fullStop();
+        // Refresh progress timer so futility/stall checks don't trip while starting a dig
+        lastNodeTime = performance.now();
 
         const digBlock = () => {
           bot
@@ -864,8 +866,8 @@ function inject(bot) {
       }
     }
 
-    // check for futility
-    if (performance.now() - lastNodeTime > 3500) {
+    // check for futility (skip while mining or building)
+    if (!digging && !placing && (performance.now() - lastNodeTime > 3500)) {
       // should never take this long to go to the next node
       resetPath("stuck");
     }
