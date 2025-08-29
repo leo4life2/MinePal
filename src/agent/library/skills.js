@@ -1370,59 +1370,6 @@ export async function collectBlock(
         }
       }
 
-      // If the tree is tall, gather dirt first so we can pillar up
-      const minY = cluster.reduce((m, b) => Math.min(m, b.position.y), Infinity);
-      const maxY = cluster.reduce((m, b) => Math.max(m, b.position.y), -Infinity);
-      const heightDiff = maxY - minY;
-      if (Number.isFinite(heightDiff) && heightDiff > 6) {
-        const invCounts = world.getInventoryCounts(bot);
-        const haveDirt = invCounts['dirt'] || 0;
-        const targetDirt = Math.min(32, Math.max(0, heightDiff + 2));
-        const needDirt = Math.max(0, targetDirt - haveDirt);
-        if (needDirt > 0) {
-          log(bot, `Tree is tall (height ${heightDiff}). Gathering ${needDirt} dirt to pillar up.`);
-          let remainingDirt = needDirt;
-          try {
-            const currentY = Math.floor(bot.entity.position.y);
-            let candidates = world.getNearestBlocks(bot, ['dirt', 'grass_block'], VERY_FAR_DISTANCE);
-            // Prefer not going down: keep same Y or above, then sort by horizontal distance
-            candidates = candidates.filter((b) => b.position.y >= currentY);
-            candidates.sort((a, b) => {
-              const da = Math.hypot(a.position.x - bot.entity.position.x, a.position.z - bot.entity.position.z);
-              const db = Math.hypot(b.position.x - bot.entity.position.x, b.position.z - bot.entity.position.z);
-              return da - db;
-            });
-            for (const b of candidates) {
-              if (bot.interrupt_code) break;
-              if (remainingDirt <= 0) break;
-              try {
-                await bot.tool.equipForBlock(b);
-                const held = bot.heldItem ? bot.heldItem.type : null;
-                if (!b.canHarvest(held)) continue;
-                await bot.collectBlock.collect(b);
-                remainingDirt--;
-              } catch (err) {
-                console.log(`Error collecting dirt candidate at ${b.position}: ${err.message}`);
-                console.log('Stack trace:', err.stack);
-                if (err.name === 'NoChests') {
-                  log(bot, `Failed to collect dirt: Inventory full, no place to deposit.`);
-                  break;
-                }
-                // Otherwise skip this candidate
-              }
-            }
-          } catch (scanErr) {
-            console.log(`Horizontal dirt scan failed: ${scanErr.message}`);
-          }
-          if (remainingDirt > 0) {
-            const gotDirt = await collectBlock(bot, 'dirt', remainingDirt, null, false);
-            if (!gotDirt) {
-              log(bot, 'Could not gather dirt for pillaring; continuing without.');
-            }
-          }
-        }
-      }
-
       const remainingNeeded = Math.max(0, num - collected);
       let toCollect = cluster.slice(0, remainingNeeded);
       toCollect.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
