@@ -34,10 +34,18 @@ function inject(bot) {
   let lastStallTime = performance.now();
   let lastStallPos = null;
   let currentDigPos = null;
+  let placingStartedAt = 0;
+  let currentPlaceInterval = null;
+  let consecutiveStallTimeouts = 0;
   const physics = new Physics(bot);
   const lockPlaceBlock = new Lock();
   const lockEquipItem = new Lock();
   const lockUseBlock = new Lock();
+  let lastStallLogTs = 0;
+  let lastFutilityLogTs = 0;
+  let unstuckUntil = 0;
+  let unstuckAction = null;
+  const stallCounts = new Map(); // key: floored node pos "x|y|z" -> count
 
   bot.pathfinder = {};
 
@@ -47,9 +55,12 @@ function inject(bot) {
   bot.pathfinder.enablePathShortcut = false; // disabled by default as it can cause bugs in specific configurations
   bot.pathfinder.LOSWhenPlacingBlocks = true;
   bot.pathfinder.sneak = false;
+  bot.pathfinder.debugPathExec = true; // set true to trace corner/physics/control decisions
+  bot.pathfinder.debugStallLogs = true; // set true to enable stall/futility logs
   // Stall detection (position-based): if pathing but not moving, reset path
   bot.pathfinder.stallTimeout = 2000; // ms without significant movement while pathing
   bot.pathfinder.stallDistanceEpsilon = 2; // blocks
+  bot.pathfinder.placeTimeout = 2500; // ms maximum to spend on a single placing step
 
   bot.pathfinder.bestHarvestTool = (block) => {
     const availableTools = bot.inventory.items();
@@ -169,6 +180,9 @@ function inject(bot) {
   }
 
   function resetPath(reason, clearStates = true) {
+    try {
+      console.log("[pathfinder][resetPath] reason=%s digging=%s placing=%s pathLen=%s", reason, digging, placing, path.length);
+    } catch {}
     if (!stopPathing && path.length > 0) bot.emit("path_reset", reason);
     path = [];
     if (digging) {
@@ -263,7 +277,14 @@ function inject(bot) {
         node.toPlace.length > 0 ||
         !physics.canStraightLineBetween(lastNode, node)
       ) {
-        newPath.push(path[i - 1]);
+        // Before accepting a long segment, add an intermediate center point if it turns 90° next to reduce corner cuts
+        const prev = path[i - 1];
+        const hasTurn = (i + 1 < path.length) && ((path[i + 1].x !== node.x) ^ (path[i + 1].z !== node.z));
+        if (hasTurn) {
+          newPath.push(new Vec3(Math.floor(node.x) + 0.5, Math.floor(node.y), Math.floor(node.z) + 0.5));
+        } else {
+          newPath.push(path[i - 1]);
+        }
         lastNode = path[i - 1];
       }
     }
@@ -508,6 +529,25 @@ function inject(bot) {
   });
 
   function monitorMovement() {
+    // Apply a brief nudge after stall timeouts to break micro-collisions
+    const nowTick = performance.now();
+    if (unstuckUntil && nowTick < unstuckUntil) {
+      if (unstuckAction === 'back') {
+        bot.setControlState('back', true);
+        bot.setControlState('sneak', true);
+      } else if (unstuckAction === 'left') {
+        bot.setControlState('left', true);
+        bot.setControlState('sneak', true);
+      } else if (unstuckAction === 'right') {
+        bot.setControlState('right', true);
+        bot.setControlState('sneak', true);
+      }
+      return;
+    } else if (unstuckAction) {
+      bot.clearControlStates();
+      unstuckAction = null;
+      unstuckUntil = 0;
+    }
     // Check if the bot is allowed free motion and if the goal is an entity
     if (stateMovements && stateMovements.allowFreeMotion && stateGoal && stateGoal.entity) {
       const target = stateGoal.entity;
@@ -578,6 +618,9 @@ function inject(bot) {
           path = results.path;
           astartTimedout = results.status === "partial";
           pathUpdated = true;
+          try {
+            console.log("[pathfinder][repath] newPathLen=%s status=%s", path.length, astartTimedout ? 'partial' : 'complete');
+          } catch {}
         }
       }
     }
@@ -636,6 +679,10 @@ function inject(bot) {
         fullStop();
         // Refresh progress timer so futility/stall checks don't trip while starting a dig
         lastNodeTime = performance.now();
+        try {
+          const posStr = block && block.position ? `${block.position.x},${block.position.y},${block.position.z}` : `${b.x},${b.y},${b.z}`;
+          console.log("[pathfinder][dig] start at %s tool=%s", posStr, tool ? (tool.name || tool.type) : 'none');
+        } catch {}
 
         const digBlock = () => {
           bot
@@ -647,6 +694,7 @@ function inject(bot) {
               lastNodeTime = performance.now();
               digging = false;
               currentDigPos = null;
+              try { console.log("[pathfinder][dig] completed"); } catch {}
             });
         };
 
@@ -670,9 +718,19 @@ function inject(bot) {
         placing = true;
         placingBlock = nextPoint.toPlace.shift();
         fullStop();
+        placingStartedAt = performance.now();
       }
 
       if (placingBlock) {
+        // Abort placing if we've been trying too long (prevents infinite jump loops)
+        if (performance.now() - placingStartedAt > bot.pathfinder.placeTimeout) {
+          console.log("[pathfinder][place] timeout -> resetPath(place_timeout)");
+          if (currentPlaceInterval) { try { clearInterval(currentPlaceInterval); } catch {} currentPlaceInterval = null; }
+          placing = false;
+          placingBlock = null;
+          resetPath("place_timeout");
+          return;
+        }
         // Open gates or doors
         if (placingBlock.useOne) {
           if (!lockUseBlock.tryAcquire()) return;
@@ -734,9 +792,10 @@ function inject(bot) {
               }
 
               // Spam placeBlock while jumping
-              const placeBlockInterval = setInterval(() => {
+              currentPlaceInterval = setInterval(() => {
                 if (!placingBlock) {
-                  clearInterval(placeBlockInterval);
+                  clearInterval(currentPlaceInterval);
+                  currentPlaceInterval = null;
                   return;
                 }
                 bot
@@ -745,7 +804,8 @@ function inject(bot) {
                     new Vec3(placingBlock.dx || 0, placingBlock.dy || 0, placingBlock.dz || 0)
                   )
                   .then(function () {
-                    clearInterval(placeBlockInterval); // Stop spamming once successful
+                    clearInterval(currentPlaceInterval); // Stop spamming once successful
+                    currentPlaceInterval = null;
                     bot.setControlState("sneak", false);
                     if (
                       bot.pathfinder.LOSWhenPlacingBlocks &&
@@ -776,7 +836,42 @@ function inject(bot) {
     let dx = nextPoint.x - p.x;
     const dy = nextPoint.y - p.y;
     let dz = nextPoint.z - p.z;
-    if (Math.abs(dx) <= 0.35 && Math.abs(dz) <= 0.35 && Math.abs(dy) < 1) {
+    // Corner handling: detect real 90° turns by comparing axes of travel (prevDir vs nextDir)
+    if (path.length >= 2) {
+      const a = nextPoint;
+      const b = path[1];
+      // Approximate previous travel axis using current position → nextPoint
+      const prevAxis = Math.abs(a.x - p.x) > Math.abs(a.z - p.z) ? 'x' : 'z';
+      const nextAxis = Math.abs(b.x - a.x) > Math.abs(b.z - a.z) ? 'x' : 'z';
+      const isTurn = (prevAxis !== nextAxis) && Math.abs(b.y - a.y) < 0.001;
+      const distToCenterSq = bot.entity.position.distanceSquared(new Vec3(a.x + 0.5, a.y, a.z + 0.5));
+      // Only attempt centering if clearly off-center and truly turning
+      if (isTurn && distToCenterSq > 0.04) {
+        const nowTs = performance.now();
+        if (bot.pathfinder.debugPathExec) {
+          console.log("[pathfinder][corner] isTurn=true prevAxis=%s nextAxis=%s a=%j b=%j distToCenterSq=%s", prevAxis, nextAxis, { x:a.x, y:a.y, z:a.z }, { x:b.x, y:b.y, z:b.z }, distToCenterSq.toFixed(3));
+        }
+        // Throttle centering attempts to avoid oscillation
+        if (!monitorMovement._lastCornerCenterTs || (nowTs - monitorMovement._lastCornerCenterTs) > 150) {
+          monitorMovement._lastCornerCenterTs = nowTs;
+          const reachedCenter = moveToBlock(new Vec3(a.x, a.y, a.z));
+          if (bot.pathfinder.debugPathExec) {
+            monitorMovement._centerFails = reachedCenter ? 0 : ((monitorMovement._centerFails || 0) + 1);
+            console.log("[pathfinder][corner] moveToBlock centered=%s consecutiveFails=%s", reachedCenter, monitorMovement._centerFails);
+          }
+          if (!reachedCenter) {
+            // Wait to be centered before proceeding, reduces corner clipping
+            return;
+          }
+        }
+      }
+    }
+    const withinNode = Math.abs(dx) <= 0.35 && Math.abs(dz) <= 0.35 && Math.abs(dy) < 1;
+    if (bot.pathfinder.debugPathExec) {
+      // arrival gate debug
+      console.log("[pathfinder][arrive] withinNode=%s dx=%s dz=%s dy=%s", withinNode, Math.abs(dx).toFixed(3), Math.abs(dz).toFixed(3), Math.abs(dy).toFixed(3));
+    }
+    if (withinNode) {
       // arrived at next point
       lastNodeTime = performance.now();
       if (stopPathing) {
@@ -841,6 +936,29 @@ function inject(bot) {
         bot.setControlState("forward", false);
         bot.setControlState("sprint", false);
       }
+
+      // Physics/control snapshot (throttled) to diagnose jiggle
+      if (bot.pathfinder.debugPathExec) {
+        const nowTs = performance.now();
+        if (!monitorMovement._lastCtrlLog || nowTs - monitorMovement._lastCtrlLog > 250) {
+          monitorMovement._lastCtrlLog = nowTs;
+          const v = bot.entity.velocity;
+          const canSL = physics.canStraightLine(path);
+          console.log("[pathfinder][phys] canStraightLine=%s dx=%s dz=%s pathLen=%s", canSL, (nextPoint.x - p.x).toFixed(2), (nextPoint.z - p.z).toFixed(2), path.length);
+          console.log("[pathfinder][ctrl] forward=%s jump=%s sprint=%s sneak=%s vel=(%s,%s,%s)",
+            bot.controlState.forward, bot.controlState.jump, bot.controlState.sprint, bot.controlState.sneak,
+            v.x.toFixed(3), v.y.toFixed(3), v.z.toFixed(3));
+          // motion delta snapshot
+          if (monitorMovement._dbgPrevPos) {
+            const dpx = p.x - monitorMovement._dbgPrevPos.x;
+            const dpy = p.y - monitorMovement._dbgPrevPos.y;
+            const dpz = p.z - monitorMovement._dbgPrevPos.z;
+            const d2 = dpx * dpx + dpy * dpy + dpz * dpz;
+            console.log("[pathfinder][motion] deltaSq=%s", d2.toFixed(4));
+          }
+          monitorMovement._dbgPrevPos = p.clone();
+        }
+      }
     }
 
     // Position-based stall detection: if pathing but not moving for too long, reset path
@@ -848,26 +966,61 @@ function inject(bot) {
     if (!lastStallPos) {
       lastStallPos = bot.entity.position.clone();
       lastStallTime = now;
+      if (bot.pathfinder.debugStallLogs) console.log("[pathfinder][stall] init lastStallPos=(%d,%d,%d)", lastStallPos.x, lastStallPos.y, lastStallPos.z);
     } else {
       const dxp = bot.entity.position.x - lastStallPos.x;
       const dyp = bot.entity.position.y - lastStallPos.y;
       const dzp = bot.entity.position.z - lastStallPos.z;
       const distSq = dxp * dxp + dyp * dyp + dzp * dzp;
       const eps = bot.pathfinder.stallDistanceEpsilon;
-      if (distSq > eps * eps) {
+      const epsSq = eps * eps;
+      const elapsed = now - lastStallTime;
+      if (bot.pathfinder.debugStallLogs) {
+        console.log(
+          "[pathfinder][stall] check distSq=%s epsSq=%s elapsed=%sms digging=%s placing=%s pathLen=%s",
+          distSq.toFixed(3), epsSq.toFixed(3), Math.floor(elapsed), digging, placing, path.length
+        );
+      }
+      if (distSq > epsSq) {
+        if (bot.pathfinder.debugStallLogs) console.log("[pathfinder][stall] movement detected; updating stall timers");
         lastStallPos = bot.entity.position.clone();
         lastStallTime = now;
-      } else if (path.length > 0 && !digging && !placing && (now - lastStallTime > bot.pathfinder.stallTimeout)) {
+        consecutiveStallTimeouts = 0;
+      } else if (path.length > 0 && !digging && !placing && (elapsed > bot.pathfinder.stallTimeout)) {
+        consecutiveStallTimeouts++;
+        const centerFails = monitorMovement._centerFails || 0;
+        console.log("[pathfinder][stall] TIMEOUT #%d node=%j centerFails=%s -> resetPath(stall_timeout)", consecutiveStallTimeouts, nextPoint, centerFails);
         resetPath("stall_timeout");
         lastNodeTime = now;
         lastStallPos = bot.entity.position.clone();
         lastStallTime = now;
+        // Small movement nudge to break out of collisions
+        const pick = consecutiveStallTimeouts % 3;
+        unstuckAction = pick === 1 ? 'back' : (pick === 2 ? 'left' : 'right');
+        unstuckUntil = now + 350;
+        // Skip current node sooner when repeatedly stalling or the path is trivial
+        if (consecutiveStallTimeouts >= 2 || path.length <= 1) {
+          if (bot.pathfinder.debugStallLogs) console.log("[pathfinder][stall] HARD RECOVERY: clearing states and skipping node");
+          digging = false;
+          placing = false;
+          currentDigPos = null;
+          if (path.length > 0) path.shift();
+          consecutiveStallTimeouts = 0;
+        }
         return;
       }
     }
 
     // check for futility (skip while mining or building)
-    if (!digging && !placing && (performance.now() - lastNodeTime > 3500)) {
+    const futElapsed = performance.now() - lastNodeTime;
+    if (bot.pathfinder.debugStallLogs) {
+      console.log(
+        "[pathfinder][futility] elapsed=%sms digging=%s placing=%s pathLen=%s",
+        Math.floor(futElapsed), digging, placing, path.length
+      );
+    }
+    if (!digging && !placing && (futElapsed > 3500)) {
+      console.log("[pathfinder][futility] STUCK -> resetPath(stuck)");
       // should never take this long to go to the next node
       resetPath("stuck");
     }
