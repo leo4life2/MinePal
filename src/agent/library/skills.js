@@ -1956,14 +1956,12 @@ export async function goToPosition(bot, x, y, z, min_distance = 2) {
 
 export async function goToPlayer(bot, username, distance = 1) {
   /**
-   * Navigate to the given player.
+   * Navigate to the given player by following them until within distance, then stop.
    * @param {MinecraftBot} bot, reference to the minecraft bot.
    * @param {string} username, the username of the player to navigate to.
    * @param {number} distance, the goal distance to the player.
-   * @returns {Promise<boolean>} true if the player was found, false otherwise.
-   * @example
-   * await skills.goToPlayer(bot, "player");
-   **/
+   * @returns {Promise<boolean>} true if reached (within distance), false otherwise.
+   */
 
   if (bot.modes.isOn("cheat")) {
     bot.chat("/tp @s " + username);
@@ -1973,7 +1971,12 @@ export async function goToPlayer(bot, username, distance = 1) {
 
   bot.modes.pause("self_defense");
   bot.modes.pause("cowardice");
-  let player = bot.players[username]?.entity;
+
+  const startTs = Date.now();
+  const maxMs = 120000; // 2 minutes ceiling to avoid hanging forever
+
+  const resolvePlayer = () => bot.players[username]?.entity || null;
+  let player = resolvePlayer();
   if (!player) {
     log(
       bot,
@@ -1982,11 +1985,39 @@ export async function goToPlayer(bot, username, distance = 1) {
     return false;
   }
 
-  const move = new pf.Movements(bot);
-  bot.pathfinder.setMovements(move);
-  await bot.pathfinder.goto(new pf.goals.GoalFollow(player, distance), true);
+  // Use dynamic GoalFollow instead of goto() so we continuously track moving targets
+  const movements = new pf.Movements(bot);
+  bot.pathfinder.setMovements(movements);
+  bot.pathfinder.setGoal(new pf.goals.GoalFollow(player, distance), true);
 
-  log(bot, `You have reached ${username}.`);
+  try {
+    while (true) {
+      if (bot.interrupt_code) return false;
+      // Refresh player entity (can change as players re-entity)
+      player = resolvePlayer();
+      if (!player) return false;
+
+      const dist = bot.entity.position.distanceTo(player.position);
+      if (dist <= Math.max(0.5, distance)) {
+        // Arrived
+        bot.pathfinder.stop();
+        log(bot, `You have reached ${username}.`);
+        return true;
+      }
+
+      if (Date.now() - startTs > maxMs) {
+        bot.pathfinder.stop();
+        log(bot, `Failed to reach ${username}: navigation timed out.`);
+        return false;
+      }
+
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  } catch (_err) {
+    // Ensure we stop any residual goal on error
+    try { bot.pathfinder.stop(); } catch {}
+    return false;
+  }
 }
 
 export async function teleportToPlayer(bot, username, agent) {
