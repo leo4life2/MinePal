@@ -55,11 +55,11 @@ function inject(bot) {
   bot.pathfinder.enablePathShortcut = false; // disabled by default as it can cause bugs in specific configurations
   bot.pathfinder.LOSWhenPlacingBlocks = true;
   bot.pathfinder.sneak = false;
-  bot.pathfinder.debugPathExec = true; // set true to trace corner/physics/control decisions
-  bot.pathfinder.debugStallLogs = true; // set true to enable stall/futility logs
+  bot.pathfinder.debugPathExec = false; // set true to trace corner/physics/control decisions
+  bot.pathfinder.debugStallLogs = false; // set true to enable stall/futility logs
   // Stall detection (position-based): if pathing but not moving, reset path
   bot.pathfinder.stallTimeout = 2000; // ms without significant movement while pathing
-  bot.pathfinder.stallDistanceEpsilon = 2; // blocks
+  bot.pathfinder.stallDistanceEpsilon = 0.2; // blocks
   bot.pathfinder.placeTimeout = 2500; // ms maximum to spend on a single placing step
 
   bot.pathfinder.bestHarvestTool = (block) => {
@@ -218,6 +218,7 @@ function inject(bot) {
   bot.pathfinder.isBuilding = () => placing;
 
   bot.pathfinder.goto = (goal) => {
+    if (bot.pathfinder.debugPathExec) console.log('[pathfinder][goto] setGoal=%j', goal);
     return gotoUtil(bot, goal);
   };
 
@@ -534,13 +535,10 @@ function inject(bot) {
     if (unstuckUntil && nowTick < unstuckUntil) {
       if (unstuckAction === 'back') {
         bot.setControlState('back', true);
-        bot.setControlState('sneak', true);
       } else if (unstuckAction === 'left') {
         bot.setControlState('left', true);
-        bot.setControlState('sneak', true);
       } else if (unstuckAction === 'right') {
         bot.setControlState('right', true);
-        bot.setControlState('sneak', true);
       }
       return;
     } else if (unstuckAction) {
@@ -618,9 +616,7 @@ function inject(bot) {
           path = results.path;
           astartTimedout = results.status === "partial";
           pathUpdated = true;
-          try {
-            console.log("[pathfinder][repath] newPathLen=%s status=%s", path.length, astartTimedout ? 'partial' : 'complete');
-          } catch {}
+          if (bot.pathfinder.debugPathExec) console.log('[pathfinder][astar] new status=%s pathLen=%s', results.status, results.path.length);
         }
       }
     }
@@ -995,9 +991,10 @@ function inject(bot) {
         lastStallPos = bot.entity.position.clone();
         lastStallTime = now;
         // Small movement nudge to break out of collisions
-        const pick = consecutiveStallTimeouts % 3;
-        unstuckAction = pick === 1 ? 'back' : (pick === 2 ? 'left' : 'right');
-        unstuckUntil = now + 350;
+        // Prefer lateral nudges only to avoid noticeable backsteps/crouching
+        const pick = consecutiveStallTimeouts % 2;
+        unstuckAction = pick === 0 ? 'left' : 'right';
+        unstuckUntil = now + 200;
         // Skip current node sooner when repeatedly stalling or the path is trivial
         if (consecutiveStallTimeouts >= 2 || path.length <= 1) {
           if (bot.pathfinder.debugStallLogs) console.log("[pathfinder][stall] HARD RECOVERY: clearing states and skipping node");

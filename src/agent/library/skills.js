@@ -1253,7 +1253,7 @@ export async function collectBlock(
     const collectedBefore = collected;
 
     let blocks = world.getNearestBlocks(bot, blocktypes, VERY_FAR_DISTANCE);
-    console.log(`Found ${blocks.length} blocks of type ${blockType}`);
+    console.log(`[collectBlock] Found ${blocks.length} blocks of type ${blockType}`);
     // Update ephemeral memory with current scan
     for (const b of blocks) {
       if (!b || !b.position) continue;

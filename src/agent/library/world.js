@@ -38,7 +38,6 @@ export function getNearestFreeSpace(bot, size=1, distance=8) {
     }
 }
 
-
 export function getNearestBlocks(bot, block_types=null, distance=64, count=10000) {
     /**
      * Get a list of the nearest blocks of the given types.
@@ -59,18 +58,27 @@ export function getNearestBlocks(bot, block_types=null, distance=64, count=10000
         if (!Array.isArray(block_types))
             block_types = [block_types];
         for(let block_type of block_types) {
-            block_ids.push(MCData.getInstance().getBlockId(block_type));
+            const id = MCData.getInstance().getBlockId(block_type);
+            if (id === null) {
+                console.log(`[getNearestBlocks] block type not found: ${block_type}`);
+                continue;
+            }
+            block_ids.push(id);
         }
     }
 
     let positions = bot.findBlocks({matching: block_ids, maxDistance: distance, count: count});
+    console.log(`[getNearestBlocks] target: ${block_types}, positions length: ${positions.length}`);
     let blocks = [];
     for (let i = 0; i < positions.length; i++) {
         let block = bot.blockAt(positions[i]);
         let distance = positions[i].distanceTo(bot.entity.position);
-        let xray_allowed = ['chest', 'trapped_chest', 'furnace', 'wheat', 'carrots', 'potatoes', 'beetroots', 'melon', 'pumpkin', 'crafting_table'];
-        if (xray_allowed.includes(block.name) || bot.canSeeBlock(block)) {
-            blocks.push({ block: block, distance: distance });
+        try {
+            if (bot.canSeeBlock(block)) {
+                blocks.push({ block: block, distance: distance });
+            }
+        } catch (err) {
+            // swallow
         }
     }
     blocks.sort((a, b) => a.distance - b.distance);
@@ -79,6 +87,7 @@ export function getNearestBlocks(bot, block_types=null, distance=64, count=10000
     for (let i = 0; i < blocks.length; i++) {
         res.push(blocks[i].block);
     }
+    console.log(`[getNearestBlocks] res length: ${res.length}`);
     return res;
 }
 
