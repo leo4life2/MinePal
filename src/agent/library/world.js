@@ -154,27 +154,14 @@ export async function getVisibleEntities(bot) {
 
         const targetPos = entity.position.offset(0, entity.height*0.9, 0);
         const range = headPos.distanceTo(targetPos);
-
         if (range === 0) continue; // Skip entity at the exact same position
-
-        const dir = targetPos.minus(headPos).normalize();
         const entityIdentifier = entity.username || entity.name || `ID ${entity.id}`;
-        
-        // Raycast should hit any block that isn't empty and doesn't contain "glass" in its name.
-        const match = (block) => block.boundingBox !== 'empty' && !(block.name?.includes('glass'));
-
-        let hitBlock = null; // Initialize hitBlock to null
         try {
-            hitBlock = bot.world.raycast(headPos, dir, range, match);
-
-            if (hitBlock === null) {
+            if (bot.canSeeEntity(entity)) {
                 visibleEntities.push(entity);
-            } else {
-                // Added log for non-visible entities with reason
-                // console.log(`[getVisibleEntities Debug] Entity ${entityIdentifier} NOT visible. Raycast hit ${hitBlock.name} at ${hitBlock.position}.`);
             }
         } catch (err) {
-            console.warn(`[getVisibleEntities] Raycast error for entity ${entityIdentifier}: ${err.message}`); 
+            console.warn(`[getVisibleEntities] Visibility error for entity ${entityIdentifier}: ${err.message}`);
         }
     }
     return visibleEntities;
