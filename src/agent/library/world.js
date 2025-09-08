@@ -68,7 +68,7 @@ export function getNearestBlocks(bot, block_types=null, distance=64, count=10000
     }
 
     let positions = bot.findBlocks({matching: block_ids, maxDistance: distance, count: count});
-    console.log(`[getNearestBlocks] target: ${block_types}, positions length: ${positions.length}`);
+    // console.log(`[getNearestBlocks] target: ${block_types}, positions length: ${positions.length}`);
     let blocks = [];
     for (let i = 0; i < positions.length; i++) {
         let block = bot.blockAt(positions[i]);
@@ -87,7 +87,7 @@ export function getNearestBlocks(bot, block_types=null, distance=64, count=10000
     for (let i = 0; i < blocks.length; i++) {
         res.push(blocks[i].block);
     }
-    console.log(`[getNearestBlocks] res length: ${res.length}`);
+    // console.log(`[getNearestBlocks] res length: ${res.length}`);
     return res;
 }
 

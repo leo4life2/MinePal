@@ -1170,23 +1170,14 @@ export async function collectBlock(
   grownCropsOnly = false
 ) {
   /**
-   * Collect one of the given block type.
-   * @param {MinecraftBot} bot, reference to the minecraft bot.
-   * @param {string} blockType, the type of block to collect.
-   * @param {number} num, the number of blocks to collect. Defaults to 1.
-   * @returns {Promise<boolean>} true if the block was collected, false if the block type was not found.
-   * @example
-   * await skills.collectBlock(bot, "oak_log");
-   **/
-  console.log(
-    `Starting collectBlock with blockType: ${blockType}, num: ${num}, exclude: ${exclude}`
-  );
+   * Producer-consumer model: continuously scan via physicsTick and consume nearest candidates.
+   */
+  console.log(`[collectBlock(producer-consumer)] start: ${blockType}, num: ${num}`);
 
   if (typeof num !== 'number') {
     log(bot, `Invalid type for num: ${typeof num}. Expected a number.`);
     return false;
   }
-
   if (num < 1) {
     log(bot, `Invalid number of blocks to collect: ${num}.`);
     return false;
@@ -1212,161 +1203,145 @@ export async function collectBlock(
   };
 
   let blocktypes = [blockType];
-  console.log(`Initial blocktypes: ${blocktypes}`);
-
-  if (blockDropMap[blockType]) {
-    blocktypes = [...blocktypes, ...blockDropMap[blockType]];
-    console.log(`Updated blocktypes with blockDropMap: ${blocktypes}`);
-  }
-
-  for (const [block, drops] of Object.entries(blockDropMap)) {
-    if (drops.includes(blockType)) {
-      blocktypes.push(block);
-    }
-  }
-  console.log(`Final blocktypes after checking drops: ${blocktypes}`);
-
+  if (blockDropMap[blockType]) blocktypes.push(...blockDropMap[blockType]);
+  for (const [block, drops] of Object.entries(blockDropMap)) if (drops.includes(blockType)) blocktypes.push(block);
   blocktypes = [...new Set(blocktypes)];
-  console.log(`Unique blocktypes: ${blocktypes}`);
 
-  let collected = 0;
-  let retries = 0;
+  const cropAgeMap = { wheat: 7, beetroot: 3, carrot: 7, potato: 7 };
+  const keyOf = (v) => `${v.x},${v.y},${v.z}`;
+  const posEq = (a, b) => a.x === b.x && a.y === b.y && a.z === b.z;
+  const excluded = Array.isArray(exclude) ? exclude : [];
 
-  console.log("Starting collect loop");
+  const candidates = new Map(); // key -> Vec3
+  let emptyTicks = 0;
+  const EMPTY_TICKS_BEFORE_EXIT = 60; // ~3s at 20Hz
+  let isCollecting = false; // control-plane guard
+  let currentTargetKey = null; // for observability
+  const SCAN_EVERY_TICKS = 5; // throttle producer scans (~6-7Hz)
+  const PRUNE_EVERY_TICKS = 10; // prune cadence (~2Hz)
+  const MAX_CANDIDATES = 200; // cap pool to avoid O(n) bloat
+  let tickIndex = 0;
 
-  const cropAgeMap = {
-    wheat: 7,
-    beetroot: 3,
-    carrot: 7,
-    potato: 7,
+  const isValidTarget = (position) => {
+    let actual;
+    try { actual = bot.blockAt(position); } catch { return false; }
+    if (!actual) return false;
+    if (!blocktypes.includes(actual.name)) return false;
+    if (grownCropsOnly && cropAgeMap[blockType]) {
+      if (actual._properties?.age !== cropAgeMap[blockType]) return false;
+    }
+    return true;
   };
 
-  // Ephemeral memory of candidate target blocks across scans for this call
-  const rememberKey = (v) => `${v.x},${v.y},${v.z}`;
-  const rememberedPositions = new Map();
-  let lastSelectedKey = null;
+  const isExcluded = (position) => excluded.some(p => posEq(p, position));
 
-  while (collected < num && retries < 3) {
-    console.log(
-      `Attempt ${retries + 1}: Collected ${collected}/${num} ${blockType}`
-    );
-    const collectedBefore = collected;
+  const onPhysicsTick = () => {
+    try {
+      tickIndex++;
+      // Throttle heavy work
+      const doScan = (tickIndex % SCAN_EVERY_TICKS) === 0;
+      const doPrune = (tickIndex % PRUNE_EVERY_TICKS) === 0;
+      if (!doScan && !doPrune) return;
 
-    let blocks = world.getNearestBlocks(bot, blocktypes, VERY_FAR_DISTANCE);
-    console.log(`[collectBlock] Found ${blocks.length} blocks of type ${blockType}`);
-    // Update ephemeral memory with current scan
-    for (const b of blocks) {
-      if (!b || !b.position) continue;
-      const key = rememberKey(b.position);
-      if (!rememberedPositions.has(key)) rememberedPositions.set(key, b);
-    }
-    // If current scan found nothing, fallback to remembered candidates
-    if (blocks.length === 0) {
-      blocks = Array.from(rememberedPositions.values());
-      console.log(`Scan yielded no new blocks; using remembered candidates: ${blocks.length}`);
-      if (blocks.length === 0) {
-        if (collected > 0) {
-          log(
-            bot,
-            `You collected ${collected} ${blockType}, and don't see more ${blockType} around`
-          );
-          return collected;
-        } else {
-          log(bot, `No ${blockType} found around.`);
-          return false;
+      // Choose a lighter radius when we already have a pool
+      const scanRadius = candidates.size === 0 ? VERY_FAR_DISTANCE : FAR_DISTANCE;
+      const found = doScan ? (world.getNearestBlocks(bot, blocktypes, scanRadius) || []) : [];
+      let added = 0;
+      if (doScan) {
+        for (const b of found) {
+          if (!b || !b.position) continue;
+          const pos = b.position;
+          if (isExcluded(pos)) continue;
+          if (!isValidTarget(pos)) continue;
+          const k = keyOf(pos);
+          if (!candidates.has(k)) { candidates.set(k, pos); added++; }
+        }
+        // Cap pool size by keeping nearest
+        if (candidates.size > MAX_CANDIDATES) {
+          const trimmed = Array.from(candidates.values())
+            .map(pos => ({ pos, dist: bot.entity.position.distanceTo(pos) }))
+            .sort((a, b) => a.dist - b.dist)
+            .slice(0, MAX_CANDIDATES)
+            .map(entry => entry.pos);
+          candidates.clear();
+          for (const pos of trimmed) candidates.set(keyOf(pos), pos);
         }
       }
-    }
-
-    if (exclude) {
-      for (let position of exclude) {
-        blocks = blocks.filter(
-          (block) =>
-            block.position.x !== position.x ||
-            block.position.y !== position.y ||
-            block.position.z !== position.z
-        );
+      if (doPrune) {
+        for (const [k, pos] of Array.from(candidates.entries())) {
+          // Do not prune the current target while actively collecting
+          if (isCollecting && k === currentTargetKey) continue;
+          if (!isValidTarget(pos) || isExcluded(pos)) candidates.delete(k);
+        }
       }
-      console.log(`Excluded positions, ${blocks.length} blocks remaining`);
-    }
-
-    if (grownCropsOnly && cropAgeMap[blockType]) {
-      blocks = blocks.filter(
-        (block) => block._properties.age === cropAgeMap[blockType]
-      );
-    }
-
-    // Filter out stale remembered entries (no longer logs/targets) and already air
-    blocks = blocks.filter((b) => {
-      if (!b || !b.position) return false;
-      let actual;
-      try {
-        actual = bot.blockAt(b.position);
-      } catch (e) {
-        // Ghost position or unloaded chunk; drop it
-        return false;
+      if (doScan) {
+        if (candidates.size === 0 && added === 0) emptyTicks++; else emptyTicks = 0;
       }
-      if (!actual) return false;
-      const isTarget = blocktypes.includes(actual.name);
-      if (!isTarget) rememberedPositions.delete(rememberKey(b.position));
-      return isTarget;
-    });
-    // Sort by distance; prefer closest
-    blocks.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
-    if (blocks.length === 0) {
-      // Nothing valid to target after filtering
-      if (collected > 0) return collected; else return false;
-    }
-    let block = blocks[0];
-    if (!block || !block.position) continue;
-    console.log(`Selected block at ${block.position}, distance: ${bot.entity.position.distanceTo(block.position).toFixed(2)}`); // Log distance
+    } catch {}
+  };
 
-    // If the selected block hasn't changed and we made no progress last loop, advance retries and drop this candidate from memory
-    const selectedKey = rememberKey(block.position);
-    if (lastSelectedKey === selectedKey && collected === collectedBefore) {
-      retries++;
-      console.log(`Stuck on same target ${selectedKey}. Incrementing retries to ${retries} and removing from memory.`);
-      rememberedPositions.delete(selectedKey);
-      // Recompute blocks list without this candidate
-      blocks = blocks.filter(b => rememberKey(b.position) !== selectedKey);
-      if (blocks.length === 0) continue;
-      block = blocks[0];
-      if (!block || !block.position) continue;
-      console.log(`Fallback selected block at ${block.position}, distance: ${bot.entity.position.distanceTo(block.position).toFixed(2)}`);
-    }
-    lastSelectedKey = selectedKey;
+  bot.on('physicsTick', onPhysicsTick);
 
-    await bot.tool.equipForBlock(block);
-    const itemId = bot.heldItem ? bot.heldItem.type : null;
-    if (!block.canHarvest(itemId)) {
-      log(bot, `Don't have right tools to harvest ${blockType}.`);
-      return false;
-    }
+  let collected = 0;
+  try {
+    while (collected < num) {
+      if (bot.interrupt_code) break;
 
-    try {
-      await bot.collectBlock.collect(block);
-      collected++;
-      rememberedPositions.delete(rememberKey(block.position));
-    } catch (err) {
-      console.log(
-        `Error collecting block at ${block.position}: ${err.message}`
-      );
-      console.log("Stack trace:", err.stack);
-      if (err.name === "NoChests") {
-        log(
-          bot,
-          `Failed to collect ${blockType}: Inventory full, no place to deposit.`
-        );
-        break;
-      } else {
-        // Drop this candidate to avoid reselecting endlessly
-        rememberedPositions.delete(rememberKey(block.position));
-        retries++;
+      console.log(`[collectBlock] candidates size: ${candidates.size}`);
+
+      // If currently collecting, yield and let the ongoing action finish
+      if (isCollecting) {
+        await new Promise(r => setTimeout(r, 50));
         continue;
       }
-    }
 
-    if (bot.interrupt_code) break;
+      if (candidates.size === 0) {
+        if (emptyTicks > EMPTY_TICKS_BEFORE_EXIT) {
+          if (collected > 0) log(bot, `You collected ${collected} ${blockType}, and don't see more ${blockType} around`);
+          else log(bot, `No ${blockType} found around.`);
+          break;
+        }
+        await new Promise(r => setTimeout(r, 100));
+        continue;
+      }
+
+      const nearest = Array.from(candidates.values())
+        .map(pos => ({ pos, dist: bot.entity.position.distanceTo(pos) }))
+        .sort((a, b) => a.dist - b.dist)[0];
+      const targetPos = nearest.pos;
+      const targetKey = keyOf(targetPos);
+
+      if (!isValidTarget(targetPos)) { candidates.delete(targetKey); continue; }
+
+      let targetBlock;
+      try { targetBlock = bot.blockAt(targetPos); } catch { candidates.delete(targetKey); continue; }
+      if (!targetBlock) { candidates.delete(targetKey); continue; }
+
+      try { await bot.tool.equipForBlock(targetBlock); } catch {}
+      const itemId = bot.heldItem ? bot.heldItem.type : null;
+      if (!targetBlock.canHarvest(itemId)) { candidates.delete(targetKey); continue; }
+
+      console.log(`[collectBlock] collecting ${targetBlock.name}`);
+      // Mark control-plane state and remove from pool before starting
+      isCollecting = true;
+      currentTargetKey = targetKey;
+      candidates.delete(targetKey);
+      try {
+        await bot.collectBlock.collect(targetBlock);
+        collected++;
+      } catch (err) {
+        if (err?.name === 'NoChests') {
+          log(bot, `Failed to collect ${blockType}: Inventory full, no place to deposit.`);
+          break;
+        }
+      } finally {
+        // Clear control-plane state
+        isCollecting = false;
+        currentTargetKey = null;
+      }
+    }
+  } finally {
+    try { bot.removeListener('physicsTick', onPhysicsTick); } catch {}
   }
 
   log(bot, `Collected ${collected} ${blockType}.`);
