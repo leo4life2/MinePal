@@ -219,7 +219,11 @@ function inject(bot) {
 
   bot.pathfinder.goto = (goal) => {
     if (bot.pathfinder.debugPathExec) console.log('[pathfinder][goto] setGoal=%j', goal);
-    return gotoUtil(bot, goal);
+    // Wrap goto to ensure lingering dynamic goals are stopped on rejection
+    return gotoUtil(bot, goal).catch((err) => {
+      try { bot.pathfinder.stop(); } catch {}
+      throw err;
+    });
   };
 
   bot.pathfinder.stop = () => {

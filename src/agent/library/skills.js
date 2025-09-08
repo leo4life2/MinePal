@@ -1343,69 +1343,9 @@ export async function collectBlock(
       return false;
     }
 
-    // Tree collection: perform DFS over adjacent logs to collect the entire tree (up to 256 blocks)
-    const isTreeTarget = (typeof blockType === 'string' && blockType.includes('_log')) || (block && block.name && block.name.includes('_log'));
-    if (isTreeTarget) {
-      const maxNodes = 256;
-      const directions = [new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 1, 0), new Vec3(0, -1, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)];
-      const posKey = (v) => `${v.x},${v.y},${v.z}`;
-      const visited = new Set();
-      const stack = [block];
-      const cluster = [];
-      while (stack.length > 0 && cluster.length < maxNodes) {
-        const current = stack.pop();
-        const currentBlock = bot.blockAt(current.position);
-        if (!currentBlock) continue;
-        const key = posKey(currentBlock.position);
-        if (visited.has(key)) continue;
-        if (!currentBlock.name || !currentBlock.name.includes('_log')) continue;
-        visited.add(key);
-        cluster.push(currentBlock);
-        for (const dir of directions) {
-          const neighborPos = currentBlock.position.plus(dir);
-          const neighbor = bot.blockAt(neighborPos);
-          if (!neighbor || !neighbor.name || !neighbor.name.includes('_log')) continue;
-          const nkey = posKey(neighbor.position);
-          if (!visited.has(nkey)) stack.push(neighbor);
-        }
-      }
-
-      const remainingNeeded = Math.max(0, num - collected);
-      let toCollect = cluster.slice(0, remainingNeeded);
-      toCollect.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
-      for (const logBlock of toCollect) {
-        if (bot.interrupt_code) break;
-        try {
-          await bot.tool.equipForBlock(logBlock);
-          const held = bot.heldItem ? bot.heldItem.type : null;
-          if (!logBlock.canHarvest(held)) {
-            log(bot, `Don't have right tools to harvest ${logBlock.name}.`);
-            return false;
-          }
-          await bot.collectBlock.collect(logBlock);
-          collected++;
-          if (collected >= num) break;
-        } catch (err) {
-          console.log(`Error collecting log at ${logBlock.position}: ${err.message}`);
-          console.log('Stack trace:', err.stack);
-          if (err.name === "NoChests") {
-            log(
-              bot,
-              `Failed to collect ${blockType}: Inventory full, no place to deposit.`
-            );
-            break;
-          }
-          // Otherwise skip this log and continue
-        }
-      }
-      // After finishing this tree cluster, continue to next iteration of the while loop
-      continue;
-    }
-
     try {
       await bot.collectBlock.collect(block);
       collected++;
-      // Remove from memory since it's handled
       rememberedPositions.delete(rememberKey(block.position));
     } catch (err) {
       console.log(

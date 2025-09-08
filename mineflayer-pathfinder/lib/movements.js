@@ -406,6 +406,8 @@ class Movements {
    */
   getMoveForward (node, dir, neighbors) {
     // Get relevant blocks
+    // Head-level at destination (two blocks above target feet)
+    const blockA = this.getBlock(node, dir.x, 2, dir.z)
     const blockB = this.getBlock(node, dir.x, 1, dir.z)
     const blockC = this.getBlock(node, dir.x, 0, dir.z)
     const blockD = this.getBlock(node, dir.x, -1, dir.z)
@@ -458,6 +460,11 @@ class Movements {
       cost += this.safeOrBreak(blockC, toBreak)
       if (cost > 100) return
     }
+
+    // Ensure head clearance at destination to avoid "depression geometry" traps
+    // If head space is blocked and cannot be (cheaply) cleared, reject this move
+    cost += this.safeOrBreak(blockA, toBreak)
+    if (cost > 100) return
 
     // Add liquid cost if applicable
     if (this.getBlock(node, 0, 0, 0).liquid) cost += this.liquidCost
