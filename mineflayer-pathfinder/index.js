@@ -45,6 +45,7 @@ function inject(bot) {
   let lastFutilityLogTs = 0;
   let unstuckUntil = 0;
   let unstuckAction = null;
+  let unstuckJump = false;
   const stallCounts = new Map(); // key: floored node pos "x|y|z" -> count
 
   bot.pathfinder = {};
@@ -58,9 +59,11 @@ function inject(bot) {
   bot.pathfinder.debugPathExec = false; // set true to trace corner/physics/control decisions
   bot.pathfinder.debugStallLogs = false; // set true to enable stall/futility logs
   // Stall detection (position-based): if pathing but not moving, reset path
-  bot.pathfinder.stallTimeout = 2000; // ms without significant movement while pathing
+  bot.pathfinder.stallTimeout = 1500; // ms without significant movement while pathing
   bot.pathfinder.stallDistanceEpsilon = 0.2; // blocks
   bot.pathfinder.placeTimeout = 2500; // ms maximum to spend on a single placing step
+  bot.pathfinder.axisLocked = true; // prefer orthogonal, center-to-center movement when executing paths
+  bot.pathfinder.axisOvershoot = 0.2; // meters to overshoot past block center along chosen axis (clamped within block)
 
   bot.pathfinder.bestHarvestTool = (block) => {
     const availableTools = bot.inventory.items();
@@ -264,7 +267,7 @@ function inject(bot) {
         curPoint.z = Math.floor(curPoint.z) + 0.5;
       }
     }
-
+    // Keep nodes as-is; rely on steering to stay orthogonal without forcing strict centering
     if (
       !bot.pathfinder.enablePathShortcut ||
       stateMovements.exclusionAreasStep.length !== 0 ||
@@ -485,7 +488,7 @@ function inject(bot) {
 
   function moveToBlock(pos) {
     // minDistanceSq = Min distance sqrt to the target pos were the bot is centered enough to place blocks around him
-    const minDistanceSq = 0.2 * 0.2;
+    const minDistanceSq = 0.3 * 0.3;
     const targetPos = pos.clone().offset(0.5, 0, 0.5);
     if (bot.entity.position.distanceSquared(targetPos) > minDistanceSq) {
       bot.lookAt(targetPos);
@@ -544,11 +547,13 @@ function inject(bot) {
       } else if (unstuckAction === 'right') {
         bot.setControlState('right', true);
       }
+      if (unstuckJump) bot.setControlState('jump', true);
       return;
     } else if (unstuckAction) {
       bot.clearControlStates();
       unstuckAction = null;
       unstuckUntil = 0;
+      unstuckJump = false;
     }
     // Check if the bot is allowed free motion and if the goal is an entity
     if (stateMovements && stateMovements.allowFreeMotion && stateGoal && stateGoal.entity) {
@@ -909,7 +914,46 @@ function inject(bot) {
       console.log("Vehicle movement");
       bot.moveVehicle(dx > 0 ? 1 : -1, dz > 0 ? 1 : -1);
     } else {
-      bot.look(Math.atan2(-dx, -dz), 0);
+      // Axis-locked steering: prefer orthogonal movement (center-to-center) over diagonals
+      let desiredYaw;
+      if (bot.pathfinder.axisLocked) {
+        const center = new Vec3(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z));
+        // If significantly off-center, gently steer toward center while progressing
+        const offCenterSq = bot.entity.position.distanceSquared(center.clone().offset(0.5, 0, 0.5));
+        if (offCenterSq > 0.25 * 0.25) {
+          moveToBlock(center); // don't early-return; avoid stalls
+        }
+        const preferX = Math.abs(dx) >= Math.abs(dz);
+        const overshoot = Math.max(0, Math.min(0.3, bot.pathfinder.axisOvershoot || 0));
+        const destBlockX = Math.floor(nextPoint.x);
+        const destBlockZ = Math.floor(nextPoint.z);
+        const baseTargetX = destBlockX + 0.5;
+        const baseTargetZ = destBlockZ + 0.5;
+        if (preferX) {
+          const dir = Math.sign(dx) || (p.x < baseTargetX ? 1 : -1);
+          let targetX = baseTargetX + dir * overshoot;
+          const minX = destBlockX + 0.2;
+          const maxX = destBlockX + 0.8;
+          if (targetX < minX) targetX = minX;
+          if (targetX > maxX) targetX = maxX;
+          const txDx = targetX - p.x;
+          const tzDz = baseTargetZ - p.z;
+          desiredYaw = Math.atan2(-txDx, -tzDz);
+        } else {
+          const dir = Math.sign(dz) || (p.z < baseTargetZ ? 1 : -1);
+          let targetZ = baseTargetZ + dir * overshoot;
+          const minZ = destBlockZ + 0.2;
+          const maxZ = destBlockZ + 0.8;
+          if (targetZ < minZ) targetZ = minZ;
+          if (targetZ > maxZ) targetZ = maxZ;
+          const txDx = baseTargetX - p.x;
+          const tzDz = targetZ - p.z;
+          desiredYaw = Math.atan2(-txDx, -tzDz);
+        }
+      } else {
+        desiredYaw = Math.atan2(-dx, -dz);
+      }
+      bot.look(desiredYaw, 0);
       bot.setControlState("forward", true);
       bot.setControlState("jump", false);
       bot.setControlState('sneak', bot.pathfinder.sneak);
@@ -995,10 +1039,15 @@ function inject(bot) {
         lastStallPos = bot.entity.position.clone();
         lastStallTime = now;
         // Small movement nudge to break out of collisions
-        // Prefer lateral nudges only to avoid noticeable backsteps/crouching
-        const pick = consecutiveStallTimeouts % 2;
-        unstuckAction = pick === 0 ? 'left' : 'right';
-        unstuckUntil = now + 200;
+        // Randomize direction and increase step size ~15%, with slight jitter; 50% chance to jump
+        const dirs = ['left', 'right', 'back'];
+        const pick = Math.floor(Math.random() * dirs.length);
+        unstuckAction = dirs[pick];
+        const base = 200; // ms
+        const factor = 1.15; // +15%
+        const jitter = 0.8 + Math.random() * 0.4; // 0.8x..1.2x
+        unstuckUntil = now + Math.floor(base * factor * jitter);
+        unstuckJump = Math.random() < 0.5;
         // Skip current node sooner when repeatedly stalling or the path is trivial
         if (consecutiveStallTimeouts >= 2 || path.length <= 1) {
           if (bot.pathfinder.debugStallLogs) console.log("[pathfinder][stall] HARD RECOVERY: clearing states and skipping node");
