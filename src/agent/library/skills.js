@@ -2,6 +2,7 @@ import MCData from "../../utils/mcdata.js";
 import * as world from "./world.js";
 import pf from "mineflayer-pathfinder";
 import Vec3 from "vec3";
+import { acquireBlock, breakBlockAt as functionsBreakBlockAt } from "./functions.js";
 import { queryList } from "../commands/queries.js";
 import fs from "fs";
 import path from "path";
@@ -1211,6 +1212,9 @@ export async function collectBlock(
   const keyOf = (v) => `${v.x},${v.y},${v.z}`;
   const posEq = (a, b) => a.x === b.x && a.y === b.y && a.z === b.z;
   const excluded = Array.isArray(exclude) ? exclude : [];
+  // Track unreachable targets during this session to avoid retry loops
+  const unreachableKeys = new Set();
+  const DEBUG = true;
 
   const candidates = new Map(); // key -> Vec3
   let emptyTicks = 0;
@@ -1233,7 +1237,7 @@ export async function collectBlock(
     return true;
   };
 
-  const isExcluded = (position) => excluded.some(p => posEq(p, position));
+  const isExcluded = (position) => unreachableKeys.has(keyOf(position)) || excluded.some(p => posEq(p, position));
 
   const onPhysicsTick = () => {
     try {
@@ -1283,11 +1287,14 @@ export async function collectBlock(
   bot.on('physicsTick', onPhysicsTick);
 
   let collected = 0;
+  let lastDugPos = null; // pivot: choose next candidate closest to this
+  let zeroScanStreak = 0;
+  let unreachableCount = 0;
   try {
     while (collected < num) {
-      if (bot.interrupt_code) break;
+      console.log(`[skills.collectBlock] collected: ${collected}, candidates: ${candidates.size}`);
 
-      console.log(`[collectBlock] candidates size: ${candidates.size}`);
+      if (bot.interrupt_code) break;
 
       // If currently collecting, yield and let the ongoing action finish
       if (isCollecting) {
@@ -1296,18 +1303,47 @@ export async function collectBlock(
       }
 
       if (candidates.size === 0) {
-        if (emptyTicks > EMPTY_TICKS_BEFORE_EXIT) {
+        zeroScanStreak++;
+        // Nudge: small random move to explore nearby area
+        try {
+          const magnitude = 5;
+          const choices = [
+            { dx: magnitude, dz: 0 },
+            { dx: -magnitude, dz: 0 },
+            { dx: 0, dz: magnitude },
+            { dx: 0, dz: -magnitude }
+          ];
+          const pick = choices[Math.floor(Math.random() * choices.length)];
+          const base = bot.entity.position;
+          const tx = Math.floor(base.x + pick.dx);
+          const ty = Math.floor(base.y);
+          const tz = Math.floor(base.z + pick.dz);
+          bot.pathfinder.setMovements(new pf.Movements(bot));
+          await bot.pathfinder.goto(new pf.goals.GoalNear(tx, ty, tz, 1));
+        } catch {}
+
+        if (zeroScanStreak >= 5 || emptyTicks > EMPTY_TICKS_BEFORE_EXIT) {
           if (collected > 0) log(bot, `You collected ${collected} ${blockType}, and don't see more ${blockType} around`);
           else log(bot, `No ${blockType} found around.`);
           break;
         }
         await new Promise(r => setTimeout(r, 100));
         continue;
+      } else {
+        zeroScanStreak = 0;
       }
 
       const nearest = Array.from(candidates.values())
-        .map(pos => ({ pos, dist: bot.entity.position.distanceTo(pos) }))
+        .map(pos => ({ pos, dist: (lastDugPos ? lastDugPos.distanceTo(pos) : bot.entity.position.distanceTo(pos)) }))
         .sort((a, b) => a.dist - b.dist)[0];
+      if (DEBUG) {
+        const preview = Array.from(candidates.values())
+          .map(pos => ({ pos, dist: bot.entity.position.distanceTo(pos) }))
+          .sort((a, b) => a.dist - b.dist)
+          .slice(0, 5)
+          .map(e => `(${e.pos.x},${e.pos.y},${e.pos.z}) d=${e.dist.toFixed(2)}`);
+        console.log(`[skills.collectBlock][pick] top candidates: ${preview.join(' | ')}`);
+      }
       const targetPos = nearest.pos;
       const targetKey = keyOf(targetPos);
 
@@ -1321,19 +1357,47 @@ export async function collectBlock(
       const itemId = bot.heldItem ? bot.heldItem.type : null;
       if (!targetBlock.canHarvest(itemId)) { candidates.delete(targetKey); continue; }
 
-      console.log(`[collectBlock] collecting ${targetBlock.name}`);
       // Mark control-plane state and remove from pool before starting
       isCollecting = true;
       currentTargetKey = targetKey;
       candidates.delete(targetKey);
       try {
-        await bot.collectBlock.collect(targetBlock);
+        // Use in-house acquireBlock (break + targeted pickup). No vendor collect.
+        const ok = await acquireBlock(bot, targetBlock);
+        if (!ok) throw new Error('AcquireFailed');
         collected++;
+        lastDugPos = targetPos.clone();
+        if (DEBUG) console.log(`[skills.collectBlock][dig] broke ${targetBlock.name} at (${targetPos.x},${targetPos.y},${targetPos.z}) -> total ${collected}`);
       } catch (err) {
+        const name = err?.name || (err && typeof err === 'object' ? (err).constructor?.name : String(err));
+        const msg = err?.message || String(err);
+        if (name === 'UnreachableTarget' || name === 'PathfindingFailed') {
+          console.log(`[skills.collectBlock] skip unreachable: ${msg}`);
+          unreachableKeys.add(targetKey);
+          unreachableCount++;
+          continue;
+        }
+        if (name === 'NoScaffoldingBlocks') {
+          console.log(`[skills.collectBlock] cannot scaffold: ${msg}`);
+          unreachableKeys.add(targetKey);
+          unreachableCount++;
+          continue;
+        }
+        if (name === 'InvalidOrUnsafeTarget' || name === 'CannotHarvest') {
+          console.log(`[skills.collectBlock] skip invalid/unsafe: ${msg}`);
+          unreachableKeys.add(targetKey); // treat as non-retriable for this session
+          continue;
+        }
+        if (name === 'DigDidNotChangeBlock') {
+          console.log(`[skills.collectBlock] dig had no effect: ${msg}`);
+          unreachableKeys.add(targetKey); // avoid re-trying same stuck block
+          continue;
+        }
         if (err?.name === 'NoChests') {
           log(bot, `Failed to collect ${blockType}: Inventory full, no place to deposit.`);
           break;
         }
+        console.log(`[skills.collectBlock] unexpected error from collect: ${name}: ${msg}`);
       } finally {
         // Clear control-plane state
         isCollecting = false;
@@ -1344,7 +1408,11 @@ export async function collectBlock(
     try { bot.removeListener('physicsTick', onPhysicsTick); } catch {}
   }
 
-  log(bot, `Collected ${collected} ${blockType}.`);
+  if (unreachableCount > 0) {
+    log(bot, `Collected ${collected} ${blockType}. Visible but unreachable: ${unreachableCount}.`);
+  } else {
+    log(bot, `Collected ${collected} ${blockType}.`);
+  }
   return collected > 0;
 }
 
@@ -1414,6 +1482,7 @@ export async function pickupNearbyItems(bot) {
   return true;
 }
 
+// Deprecated: moved to library/functions.js
 export async function breakBlockAt(bot, x, y, z) {
   /**
    * Break the block at the given position. Will use the bot's equipped item.
@@ -1426,59 +1495,7 @@ export async function breakBlockAt(bot, x, y, z) {
    * let position = world.getPosition(bot);
    * await skills.breakBlockAt(bot, position.x, position.y - 1, position.x);
    **/
-  if (x == null || y == null || z == null)
-    throw new Error("Invalid position to break block at.");
-  let block = bot.blockAt(Vec3(x, y, z));
-  if (block.name !== "air" && block.name !== "water" && block.name !== "lava") {
-    if (bot.modes.isOn("cheat")) {
-      let msg =
-        "/setblock " +
-        Math.floor(x) +
-        " " +
-        Math.floor(y) +
-        " " +
-        Math.floor(z) +
-        " air";
-      bot.chat(msg);
-      log(bot, `Used /setblock to break block at ${x}, ${y}, ${z}.`);
-      return true;
-    }
-
-    if (bot.entity.position.distanceTo(block.position) > NEAR_DISTANCE) {
-      let pos = block.position;
-      let movements = new pf.Movements(bot);
-      movements.canPlaceOn = false;
-      movements.allow1by1towers = false;
-      bot.pathfinder.setMovements(movements);
-      await bot.pathfinder.goto(
-        new pf.goals.GoalNear(pos.x, pos.y, pos.z, NEAR_DISTANCE)
-      );
-    }
-    if (bot.game.gameMode !== "creative") {
-      await bot.tool.equipForBlock(block);
-      const itemId = bot.heldItem ? bot.heldItem.type : null;
-      if (!block.canHarvest(itemId)) {
-        log(bot, `Don't have right tools to break ${block.name}.`);
-        return false;
-      }
-    }
-    await bot.dig(block, true);
-    log(
-      bot,
-      `Broke ${block.name} at x:${x.toFixed(1)}, y:${y.toFixed(
-        1
-      )}, z:${z.toFixed(1)}.`
-    );
-  } else {
-    log(
-      bot,
-      `Skipping block at x:${x.toFixed(1)}, y:${y.toFixed(1)}, z:${z.toFixed(
-        1
-      )} because it is ${block.name}.`
-    );
-    return false;
-  }
-  return true;
+  return functionsBreakBlockAt(bot, x, y, z);
 }
 
 export async function placeBlock(

@@ -102,6 +102,16 @@ function inject(bot) {
       value: { result, astarContext: context },
     } = generator.next();
     astarContext = context;
+    try {
+      const path = result?.path || [];
+      const usesPlacement = path.some(n => Array.isArray(n.toPlace) && n.toPlace.length > 0);
+      const remainingBlocksMin = path.reduce((min, n) => {
+        const rb = typeof n.remainingBlocks === 'number' ? n.remainingBlocks : min;
+        return rb < min ? rb : min;
+      }, Number.POSITIVE_INFINITY);
+      const rbMinOut = isFinite(remainingBlocksMin) ? remainingBlocksMin : 'n/a';
+      console.log('[pathfinder][plan] status=%s pathLen=%s usesPlacement=%s remainingBlocksMin=%s', result?.status, path.length, usesPlacement, rbMinOut);
+    } catch {}
     return result;
   };
 

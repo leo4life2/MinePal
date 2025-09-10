@@ -12,7 +12,6 @@ MinePal is a desktop Minecraft companion app built with Electron that adds an AI
 - **Agent**: Minecraft agent logic in `src/agent/`.
 - **Libraries**: Located in `libs/`, contains several submodules:
   - `node-minecraft-protocol-forge/`
-  - `mineflayer-collectblock/`
   - `mineflayer-auto-eat/`
   - `mineflayer-pvp/`
   - `prismarine-world/`

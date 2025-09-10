@@ -22,7 +22,6 @@
     "mineflayer": "file:libs/mineflayer",
     "mineflayer-armor-manager": "^2.0.1",
     "mineflayer-auto-eat": "file:libs/mineflayer-auto-eat",
-    "mineflayer-collectblock": "file:libs/mineflayer-collectblock",
     "mineflayer-pathfinder": "file:mineflayer-pathfinder",
     "mineflayer-pvp": "file:libs/mineflayer-pvp",
     "multer": "^2.0.1",
