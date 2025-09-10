@@ -31,7 +31,7 @@
     "prismarine-world": "file:libs/prismarine-world",
     "rotating-file-stream": "^3.2.3",
     "uiohook-napi": "^1.5.4",
-    "vectra": "^0.9.0",
+    "vectra": "^0.11.1",
     "ws": "^8.18.0",
     "yargs": "^17.7.2"
   },
@@ -49,7 +49,7 @@
   },
   "devDependencies": {
     "@electron/notarize": "^2.3.2",
-    "electron": "^31.7.7",
+    "electron": "^38.1.0",
     "electron-builder": "^24.13.3",
     "electron-rebuild": "^3.2.9"
   },
