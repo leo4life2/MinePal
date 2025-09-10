@@ -1,6 +1,3 @@
-[submodule "libs/mineflayer-collectblock"]
-	path = libs/mineflayer-collectblock
-	url = git@github.com:leo4life2/mineflayer-collectblock.git
 [submodule "libs/mineflayer-pvp"]
 	path = libs/mineflayer-pvp
 	url = git@github.com:leo4life2/mineflayer-pvp.git
