@@ -1999,10 +1999,18 @@ export async function giveToPlayer(bot, username, items) {
     return false;
   }
   await goToPlayer(bot, username);
+  await new Promise((resolve) => setTimeout(resolve, 200));
   await bot.lookAt(player.position);
+  await new Promise((resolve) => setTimeout(resolve, 300));
   for (const { name, quantity } of itemsList) {
     await discard(bot, name, quantity);
   }
+  // After tossing items, step back a bit to avoid picking them up ourselves
+  try {
+    bot.setControlState("back", true);
+    await new Promise((resolve) => setTimeout(resolve, 200)); // ~two short steps
+    bot.setControlState("back", false);
+  } catch (_) {}
   return true;
 }
 
@@ -2053,7 +2061,7 @@ export async function goToPlayer(bot, username, distance = 1) {
   bot.modes.pause("cowardice");
 
   const startTs = Date.now();
-  const maxMs = 120000; // 2 minutes ceiling to avoid hanging forever
+  const maxMs = 60000; // 1 minute ceiling to avoid hanging forever
 
   const resolvePlayer = () => bot.players[username]?.entity || null;
   let player = resolvePlayer();
@@ -2078,7 +2086,7 @@ export async function goToPlayer(bot, username, distance = 1) {
       if (!player) return false;
 
       const dist = bot.entity.position.distanceTo(player.position);
-      if (dist <= Math.max(0.5, distance)) {
+      if (dist <= Math.max(2, distance)) {
         // Arrived
         bot.pathfinder.stop();
         log(bot, `You have reached ${username}.`);
