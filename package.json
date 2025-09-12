@@ -24,6 +24,7 @@
     "mineflayer-auto-eat": "file:libs/mineflayer-auto-eat",
     "mineflayer-pathfinder": "file:mineflayer-pathfinder",
     "mineflayer-pvp": "file:libs/mineflayer-pvp",
+    "mineflayer-tool": "^1.2.0",
     "multer": "^2.0.1",
     "patch-package": "^8.0.0",
     "pidusage": "^3.0.2",

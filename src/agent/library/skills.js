@@ -2,7 +2,7 @@ import MCData from "../../utils/mcdata.js";
 import * as world from "./world.js";
 import pf from "mineflayer-pathfinder";
 import Vec3 from "vec3";
-import { acquireBlock, breakBlockAt as functionsBreakBlockAt } from "./functions.js";
+import { digBlock, breakBlockAt as functionsBreakBlockAt } from "./functions.js";
 import { queryList } from "../commands/queries.js";
 import fs from "fs";
 import path from "path";
@@ -1217,6 +1217,16 @@ export async function collectBlock(
   const DEBUG = true;
 
   const candidates = new Map(); // key -> Vec3
+  // Persistent drop tracking: id -> { pos: Vec3, spawnedAt: number, lastSeen: number, predicted: boolean, name?: string }
+  const pendingDrops = new Map();
+  const DETOUR_BUDGET = 4; // blocks of extra distance allowed by default
+  const URGENT_AGE_MS = 4 * 60 * 1000; // 4 minutes
+  const DESPAWN_MS = 5 * 60 * 1000; // 5 minutes
+  const ABOUT_TO_DESPAWN_MS = DESPAWN_MS - 20 * 1000; // 20s margin
+  const PRUNE_UNSEEN_MS = 15 * 1000; // if unseen for this long, consider gone
+  const DROP_NEAR_RADIUS = 1.0;
+  const DEBT_DROP_COUNT = 15;
+  const MAX_SWEEP_ON_DEBT = 10;
   let emptyTicks = 0;
   const EMPTY_TICKS_BEFORE_EXIT = 60; // ~3s at 20Hz
   let isCollecting = false; // control-plane guard
@@ -1225,6 +1235,21 @@ export async function collectBlock(
   const PRUNE_EVERY_TICKS = 10; // prune cadence (~2Hz)
   const MAX_CANDIDATES = 200; // cap pool to avoid O(n) bloat
   let tickIndex = 0;
+
+  // Inventory-based progress tracking
+  const targetItemId = MCData.getInstance().getItemId(blockType);
+  const countTarget = () => {
+    try {
+      if (targetItemId != null && bot.inventory && typeof bot.inventory.count === 'function') {
+        return bot.inventory.count(targetItemId, null);
+      }
+      const inv = world.getInventoryCounts(bot) || {};
+      return inv[blockType] || 0;
+    } catch {
+      return 0;
+    }
+  };
+  const baselineCount = countTarget();
 
   const isValidTarget = (position) => {
     let actual;
@@ -1271,6 +1296,61 @@ export async function collectBlock(
           for (const pos of trimmed) candidates.set(keyOf(pos), pos);
         }
       }
+      // Scan/update pending drops with visible item entities
+      if (doScan) {
+        try {
+          world.getVisibleEntities(bot).then((visible) => {
+            const now = Date.now();
+            // First, index visible items by id and position
+            const visibleItems = [];
+            for (const e of visible) {
+              if (e && e.name === 'item') {
+                visibleItems.push(e);
+              }
+            }
+
+            // Merge or insert visible items
+            for (const it of visibleItems) {
+              const id = it.id;
+              const pos = it.position;
+              const existing = pendingDrops.get(id);
+              if (existing) {
+                existing.pos = pos;
+                existing.lastSeen = now;
+                if (!existing.name && it.displayName) existing.name = it.displayName;
+              } else {
+                // Reconcile with any predicted drops near this position (within 1.5 blocks)
+                let predictedMatchKey = null;
+                let predictedSpawnTs = now;
+                for (const [k, rec] of pendingDrops.entries()) {
+                  if (rec.predicted && rec.pos.distanceTo(pos) <= 1.5) {
+                    predictedMatchKey = k;
+                    predictedSpawnTs = Math.min(predictedSpawnTs, rec.spawnedAt);
+                    break;
+                  }
+                }
+                if (predictedMatchKey) pendingDrops.delete(predictedMatchKey);
+                pendingDrops.set(id, {
+                  pos: pos,
+                  spawnedAt: predictedSpawnTs,
+                  lastSeen: now,
+                  predicted: false,
+                  name: it.displayName || undefined
+                });
+              }
+            }
+
+            // Prune drops that are unseen for too long or certainly despawned
+            for (const [id, rec] of Array.from(pendingDrops.entries())) {
+              const age = now - rec.spawnedAt;
+              const unseen = now - rec.lastSeen;
+              if (age >= DESPAWN_MS || unseen >= PRUNE_UNSEEN_MS) {
+                pendingDrops.delete(id);
+              }
+            }
+          }).catch(() => {});
+        } catch {}
+      }
       if (doPrune) {
         for (const [k, pos] of Array.from(candidates.entries())) {
           // Do not prune the current target while actively collecting
@@ -1286,13 +1366,16 @@ export async function collectBlock(
 
   bot.on('physicsTick', onPhysicsTick);
 
-  let collected = 0;
+  // Note: collectedTarget is derived from inventory, not incremented manually
   let lastDugPos = null; // pivot: choose next candidate closest to this
   let zeroScanStreak = 0;
   let unreachableCount = 0;
+  let digBatchCount = 0;
   try {
-    while (collected < num) {
-      console.log(`[skills.collectBlock] collected: ${collected}, candidates: ${candidates.size}`);
+    while (true) {
+      const collectedTarget = countTarget() - baselineCount;
+      if (collectedTarget >= num) break;
+      console.log(`[skills.collectBlock] collected: ${collectedTarget}, candidates: ${candidates.size}`);
 
       if (bot.interrupt_code) break;
 
@@ -1322,8 +1405,8 @@ export async function collectBlock(
           await bot.pathfinder.goto(new pf.goals.GoalNear(tx, ty, tz, 1));
         } catch {}
 
-        if (zeroScanStreak >= 5 || emptyTicks > EMPTY_TICKS_BEFORE_EXIT) {
-          if (collected > 0) log(bot, `You collected ${collected} ${blockType}, and don't see more ${blockType} around`);
+        if (zeroScanStreak >= 3 || emptyTicks > EMPTY_TICKS_BEFORE_EXIT) {
+          if (collectedTarget > 0) log(bot, `You collected ${collectedTarget} ${blockType}, and don't see more ${blockType} around`);
           else log(bot, `No ${blockType} found around.`);
           break;
         }
@@ -1357,63 +1440,128 @@ export async function collectBlock(
       const itemId = bot.heldItem ? bot.heldItem.type : null;
       if (!targetBlock.canHarvest(itemId)) { candidates.delete(targetKey); continue; }
 
+      // Decide on a detour drop before heading to target block
+      // A greedy detour-budget heuristic for pickup-and-delivery TSP with time-window constraints.
+      try {
+        const now = Date.now();
+        let bestDropEntry = null;
+        let bestDelta = Number.POSITIVE_INFINITY;
+        const cur = bot.entity.position;
+        const direct = cur.distanceTo(targetPos);
+        for (const [did, rec] of pendingDrops.entries()) {
+          const drop = rec.pos;
+          const delta = cur.distanceTo(drop) + drop.distanceTo(targetPos) - direct;
+          const urgent = (now - rec.spawnedAt) >= URGENT_AGE_MS;
+          const budget = urgent ? 3 * DETOUR_BUDGET : DETOUR_BUDGET;
+          if (delta <= budget && delta < bestDelta) {
+            bestDelta = delta;
+            bestDropEntry = [did, rec];
+          }
+        }
+        if (bestDropEntry) {
+          const [did, rec] = bestDropEntry;
+          try {
+            bot.pathfinder.setMovements(new pf.Movements(bot));
+            await bot.pathfinder.goto(new pf.goals.GoalNear(rec.pos.x, rec.pos.y, rec.pos.z, DROP_NEAR_RADIUS));
+            await new Promise(r => setTimeout(r, 120));
+          } catch {}
+          finally {
+            pendingDrops.delete(did);
+          }
+          if (bot.interrupt_code) break;
+        }
+      } catch {}
+
       // Mark control-plane state and remove from pool before starting
       isCollecting = true;
       currentTargetKey = targetKey;
       candidates.delete(targetKey);
       try {
-        // Use in-house acquireBlock (break + targeted pickup). No vendor collect.
-        const ok = await acquireBlock(bot, targetBlock);
-        if (!ok) throw new Error('AcquireFailed');
-        collected++;
-        lastDugPos = targetPos.clone();
-        if (DEBUG) console.log(`[skills.collectBlock][dig] broke ${targetBlock.name} at (${targetPos.x},${targetPos.y},${targetPos.z}) -> total ${collected}`);
+        // Use in-house digBlock (break + targeted pickup). Throws on specific reasons.
+        await digBlock(bot, targetBlock);
+        // Update lastDugPos only if block actually broke
+        try {
+          const now = bot.blockAt(targetPos);
+          if (!now || now.name !== targetBlock.name) lastDugPos = targetPos.clone();
+        } catch { lastDugPos = targetPos.clone(); }
+        const collectedTargetNow = countTarget() - baselineCount;
+        if (DEBUG) console.log(`[skills.collectBlock][dig] attempted ${targetBlock.name} at (${targetPos.x},${targetPos.y},${targetPos.z}) -> total ${collectedTargetNow}`);
+        digBatchCount++;
+        // Predict a drop at the dig position
+        const predId = `pred:${targetPos.x},${targetPos.y},${targetPos.z}:${Date.now()}`;
+        pendingDrops.set(predId, { pos: targetPos.clone(), spawnedAt: Date.now(), lastSeen: Date.now(), predicted: true });
       } catch (err) {
         const name = err?.name || (err && typeof err === 'object' ? (err).constructor?.name : String(err));
         const msg = err?.message || String(err);
-        if (name === 'UnreachableTarget' || name === 'PathfindingFailed') {
-          console.log(`[skills.collectBlock] skip unreachable: ${msg}`);
-          unreachableKeys.add(targetKey);
-          unreachableCount++;
-          continue;
+        const stack = err?.stack || "<no stack>";
+        const heldName = bot.heldItem ? bot.heldItem.name : '<empty hand>';
+        const heldType = bot.heldItem ? bot.heldItem.type : null;
+        let canHarvestNow = false;
+        try { canHarvestNow = targetBlock.canHarvest(heldType); } catch {}
+        const collectedTargetNow = (typeof countTarget === 'function') ? (countTarget() - baselineCount) : undefined;
+        const ctx = {
+          target: { name: targetBlock?.name, pos: { x: targetPos?.x, y: targetPos?.y, z: targetPos?.z } },
+          held: { name: heldName, type: heldType },
+          canHarvestNow,
+          collectedSoFar: collectedTargetNow,
+          candidatesSize: candidates.size,
+          isCollecting,
+          unreachableCount
+        };
+        // Handle our new error codes first (best-effort: continue)
+        if (msg === 'BreakFailed' || msg === 'NoDropsVisible' || msg === 'PickupTimeout' || msg === 'PickupFailed' || name === 'AcquireFailed') {
+          console.log(`[skills.collectBlock] digBlock issue: ${msg} context=${JSON.stringify(ctx)}`);
+          // TODO: this is getting thrown a lot even though it's successful. lots of false negatives.
+          // Even on pickup failure, rely on inventory progress; fall through to sweep logic
         }
-        if (name === 'NoScaffoldingBlocks') {
-          console.log(`[skills.collectBlock] cannot scaffold: ${msg}`);
-          unreachableKeys.add(targetKey);
-          unreachableCount++;
-          continue;
-        }
-        if (name === 'InvalidOrUnsafeTarget' || name === 'CannotHarvest') {
-          console.log(`[skills.collectBlock] skip invalid/unsafe: ${msg}`);
-          unreachableKeys.add(targetKey); // treat as non-retriable for this session
-          continue;
-        }
-        if (name === 'DigDidNotChangeBlock') {
-          console.log(`[skills.collectBlock] dig had no effect: ${msg}`);
-          unreachableKeys.add(targetKey); // avoid re-trying same stuck block
-          continue;
-        }
-        if (err?.name === 'NoChests') {
-          log(bot, `Failed to collect ${blockType}: Inventory full, no place to deposit.`);
-          break;
-        }
-        console.log(`[skills.collectBlock] unexpected error from collect: ${name}: ${msg}`);
+        console.log(`[skills.collectBlock] unexpected error from collect: ${name}: ${msg}\nstack=${stack}\ncontext=${JSON.stringify(ctx)}`);
       } finally {
         // Clear control-plane state
         isCollecting = false;
         currentTargetKey = null;
       }
+
+      // Fallback sweep (rare): if pickup debt is high or drops are about to despawn
+      try {
+        const now = Date.now();
+        let oldestAge = 0;
+        for (const rec of pendingDrops.values()) {
+          if (rec.predicted) continue; // ignore predicted for despawn urgency
+          oldestAge = Math.max(oldestAge, now - rec.spawnedAt);
+        }
+        const pickupDebtTooHigh = pendingDrops.size >= DEBT_DROP_COUNT || oldestAge >= ABOUT_TO_DESPAWN_MS;
+        if (pickupDebtTooHigh && pendingDrops.size > 0) {
+          const ordered = Array.from(pendingDrops.entries())
+            .map(([id, rec]) => ({ id, rec, d: bot.entity.position.distanceTo(rec.pos) }))
+            .sort((a, b) => a.d - b.d)
+            .slice(0, MAX_SWEEP_ON_DEBT);
+          for (const { id, rec } of ordered) {
+            try {
+              bot.pathfinder.setMovements(new pf.Movements(bot));
+              await bot.pathfinder.goto(new pf.goals.GoalNear(rec.pos.x, rec.pos.y, rec.pos.z, DROP_NEAR_RADIUS));
+              await new Promise(r => setTimeout(r, 120));
+            } catch {}
+            finally {
+              pendingDrops.delete(id);
+            }
+            if (bot.interrupt_code) break;
+          }
+          // After a sweep, reset batch count to encourage more digging before next sweep
+          digBatchCount = 0;
+        }
+      } catch {}
     }
   } finally {
     try { bot.removeListener('physicsTick', onPhysicsTick); } catch {}
   }
 
+  const finalCollected = countTarget() - baselineCount;
   if (unreachableCount > 0) {
-    log(bot, `Collected ${collected} ${blockType}. Visible but unreachable: ${unreachableCount}.`);
+    log(bot, `Collected ${finalCollected} ${blockType}. Visible but unreachable: ${unreachableCount}.`);
   } else {
-    log(bot, `Collected ${collected} ${blockType}.`);
+    log(bot, `Collected ${finalCollected} ${blockType}.`);
   }
-  return collected > 0;
+  return finalCollected > 0;
 }
 
 export async function pickupNearbyItems(bot) {

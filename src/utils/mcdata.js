@@ -3,9 +3,9 @@ import { createBot } from 'mineflayer';
 import prismarine_items from 'prismarine-item';
 import { pathfinder } from 'mineflayer-pathfinder';
 import { plugin as pvp } from 'mineflayer-pvp';
-import { plugin as collectblock } from 'mineflayer-collectblock';
 import { loader as autoEat } from 'mineflayer-auto-eat';
 import plugin from 'mineflayer-armor-manager';
+import { plugin as toolPlugin } from 'mineflayer-tool';
 import protocolForge from 'minecraft-protocol-forge';
 import mc from 'minecraft-protocol';
 
@@ -64,8 +64,8 @@ class MCData {
         });
 
         this.bot.loadPlugin(pathfinder);
+        this.bot.loadPlugin(toolPlugin);
         this.bot.loadPlugin(pvp);
-        this.bot.loadPlugin(collectblock);
         this.bot.loadPlugin(autoEat);
         this.bot.loadPlugin(armorManager); // auto equip armor
 
