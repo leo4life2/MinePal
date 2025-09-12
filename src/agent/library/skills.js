@@ -1203,10 +1203,35 @@ export async function collectBlock(
     ancient_debris: ["netherite_scrap"],
   };
 
-  let blocktypes = [blockType];
-  if (blockDropMap[blockType]) blocktypes.push(...blockDropMap[blockType]);
-  for (const [block, drops] of Object.entries(blockDropMap)) if (drops.includes(blockType)) blocktypes.push(block);
+  // Build the scan list: ONLY include diggable block names, never item drop names
+  // and compute desired drop item names for pickup sweeping.
+  let blocktypes = [];
+  let desiredDropNames = [];
+  if (blockDropMap[blockType]) {
+    // Requested is a diggable block that has special drops (e.g., diamond_ore -> diamond)
+    const registry = MCData.getInstance();
+    const variantBlocks = blockDropMap[blockType].filter((name) => {
+      try { return !!registry.getBlockId(name); } catch { return false; }
+    });
+    blocktypes = [blockType, ...variantBlocks];
+    desiredDropNames = [...blockDropMap[blockType]];
+  } else {
+    // See if requested is a drop item; then scan for any blocks that can drop it
+    const sourceBlocks = Object.entries(blockDropMap)
+      .filter(([, drops]) => drops.includes(blockType))
+      .map(([block]) => block);
+    if (sourceBlocks.length > 0) {
+      blocktypes = sourceBlocks;
+      desiredDropNames = [blockType];
+    } else {
+      // Default case: assume the requested name is itself a block and its drop is itself
+      blocktypes = [blockType];
+      desiredDropNames = [blockType];
+    }
+  }
   blocktypes = [...new Set(blocktypes)];
+  desiredDropNames = [...new Set(desiredDropNames)];
+  const desiredDropNamesNormalized = desiredDropNames.map(n => n.toLowerCase());
 
   const cropAgeMap = { wheat: 7, beetroot: 3, carrot: 7, potato: 7 };
   const keyOf = (v) => `${v.x},${v.y},${v.z}`;
@@ -1219,7 +1244,7 @@ export async function collectBlock(
   const candidates = new Map(); // key -> Vec3
   // Persistent drop tracking: id -> { pos: Vec3, spawnedAt: number, lastSeen: number, predicted: boolean, name?: string }
   const pendingDrops = new Map();
-  const DETOUR_BUDGET = 4; // blocks of extra distance allowed by default
+  const DETOUR_BUDGET = 10; // blocks of extra distance allowed by default
   const URGENT_AGE_MS = 4 * 60 * 1000; // 4 minutes
   const DESPAWN_MS = 5 * 60 * 1000; // 5 minutes
   const ABOUT_TO_DESPAWN_MS = DESPAWN_MS - 20 * 1000; // 20s margin
@@ -1237,14 +1262,22 @@ export async function collectBlock(
   let tickIndex = 0;
 
   // Inventory-based progress tracking
-  const targetItemId = MCData.getInstance().getItemId(blockType);
+  const registryForCount = MCData.getInstance();
   const countTarget = () => {
     try {
-      if (targetItemId != null && bot.inventory && typeof bot.inventory.count === 'function') {
-        return bot.inventory.count(targetItemId, null);
+      if (bot.inventory && typeof bot.inventory.count === 'function' && desiredDropNames.length > 0) {
+        return desiredDropNames.reduce((sum, name) => {
+          let id = null;
+          try { id = registryForCount.getItemId(name); } catch { id = null; }
+          if (id == null) return sum;
+          return sum + bot.inventory.count(id, null);
+        }, 0);
       }
       const inv = world.getInventoryCounts(bot) || {};
-      return inv[blockType] || 0;
+      if (desiredDropNames.length > 0) {
+        return desiredDropNames.reduce((sum, name) => sum + (inv[name] || 0), 0);
+      }
+      return 0;
     } catch {
       return 0;
     }
@@ -1310,6 +1343,7 @@ export async function collectBlock(
             }
 
             // Merge or insert visible items
+            const normalizeDisp = (s) => (s || '').toLowerCase().replace(/\s+/g, '_');
             for (const it of visibleItems) {
               const id = it.id;
               const pos = it.position;
@@ -1317,7 +1351,7 @@ export async function collectBlock(
               if (existing) {
                 existing.pos = pos;
                 existing.lastSeen = now;
-                if (!existing.name && it.displayName) existing.name = it.displayName;
+                if (!existing.name && it.displayName) existing.name = normalizeDisp(it.displayName);
               } else {
                 // Reconcile with any predicted drops near this position (within 1.5 blocks)
                 let predictedMatchKey = null;
@@ -1330,13 +1364,18 @@ export async function collectBlock(
                   }
                 }
                 if (predictedMatchKey) pendingDrops.delete(predictedMatchKey);
-                pendingDrops.set(id, {
-                  pos: pos,
-                  spawnedAt: predictedSpawnTs,
-                  lastSeen: now,
-                  predicted: false,
-                  name: it.displayName || undefined
-                });
+                // Only track items that match desired drop names to keep the pool relevant
+                const itemNameNorm = normalizeDisp(it.displayName || '');
+                const matchesDesired = itemNameNorm === '' || desiredDropNamesNormalized.includes(itemNameNorm);
+                if (matchesDesired) {
+                  pendingDrops.set(id, {
+                    pos: pos,
+                    spawnedAt: predictedSpawnTs,
+                    lastSeen: now,
+                    predicted: false,
+                    name: itemNameNorm
+                  });
+                }
               }
             }
 
@@ -1453,7 +1492,9 @@ export async function collectBlock(
           const delta = cur.distanceTo(drop) + drop.distanceTo(targetPos) - direct;
           const urgent = (now - rec.spawnedAt) >= URGENT_AGE_MS;
           const budget = urgent ? 3 * DETOUR_BUDGET : DETOUR_BUDGET;
-          if (delta <= budget && delta < bestDelta) {
+          // Only consider desired drops or predicted ones (which will reconcile shortly)
+          const isDesired = rec.predicted || (rec.name && desiredDropNamesNormalized.includes(rec.name.toLowerCase()));
+          if (isDesired && delta <= budget && delta < bestDelta) {
             bestDelta = delta;
             bestDropEntry = [did, rec];
           }
@@ -1532,6 +1573,7 @@ export async function collectBlock(
         const pickupDebtTooHigh = pendingDrops.size >= DEBT_DROP_COUNT || oldestAge >= ABOUT_TO_DESPAWN_MS;
         if (pickupDebtTooHigh && pendingDrops.size > 0) {
           const ordered = Array.from(pendingDrops.entries())
+            .filter(([, rec]) => rec.predicted || (rec.name && desiredDropNamesNormalized.includes(rec.name.toLowerCase())))
             .map(([id, rec]) => ({ id, rec, d: bot.entity.position.distanceTo(rec.pos) }))
             .sort((a, b) => a.d - b.d)
             .slice(0, MAX_SWEEP_ON_DEBT);
