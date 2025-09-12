@@ -1511,8 +1511,9 @@ export async function collectBlock(
         // Handle our new error codes first (best-effort: continue)
         if (msg === 'BreakFailed' || msg === 'NoDropsVisible' || msg === 'PickupTimeout' || msg === 'PickupFailed' || name === 'AcquireFailed') {
           console.log(`[skills.collectBlock] digBlock issue: ${msg} context=${JSON.stringify(ctx)}`);
-          // TODO: this is getting thrown a lot even though it's successful. lots of false negatives.
-          // Even on pickup failure, rely on inventory progress; fall through to sweep logic
+          // Mark this target as unreachable so it won't re-enter the pool
+          try { unreachableKeys.add(targetKey); unreachableCount++; } catch {}
+          // Even on pickup failure, rely on inventory progress; fall through to other logic
         }
         console.log(`[skills.collectBlock] unexpected error from collect: ${name}: ${msg}\nstack=${stack}\ncontext=${JSON.stringify(ctx)}`);
       } finally {

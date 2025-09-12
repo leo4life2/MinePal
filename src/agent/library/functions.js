@@ -3,7 +3,6 @@ import Vec3 from "vec3";
 import * as world from "./world.js";
 
 const NEAR_DISTANCE = 3.0;
-const MID_DISTANCE = 8;
 const DEBUG = true;
 
 async function equipForBlockSafe(bot, block) {
@@ -18,17 +17,14 @@ async function equipForBlockSafe(bot, block) {
 }
 
 export async function breakBlockAt(bot, x, y, z) {
-  if (DEBUG) console.log(`[functions.breakBlockAt] start (${x},${y},${z})`);
   if (x == null || y == null || z == null) return false;
   const block = bot.blockAt(Vec3(x, y, z));
   if (!block) {
-    if (DEBUG) console.log(`[functions.breakBlockAt] no block at ${x},${y},${z}`);
     return false;
   }
   if (block.name === "air" || block.name === "water" || block.name === "lava") return false;
 
   if (bot.entity.position.distanceTo(block.position) > NEAR_DISTANCE) {
-    if (DEBUG) console.log(`[functions.breakBlockAt] moving near block ${block.name} @ ${x},${y},${z}`);
     const pos = block.position;
     const movements = new pf.Movements(bot);
     movements.canPlaceOn = false;
@@ -38,18 +34,13 @@ export async function breakBlockAt(bot, x, y, z) {
   }
 
   if (bot.game?.gameMode !== "creative") {
-    if (DEBUG) console.log(`[functions.breakBlockAt] equipping tool for ${block.name}`);
     await equipForBlockSafe(bot, block);
     const itemId = bot.heldItem ? bot.heldItem.type : null;
     if (!block.canHarvest(itemId)) return false;
   }
-
-  if (DEBUG) console.log(`[functions.breakBlockAt] digging ${block.name} @ ${x},${y},${z}`);
   const ok = await bot.dig(block, true);
-  if (ok) {
-    if (DEBUG) console.log(`[functions.breakBlockAt] successfully broke ${block.name} @ ${x},${y},${z}`);
-  } else {
-    if (DEBUG) console.log(`[functions.breakBlockAt] failed to break ${block.name} @ ${x},${y},${z}`);
+  if (ok && DEBUG) {
+    console.log(`[functions.breakBlockAt] successfully broke ${block.name} @ ${x},${y},${z}`);
   }
   return ok;
 }
@@ -61,7 +52,6 @@ export async function digBlock(bot, block) {
 
   const ok = await breakBlockAt(bot, targetPos.x, targetPos.y, targetPos.z);
   if (!ok) {
-    // TODO: debug why we keep getting this despite success
     const err = new Error('BreakFailed');
     err.code = 'BreakFailed';
     throw err;
