@@ -1515,7 +1515,6 @@ export async function collectBlock(
           try { unreachableKeys.add(targetKey); unreachableCount++; } catch {}
           // Even on pickup failure, rely on inventory progress; fall through to other logic
         }
-        console.log(`[skills.collectBlock] unexpected error from collect: ${name}: ${msg}\nstack=${stack}\ncontext=${JSON.stringify(ctx)}`);
       } finally {
         // Clear control-plane state
         isCollecting = false;

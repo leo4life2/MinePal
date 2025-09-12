@@ -11,6 +11,10 @@ import fs from 'fs/promises';
 import * as world from "./library/world.js";
 import { emote } from './library/skills.js';
 import * as skills from './library/skills.js';
+import { EventEmitter } from 'events';
+
+// Increase global EventEmitter listener limit
+EventEmitter.prototype.setMaxListeners(50);
 
 // --- Silence Timer Constants ---
 const MEAN_1 = 27; // Base mean silence duration in seconds for the first silence
