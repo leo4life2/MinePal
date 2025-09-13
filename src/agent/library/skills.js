@@ -1205,6 +1205,9 @@ export async function collectBlock(
 
   // Build the scan list: ONLY include diggable block names, never item drop names
   // and compute desired drop item names for pickup sweeping.
+
+  const DEBUG = true;
+
   let blocktypes = [];
   let desiredDropNames = [];
   if (blockDropMap[blockType]) {
@@ -1231,6 +1234,11 @@ export async function collectBlock(
   }
   blocktypes = [...new Set(blocktypes)];
   desiredDropNames = [...new Set(desiredDropNames)];
+  if (DEBUG) {
+    try {
+      console.log(`[skills.collectBlock][init] blocktypes=${JSON.stringify(blocktypes)} desiredDrops=${JSON.stringify(desiredDropNames)} grownCropsOnly=${grownCropsOnly}`);
+    } catch {}
+  }
   const desiredDropNamesNormalized = desiredDropNames.map(n => n.toLowerCase());
 
   const cropAgeMap = { wheat: 7, beetroot: 3, carrot: 7, potato: 7 };
@@ -1239,7 +1247,6 @@ export async function collectBlock(
   const excluded = Array.isArray(exclude) ? exclude : [];
   // Track unreachable targets during this session to avoid retry loops
   const unreachableKeys = new Set();
-  const DEBUG = true;
 
   const candidates = new Map(); // key -> Vec3
   // Persistent drop tracking: id -> { pos: Vec3, spawnedAt: number, lastSeen: number, predicted: boolean, name?: string }
@@ -1308,13 +1315,23 @@ export async function collectBlock(
       // Choose a lighter radius when we already have a pool
       const scanRadius = candidates.size === 0 ? VERY_FAR_DISTANCE : FAR_DISTANCE;
       const found = doScan ? (world.getNearestBlocks(bot, blocktypes, scanRadius) || []) : [];
+      if (doScan && DEBUG) {
+        try {
+          console.log(`[skills.collectBlock][scan] scanRadius=${scanRadius} found=${found.length}`);
+          const preview = found.slice(0, 5).map(b => `(${b.position.x},${b.position.y},${b.position.z}) ${b.name}`);
+          if (preview.length > 0) console.log(`[skills.collectBlock][scan] first: ${preview.join(' | ')}`);
+        } catch {}
+      }
       let added = 0;
       if (doScan) {
         for (const b of found) {
           if (!b || !b.position) continue;
           const pos = b.position;
           if (isExcluded(pos)) continue;
-          if (!isValidTarget(pos)) continue;
+          if (!isValidTarget(pos)) {
+            if (DEBUG) console.log(`[skills.collectBlock][filter] rejected (${pos.x},${pos.y},${pos.z}) name=${bot.blockAt(pos)?.name} grownCropsOnly=${grownCropsOnly}`);
+            continue;
+          }
           const k = keyOf(pos);
           if (!candidates.has(k)) { candidates.set(k, pos); added++; }
         }
@@ -1410,6 +1427,9 @@ export async function collectBlock(
   let zeroScanStreak = 0;
   let unreachableCount = 0;
   let digBatchCount = 0;
+  // Track reasons for unreachable targets for end-of-run diagnostics
+  const undiggableByBlock = new Map(); // blockName -> count
+  const cannotHarvestByBlockTool = new Map(); // `${blockName}||${toolName}` -> count
   try {
     while (true) {
       const collectedTarget = countTarget() - baselineCount;
@@ -1426,24 +1446,29 @@ export async function collectBlock(
 
       if (candidates.size === 0) {
         zeroScanStreak++;
-        // Nudge: small random move to explore nearby area
-        try {
-          const magnitude = 5;
-          const choices = [
-            { dx: magnitude, dz: 0 },
-            { dx: -magnitude, dz: 0 },
-            { dx: 0, dz: magnitude },
-            { dx: 0, dz: -magnitude }
-          ];
-          const pick = choices[Math.floor(Math.random() * choices.length)];
-          const base = bot.entity.position;
-          const tx = Math.floor(base.x + pick.dx);
-          const ty = Math.floor(base.y);
-          const tz = Math.floor(base.z + pick.dz);
-          bot.pathfinder.setMovements(new pf.Movements(bot));
-          await bot.pathfinder.goto(new pf.goals.GoalNear(tx, ty, tz, 1));
-        } catch {}
-
+        // Diagnostic: if nothing in candidates, probe raw matches without visibility filter
+        if (DEBUG) {
+          try {
+            const registry = MCData.getInstance();
+            const ids = blocktypes
+              .map((name) => { try { return registry.getBlockId(name); } catch { return null; } })
+              .filter((id) => id != null);
+            if (ids.length > 0) {
+              const rawPositions = bot.findBlocks({ matching: ids, maxDistance: FAR_DISTANCE, count: 64 });
+              console.log(`[skills.collectBlock][diagnostic] candidates empty; rawPositions=${rawPositions.length} within ${FAR_DISTANCE}`);
+              for (let i = 0; i < Math.min(5, rawPositions.length); i++) {
+                const p = rawPositions[i];
+                const b = bot.blockAt(p);
+                let vis = false; let visErr = null;
+                try { vis = bot.canSeeBlock(b); } catch (e) { visErr = e?.message || String(e); }
+                const dist = bot.entity.position.distanceTo(p).toFixed(2);
+                console.log(`[skills.collectBlock][diagnostic] #${i+1} at (${p.x},${p.y},${p.z}) name=${b?.name} dist=${dist} visible=${vis}${visErr ? ` err=${visErr}` : ''}`);
+              }
+            } else {
+              console.log(`[skills.collectBlock][diagnostic] candidates empty; no valid block IDs computed for blocktypes=${JSON.stringify(blocktypes)}`);
+            }
+          } catch {}
+        }
         if (zeroScanStreak >= 3 || emptyTicks > EMPTY_TICKS_BEFORE_EXIT) {
           if (collectedTarget > 0) log(bot, `You collected ${collectedTarget} ${blockType}, and don't see more ${blockType} around`);
           else log(bot, `No ${blockType} found around.`);
@@ -1458,6 +1483,10 @@ export async function collectBlock(
       const nearest = Array.from(candidates.values())
         .map(pos => ({ pos, dist: (lastDugPos ? lastDugPos.distanceTo(pos) : bot.entity.position.distanceTo(pos)) }))
         .sort((a, b) => a.dist - b.dist)[0];
+      if (DEBUG && nearest && nearest.pos) {
+        const b = bot.blockAt(nearest.pos);
+        console.log(`[skills.collectBlock][choose] target (${nearest.pos.x},${nearest.pos.y},${nearest.pos.z}) ${b?.name} d=${nearest.dist.toFixed(2)}`);
+      }
       if (DEBUG) {
         const preview = Array.from(candidates.values())
           .map(pos => ({ pos, dist: bot.entity.position.distanceTo(pos) }))
@@ -1475,9 +1504,53 @@ export async function collectBlock(
       try { targetBlock = bot.blockAt(targetPos); } catch { candidates.delete(targetKey); continue; }
       if (!targetBlock) { candidates.delete(targetKey); continue; }
 
+      // Skip undiggable blocks (e.g., bedrock) and mark as unreachable for this session
+      try {
+        if (targetBlock && targetBlock.diggable === false) {
+          if (DEBUG) console.log(`[skills.collectBlock] undiggable ${targetBlock.name} at (${targetPos.x},${targetPos.y},${targetPos.z}) -> marking unreachable`);
+          try {
+            unreachableKeys.add(targetKey); 
+            unreachableCount++;
+            const bname = targetBlock.name;
+            undiggableByBlock.set(bname, (undiggableByBlock.get(bname) || 0) + 1);
+          } catch {}
+          candidates.delete(targetKey);
+          continue;
+        }
+      } catch {}
+
+      // Try to equip the right tool for the block
       try { await bot.tool.equipForBlock(targetBlock); } catch {}
       const itemId = bot.heldItem ? bot.heldItem.type : null;
-      if (!targetBlock.canHarvest(itemId)) { candidates.delete(targetKey); continue; }
+      // If we still cannot harvest with the currently equipped tool (or empty hand),
+      // mark as unreachable to avoid infinite re-discovery loops.
+      try {
+        if (!targetBlock.canHarvest(itemId)) {
+          const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
+          if (DEBUG) console.log(`[skills.collectBlock] cannot harvest ${targetBlock.name} with ${toolName} at (${targetPos.x},${targetPos.y},${targetPos.z}) -> marking unreachable`);
+          try {
+            unreachableKeys.add(targetKey); 
+            unreachableCount++;
+            const bname = targetBlock.name;
+            const key = `${bname}||${toolName}`;
+            cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
+          } catch {}
+          candidates.delete(targetKey);
+          continue;
+        }
+      } catch {
+        // If canHarvest throws for any reason, be conservative and mark as unreachable
+        try {
+          unreachableKeys.add(targetKey); 
+          unreachableCount++;
+          const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
+          const bname = targetBlock?.name || 'unknown';
+          const key = `${bname}||${toolName}`;
+          cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
+        } catch {}
+        candidates.delete(targetKey);
+        continue;
+      }
 
       // Decide on a detour drop before heading to target block
       // A greedy detour-budget heuristic for pickup-and-delivery TSP with time-window constraints.
@@ -1600,6 +1673,24 @@ export async function collectBlock(
   const finalCollected = countTarget() - baselineCount;
   if (unreachableCount > 0) {
     log(bot, `Collected ${finalCollected} ${blockType}. Visible but unreachable: ${unreachableCount}.`);
+    // Provide breakdown of unreachable reasons for visibility
+    try {
+      const details = [];
+      if (undiggableByBlock.size > 0) {
+        for (const [bname, cnt] of undiggableByBlock.entries()) {
+          details.push(`${cnt} ${bname} not diggable`);
+        }
+      }
+      if (cannotHarvestByBlockTool.size > 0) {
+        for (const [key, cnt] of cannotHarvestByBlockTool.entries()) {
+          const [bname, toolName] = key.split('||');
+          details.push(`${cnt} ${bname} cannot be harvested with ${toolName}`);
+        }
+      }
+      if (details.length > 0) {
+        log(bot, `Unreachable breakdown:\n- ${details.join('\n- ')}`);
+      }
+    } catch {}
   } else {
     log(bot, `Collected ${finalCollected} ${blockType}.`);
   }
@@ -3545,7 +3636,6 @@ export async function emote(bot, emoteType) {
    * @returns {Promise<string>} A message indicating success or failure.
    */
   if (emotes[emoteType]) {
-    log(bot, `Performing emote: ${emoteType}...`);
     try {
       // Find nearest entity to look at (similar to idle_staring)
       const entity = bot.nearestEntity((e) => e.type !== 'object' && e.type !== 'orb' && e.name !== 'enderman' && e.name !== 'item'); // Filter out objects/items/endermen
@@ -3562,18 +3652,15 @@ export async function emote(bot, emoteType) {
       // No need to pass targetPosition to the emote function
       await emotes[emoteType](bot);
       const message = `Successfully performed emote: ${emoteType}.`;
-      log(bot, message);
       return message;
     } catch (error) {
       const message = `Failed to perform emote ${emoteType}: ${error.message}`;
-      log(bot, message);
       console.error(error); // Log full error for debugging
       return message;
     }
   } else {
     const validEmotes = Object.keys(emotes).join(', ');
     const message = `Invalid emote type "${emoteType}". Valid emotes are: ${validEmotes}.`;
-    log(bot, message);
     return message;
   }
 }
