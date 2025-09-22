@@ -1206,8 +1206,6 @@ export async function collectBlock(
   // Build the scan list: ONLY include diggable block names, never item drop names
   // and compute desired drop item names for pickup sweeping.
 
-  const DEBUG = true;
-
   let blocktypes = [];
   let desiredDropNames = [];
   if (blockDropMap[blockType]) {
@@ -1234,11 +1232,6 @@ export async function collectBlock(
   }
   blocktypes = [...new Set(blocktypes)];
   desiredDropNames = [...new Set(desiredDropNames)];
-  if (DEBUG) {
-    try {
-      console.log(`[skills.collectBlock][init] blocktypes=${JSON.stringify(blocktypes)} desiredDrops=${JSON.stringify(desiredDropNames)} grownCropsOnly=${grownCropsOnly}`);
-    } catch {}
-  }
   const desiredDropNamesNormalized = desiredDropNames.map(n => n.toLowerCase());
 
   const cropAgeMap = { wheat: 7, beetroot: 3, carrot: 7, potato: 7 };
@@ -1315,23 +1308,13 @@ export async function collectBlock(
       // Choose a lighter radius when we already have a pool
       const scanRadius = candidates.size === 0 ? VERY_FAR_DISTANCE : FAR_DISTANCE;
       const found = doScan ? (world.getNearestBlocks(bot, blocktypes, scanRadius) || []) : [];
-      if (doScan && DEBUG) {
-        try {
-          console.log(`[skills.collectBlock][scan] scanRadius=${scanRadius} found=${found.length}`);
-          const preview = found.slice(0, 5).map(b => `(${b.position.x},${b.position.y},${b.position.z}) ${b.name}`);
-          if (preview.length > 0) console.log(`[skills.collectBlock][scan] first: ${preview.join(' | ')}`);
-        } catch {}
-      }
       let added = 0;
       if (doScan) {
         for (const b of found) {
           if (!b || !b.position) continue;
           const pos = b.position;
           if (isExcluded(pos)) continue;
-          if (!isValidTarget(pos)) {
-            if (DEBUG) console.log(`[skills.collectBlock][filter] rejected (${pos.x},${pos.y},${pos.z}) name=${bot.blockAt(pos)?.name} grownCropsOnly=${grownCropsOnly}`);
-            continue;
-          }
+          if (!isValidTarget(pos)) { continue; }
           const k = keyOf(pos);
           if (!candidates.has(k)) { candidates.set(k, pos); added++; }
         }
@@ -1434,7 +1417,7 @@ export async function collectBlock(
     while (true) {
       const collectedTarget = countTarget() - baselineCount;
       if (collectedTarget >= num) break;
-      console.log(`[skills.collectBlock] collected: ${collectedTarget}, candidates: ${candidates.size}`);
+      
 
       if (bot.interrupt_code) break;
 
@@ -1446,32 +1429,30 @@ export async function collectBlock(
 
       if (candidates.size === 0) {
         zeroScanStreak++;
-        // Diagnostic: if nothing in candidates, probe raw matches without visibility filter
-        if (DEBUG) {
-          try {
-            const registry = MCData.getInstance();
-            const ids = blocktypes
-              .map((name) => { try { return registry.getBlockId(name); } catch { return null; } })
-              .filter((id) => id != null);
-            if (ids.length > 0) {
-              const rawPositions = bot.findBlocks({ matching: ids, maxDistance: FAR_DISTANCE, count: 64 });
-              console.log(`[skills.collectBlock][diagnostic] candidates empty; rawPositions=${rawPositions.length} within ${FAR_DISTANCE}`);
-              for (let i = 0; i < Math.min(5, rawPositions.length); i++) {
-                const p = rawPositions[i];
-                const b = bot.blockAt(p);
-                let vis = false; let visErr = null;
-                try { vis = bot.canSeeBlock(b); } catch (e) { visErr = e?.message || String(e); }
-                const dist = bot.entity.position.distanceTo(p).toFixed(2);
-                console.log(`[skills.collectBlock][diagnostic] #${i+1} at (${p.x},${p.y},${p.z}) name=${b?.name} dist=${dist} visible=${vis}${visErr ? ` err=${visErr}` : ''}`);
-              }
-            } else {
-              console.log(`[skills.collectBlock][diagnostic] candidates empty; no valid block IDs computed for blocktypes=${JSON.stringify(blocktypes)}`);
-            }
-          } catch {}
-        }
+        
         if (zeroScanStreak >= 3 || emptyTicks > EMPTY_TICKS_BEFORE_EXIT) {
-          if (collectedTarget > 0) log(bot, `You collected ${collectedTarget} ${blockType}, and don't see more ${blockType} around`);
-          else log(bot, `No ${blockType} found around.`);
+          if (collectedTarget > 0) {
+            log(bot, `You collected ${collectedTarget} ${blockType}, and don't see more ${blockType} around`);
+          } else if (unreachableCount > 0) {
+            log(bot, `No reachable ${blockType} found nearby. Visible but unreachable: ${unreachableCount}.`);
+          } else {
+            // Final passive probe (non-verbose): check if there are matching blocks in range even if not visible
+            let rawCount = 0;
+            try {
+              const registry = MCData.getInstance();
+              const ids = blocktypes
+                .map((name) => { try { return registry.getBlockId(name); } catch { return null; } })
+                .filter((id) => id != null);
+              if (ids.length > 0) {
+                rawCount = (bot.findBlocks({ matching: ids, maxDistance: FAR_DISTANCE, count: 256 }) || []).length;
+              }
+            } catch {}
+            if (rawCount > 0) {
+              log(bot, `No reachable ${blockType} found nearby. Found ${rawCount} candidate blocks in range but none passed visibility/validity filters.`);
+            } else {
+              log(bot, `No ${blockType} found around.`);
+            }
+          }
           break;
         }
         await new Promise(r => setTimeout(r, 100));
@@ -1483,18 +1464,6 @@ export async function collectBlock(
       const nearest = Array.from(candidates.values())
         .map(pos => ({ pos, dist: (lastDugPos ? lastDugPos.distanceTo(pos) : bot.entity.position.distanceTo(pos)) }))
         .sort((a, b) => a.dist - b.dist)[0];
-      if (DEBUG && nearest && nearest.pos) {
-        const b = bot.blockAt(nearest.pos);
-        console.log(`[skills.collectBlock][choose] target (${nearest.pos.x},${nearest.pos.y},${nearest.pos.z}) ${b?.name} d=${nearest.dist.toFixed(2)}`);
-      }
-      if (DEBUG) {
-        const preview = Array.from(candidates.values())
-          .map(pos => ({ pos, dist: bot.entity.position.distanceTo(pos) }))
-          .sort((a, b) => a.dist - b.dist)
-          .slice(0, 5)
-          .map(e => `(${e.pos.x},${e.pos.y},${e.pos.z}) d=${e.dist.toFixed(2)}`);
-        console.log(`[skills.collectBlock][pick] top candidates: ${preview.join(' | ')}`);
-      }
       const targetPos = nearest.pos;
       const targetKey = keyOf(targetPos);
 
@@ -1507,7 +1476,6 @@ export async function collectBlock(
       // Skip undiggable blocks (e.g., bedrock) and mark as unreachable for this session
       try {
         if (targetBlock && targetBlock.diggable === false) {
-          if (DEBUG) console.log(`[skills.collectBlock] undiggable ${targetBlock.name} at (${targetPos.x},${targetPos.y},${targetPos.z}) -> marking unreachable`);
           try {
             unreachableKeys.add(targetKey); 
             unreachableCount++;
@@ -1527,7 +1495,6 @@ export async function collectBlock(
       try {
         if (!targetBlock.canHarvest(itemId)) {
           const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
-          if (DEBUG) console.log(`[skills.collectBlock] cannot harvest ${targetBlock.name} with ${toolName} at (${targetPos.x},${targetPos.y},${targetPos.z}) -> marking unreachable`);
           try {
             unreachableKeys.add(targetKey); 
             unreachableCount++;
@@ -1599,7 +1566,6 @@ export async function collectBlock(
           if (!now || now.name !== targetBlock.name) lastDugPos = targetPos.clone();
         } catch { lastDugPos = targetPos.clone(); }
         const collectedTargetNow = countTarget() - baselineCount;
-        if (DEBUG) console.log(`[skills.collectBlock][dig] attempted ${targetBlock.name} at (${targetPos.x},${targetPos.y},${targetPos.z}) -> total ${collectedTargetNow}`);
         digBatchCount++;
         // Predict a drop at the dig position
         const predId = `pred:${targetPos.x},${targetPos.y},${targetPos.z}:${Date.now()}`;
@@ -1624,7 +1590,6 @@ export async function collectBlock(
         };
         // Handle our new error codes first (best-effort: continue)
         if (msg === 'BreakFailed' || msg === 'NoDropsVisible' || msg === 'PickupTimeout' || msg === 'PickupFailed' || name === 'AcquireFailed') {
-          console.log(`[skills.collectBlock] digBlock issue: ${msg} context=${JSON.stringify(ctx)}`);
           // Mark this target as unreachable so it won't re-enter the pool
           try { unreachableKeys.add(targetKey); unreachableCount++; } catch {}
           // Even on pickup failure, rely on inventory progress; fall through to other logic
@@ -1691,9 +1656,8 @@ export async function collectBlock(
         log(bot, `Unreachable breakdown:\n- ${details.join('\n- ')}`);
       }
     } catch {}
-  } else {
-    log(bot, `Collected ${finalCollected} ${blockType}.`);
-  }
+  } 
+  log(bot, `Collected ${finalCollected} ${blockType}.`);
   return finalCollected > 0;
 }
 
