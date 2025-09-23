@@ -70,15 +70,6 @@ export async function collectBlocks(
 
   const countTarget = createCountTarget(MCData.getInstance(), bot, desiredDropNames, world);
   const baselineCount = countTarget();
-  try {
-    console.log('[scanDebug] [setup] collectBlock', {
-      request: blockType,
-      blocktypes,
-      desiredDropNames,
-      grownCropsOnly: !!grownCropsOnly,
-      baselineCount
-    });
-  } catch {}
 
   const isValidTarget = createIsValidTarget(bot, blocktypes, grownCropsOnly, CROP_AGE_MAP, blockType);
   const isExcluded = isExcludedFactory(unreachableKeys, excluded, keyOf, posEq);
@@ -156,7 +147,6 @@ export async function collectBlocks(
       const { targetPos, targetKey } = pick;
 
       if (!isValidTarget(targetPos)) { candidates.delete(targetKey); continue; }
-      try { console.log('[scanDebug] selected target', { targetPos, distance: bot.entity.position.distanceTo(targetPos), candidatesSize: candidates.size }); } catch {}
 
       let targetBlock;
       try { targetBlock = bot.blockAt(targetPos); } catch { candidates.delete(targetKey); continue; }
@@ -169,7 +159,6 @@ export async function collectBlocks(
             unreachableCount++;
             const bname = targetBlock.name;
             undiggableByBlock.set(bname, (undiggableByBlock.get(bname) || 0) + 1);
-            try { console.log('[scanDebug] undiggable block', { name: bname, pos: targetPos }); } catch {}
           } catch {}
           candidates.delete(targetKey);
           continue;
@@ -187,7 +176,6 @@ export async function collectBlocks(
             const bname = targetBlock.name;
             const key = `${bname}||${toolName}`;
             cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
-            try { console.log('[scanDebug] cannot harvest', { block: bname, tool: toolName, pos: targetPos }); } catch {}
           } catch {}
           candidates.delete(targetKey);
           continue;
@@ -200,7 +188,6 @@ export async function collectBlocks(
           const bname = targetBlock?.name || 'unknown';
           const key = `${bname}||${toolName}`;
           cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
-          try { console.log('[scanDebug] canHarvest threw', { block: bname, tool: toolName, pos: targetPos }); } catch {}
         } catch {}
         candidates.delete(targetKey);
         continue;

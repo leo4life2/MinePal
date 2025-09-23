@@ -166,9 +166,6 @@ export function pruneCandidates(candidates, isCollecting, currentTargetKey, isVa
     if (!isValidTarget(pos, true, 'prune') || isExcluded(pos)) candidates.delete(k);
   }
   const after = candidates.size;
-  if (after < before) {
-    try { console.log('[scanDebug] pruned candidates', { removed: before - after, remaining: after }); } catch {}
-  }
   return { removed: before - after, remaining: after };
 }
 
@@ -185,9 +182,6 @@ export function scanForCandidates(bot, world, blocktypes, candidates, isExcluded
     sampleAdded: [],
     sampleExcluded: []
   };
-  try {
-    console.log('[scanDebug] [tick] doScan', { tickIndex, scanRadius, foundCount: found.length, candidatesBefore: candidates.size });
-  } catch {}
   for (const b of found) {
     if (!b || !b.position) continue;
     const pos = b.position;
@@ -211,12 +205,7 @@ export function scanForCandidates(bot, world, blocktypes, candidates, isExcluded
       .map(entry => entry.pos);
     candidates.clear();
     for (const pos of trimmed) candidates.set(`${pos.x},${pos.y},${pos.z}`, pos);
-    try { console.log('[scanDebug] trimmed candidates to cap', { kept: candidates.size, cap: MAX_CANDIDATES }); } catch {}
   }
-  try {
-    if (summary.added > 0) console.log('[scanDebug] candidates added', { added: summary.added, candidatesNow: candidates.size });
-    else if (summary.foundCount > 0) console.log('[scanDebug] no candidates added despite found', { found: summary.foundCount, candidatesNow: candidates.size, excludedCounts: summary.excludedCounts, sampleFound: summary.sampleFound, sampleExcluded: summary.sampleExcluded });
-  } catch {}
   if (scanSummaryOut) scanSummaryOut.last = summary;
   return { added: summary.added, foundCount: summary.foundCount };
 }
@@ -230,7 +219,6 @@ export function selectNearestCandidate(candidates, lastDugPos, bot) {
     .sort((a, b) => a.dist - b.dist)[0];
   const targetPos = nearest.pos;
   const targetKey = keyOfVec3(targetPos);
-  try { console.log('[scanDebug] selected target', { targetPos, distance: bot.entity.position.distanceTo(targetPos), candidatesSize: candidates.size }); } catch {}
   return { targetPos, targetKey };
 }
 
@@ -241,7 +229,6 @@ export function ensureHarvestable(bot, targetBlock, targetPos, { unreachableKeys
         unreachableKeys.add(targetKey);
         const bname = targetBlock.name;
         undiggableByBlock.set(bname, (undiggableByBlock.get(bname) || 0) + 1);
-        try { console.log('[scanDebug] undiggable block', { name: bname, pos: targetPos }); } catch {}
       } catch {}
       candidates.delete(targetKey);
       return { ok: false };
@@ -258,7 +245,6 @@ export function ensureHarvestable(bot, targetBlock, targetPos, { unreachableKeys
         const bname = targetBlock.name;
         const key = `${bname}||${toolName}`;
         cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
-        try { console.log('[scanDebug] cannot harvest', { block: bname, tool: toolName, pos: targetPos }); } catch {}
       } catch {}
       candidates.delete(targetKey);
       return { ok: false };
@@ -270,7 +256,6 @@ export function ensureHarvestable(bot, targetBlock, targetPos, { unreachableKeys
       const bname = targetBlock?.name || 'unknown';
       const key = `${bname}||${toolName}`;
       cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
-      try { console.log('[scanDebug] canHarvest threw', { block: bname, tool: toolName, pos: targetPos }); } catch {}
     } catch {}
     candidates.delete(targetKey);
     return { ok: false };
@@ -301,7 +286,6 @@ export async function performDigAndPredict(bot, targetBlock, targetPos, countTar
   } catch (err) {
     const name = err?.name || (err && typeof err === 'object' ? err.constructor?.name : String(err));
     const msg = err?.message || String(err);
-    try { console.log('[scanDebug] digBlock error', { errorName: name, message: msg }); } catch {}
     return { lastDugPosNew: null, digBatchInc: 0 };
   }
 }
@@ -338,7 +322,6 @@ export async function sweepPendingDropsIfNeeded(bot, pendingDrops, desiredDropNa
 
 export function handleEmptyCandidatesExit({ emptyTicks, collectedTarget, unreachableCount, candidatesSize, MCDataInstance, blocktypes, blockType, FAR_DISTANCE, bot }) {
   if (emptyTicks <= 60) return { exit: false };
-  try { console.log('[scanDebug] exiting due to empty scans', { emptyTicks, unreachableCount, candidatesSize }); } catch {}
   if (collectedTarget > 0) {
     bot.output += `You collected ${collectedTarget} ${blockType}, and don't see more ${blockType} around\n`;
     return { exit: true };
@@ -346,7 +329,6 @@ export function handleEmptyCandidatesExit({ emptyTicks, collectedTarget, unreach
     bot.output += `No reachable ${blockType} found nearby. Visible but unreachable: ${unreachableCount}.\n`;
     return { exit: true };
   } else {
-    try { console.log('[scanDebug] skipping passive probe (no xray)'); } catch {}
     bot.output += `No reachable ${blockType} found nearby. Scanner not populated yet.\n`;
     return { exit: true };
   }
