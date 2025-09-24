@@ -52,6 +52,18 @@ export async function collectBlocks(
     return false;
   }
 
+  // Early validation: ensure provided block type exists in MCData registry
+  try {
+    const id = MCData.getInstance().getBlockId(blockType);
+    if (id === null) {
+      bot.output += `Invalid block type: ${blockType}.\n`;
+      return false;
+    }
+  } catch {
+    bot.output += `Invalid block type: ${blockType}.\n`;
+    return false;
+  }
+
   const { blocktypes, desiredDropNames } = buildBlockTypes(MCData.getInstance(), BLOCK_DROP_MAP, blockType);
   const desiredDropNamesNormalized = desiredDropNames.map(n => n.toLowerCase());
 
@@ -201,6 +213,9 @@ export async function collectBlocks(
       {
         const res = await performDigAndPredict(bot, targetBlock, targetPos, countTarget, baselineCount, pendingDrops);
         if (res.lastDugPosNew) lastDugPos = res.lastDugPosNew;
+        if (res.digBatchInc === 0) {
+          try { unreachableKeys.add(targetKey); unreachableCount++; } catch {}
+        }
         digBatchCount += res.digBatchInc;
       }
       isCollecting = false;

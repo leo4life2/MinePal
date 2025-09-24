@@ -1,4 +1,5 @@
 import Vec3 from "vec3";
+import { digBlock } from "../functions.js";
 
 export function buildBlockTypes(registry, blockDropMap, blockType) {
   let blocktypes = [];
@@ -273,7 +274,7 @@ export async function performDigAndPredict(bot, targetBlock, targetPos, countTar
     await bot.pathfinder?.setMovements?.(new (require('mineflayer-pathfinder').Movements)(bot));
   } catch {}
   try {
-    await (await import('../functions.js')).digBlock(bot, targetBlock);
+    await digBlock(bot, targetBlock);
     try {
       const now = bot.blockAt(targetPos);
       if (!now || now.name !== targetBlock.name) lastDugPosNew = targetPos.clone();
@@ -321,7 +322,7 @@ export async function sweepPendingDropsIfNeeded(bot, pendingDrops, desiredDropNa
 }
 
 export function handleEmptyCandidatesExit({ emptyTicks, collectedTarget, unreachableCount, candidatesSize, MCDataInstance, blocktypes, blockType, FAR_DISTANCE, bot }) {
-  if (emptyTicks <= 60) return { exit: false };
+  if (emptyTicks <= 30) return { exit: false };
   if (collectedTarget > 0) {
     bot.output += `You collected ${collectedTarget} ${blockType}, and don't see more ${blockType} around\n`;
     return { exit: true };
