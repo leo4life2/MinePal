@@ -5,14 +5,14 @@ export const FAR_DISTANCE = 32;
 export const VERY_FAR_DISTANCE = 128;
 
 // Candidate and drops processing
-export const DETOUR_BUDGET = 10; // blocks of extra distance allowed by default
-export const URGENT_AGE_MS = 4 * 60 * 1000; // 4 minutes
+export const DETOUR_BUDGET = 30; // more aggressive: allow larger detours by default
+export const URGENT_AGE_MS = 30 * 1000; // 30 seconds -> consider drops urgent much earlier
 export const DESPAWN_MS = 5 * 60 * 1000; // 5 minutes
-export const ABOUT_TO_DESPAWN_MS = DESPAWN_MS - 20 * 1000; // 20s margin
-export const PRUNE_UNSEEN_MS = 15 * 1000; // if unseen for this long, consider gone
-export const DROP_NEAR_RADIUS = 1.0;
-export const DEBT_DROP_COUNT = 15;
-export const MAX_SWEEP_ON_DEBT = 10;
+export const ABOUT_TO_DESPAWN_MS = DESPAWN_MS - 45 * 1000; // 45s margin for preemptive pickup
+export const PRUNE_UNSEEN_MS = 30 * 1000; // retain unseen drops longer before pruning
+export const DROP_NEAR_RADIUS = 2.0; // easier completion near drops
+export const DEBT_DROP_COUNT = 5; // trigger debt sweeps earlier
+export const MAX_SWEEP_ON_DEBT = 20; // sweep more items when in debt
 
 // Scanning cadence and pool sizing
 export const EMPTY_TICKS_BEFORE_EXIT = 60; // ~3s at 20Hz

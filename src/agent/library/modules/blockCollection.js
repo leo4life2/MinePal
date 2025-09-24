@@ -75,7 +75,7 @@ export async function collectBlocks(
 
   const candidates = new Map();
   const pendingDrops = new Map();
-  let emptyTicks = 0;
+  let emptyScans = 0;
   let isCollecting = false;
   let currentTargetKey = null;
   let tickIndex = 0;
@@ -112,9 +112,9 @@ export async function collectBlocks(
       if (doPrune) pruneCandidates(candidates, isCollecting, currentTargetKey, isValidTarget, isExcluded);
       if (doScan) {
         if (candidates.size === 0 && added === 0) {
-          emptyTicks++;
+          emptyScans++;
         } else {
-          emptyTicks = 0;
+          emptyScans = 0;
         }
       }
     } catch {}
@@ -138,7 +138,7 @@ export async function collectBlocks(
       }
       if (candidates.size === 0) {
         const exit = handleEmptyCandidatesExit({
-          emptyTicks,
+          emptyScans,
           collectedTarget,
           unreachableCount,
           candidatesSize: candidates.size,
@@ -177,10 +177,14 @@ export async function collectBlocks(
         }
       } catch {}
 
+      // Equip appropriate tool for block harvesting
       try { await bot.tool.equipForBlock(targetBlock); } catch {}
       const itemId = bot.heldItem ? bot.heldItem.type : null;
       try {
+        // Check if current tool can harvest the block
         if (!targetBlock.canHarvest(itemId)) {
+          // If tool cannot harvest block, add to unreachable list
+          console.log(`[collectBlock] canHarvest false, cannot harvest block: ${targetBlock.name} with ${itemId}`);
           const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
           try {
             unreachableKeys.add(targetKey);
@@ -193,6 +197,8 @@ export async function collectBlocks(
           continue;
         }
       } catch {
+        // If tool cannot harvest block, add to unreachable list
+        console.log(`[collectBlock] catch, cannot harvest block: ${targetBlock.name} with ${itemId}`);
         try {
           unreachableKeys.add(targetKey);
           unreachableCount++;

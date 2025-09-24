@@ -321,8 +321,8 @@ export async function sweepPendingDropsIfNeeded(bot, pendingDrops, desiredDropNa
   } catch {}
 }
 
-export function handleEmptyCandidatesExit({ emptyTicks, collectedTarget, unreachableCount, candidatesSize, MCDataInstance, blocktypes, blockType, FAR_DISTANCE, bot }) {
-  if (emptyTicks <= 30) return { exit: false };
+export function handleEmptyCandidatesExit({ emptyScans, collectedTarget, unreachableCount, candidatesSize, MCDataInstance, blocktypes, blockType, FAR_DISTANCE, bot }) {
+  if (emptyScans <= 3) return { exit: false };
   if (collectedTarget > 0) {
     bot.output += `You collected ${collectedTarget} ${blockType}, and don't see more ${blockType} around\n`;
     return { exit: true };

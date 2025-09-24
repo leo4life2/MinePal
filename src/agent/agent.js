@@ -1433,9 +1433,9 @@ export class Agent {
         // console.log("[_processPromptCycle] LLM response received.");
         // Log response data if needed (consider adding a debug flag)
         if (responseData) {
-            console.log("[DEBUG] LLM Response Data (from llmResult.json):", JSON.stringify(responseData, null, 2));
+            // console.log("[DEBUG] LLM Response Data (from llmResult.json):", JSON.stringify(responseData, null, 2));
         }
-        console.log("[DEBUG] topLevelError and audio_failed_but_text_ok:", topLevelError, audio_failed_but_text_ok);
+        // console.log("[DEBUG] topLevelError and audio_failed_but_text_ok:", topLevelError, audio_failed_but_text_ok);
 
         // --- Process LLM Response ---
 

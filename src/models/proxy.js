@@ -215,8 +215,6 @@ export class Proxy {
                 const contentType = response.headers['content-type'];
                 const responseBuffer = Buffer.from(response.data);
 
-                console.log("[Proxy] Response content type:", contentType);
-
                 if (contentType && contentType.startsWith('multipart/mixed')) {
                     const boundaryMatch = contentType.match(/boundary=(.+)$/);
                     if (!boundaryMatch) return { json: { error: "Multipart response missing boundary string."}};
