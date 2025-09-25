@@ -211,7 +211,23 @@ export async function collectBlocks(
         continue;
       }
 
-      try { await chooseDetour(bot, targetPos, pendingDrops, desiredDropNamesNormalized, DETOUR_BUDGET, URGENT_AGE_MS, DROP_NEAR_RADIUS, pf); } catch {}
+      try {
+        const detoured = await chooseDetour(
+          bot,
+          targetPos,
+          pendingDrops,
+          desiredDropNamesNormalized,
+          DETOUR_BUDGET,
+          URGENT_AGE_MS,
+          DROP_NEAR_RADIUS,
+          pf
+        );
+        if (detoured) {
+          continue;
+        }
+      } catch (err) {
+        console.log('[collectBlocks] chooseDetour threw', err);
+      }
 
       isCollecting = true;
       currentTargetKey = targetKey;

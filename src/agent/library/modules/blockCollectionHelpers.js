@@ -1,4 +1,5 @@
 import Vec3 from "vec3";
+import MCData from "../../../utils/mcdata.js";
 import { digBlock } from "../functions.js";
 
 export function buildBlockTypes(registry, blockDropMap, blockType) {
@@ -88,6 +89,7 @@ export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDr
     }
   }
   const normalizeDisp = (s) => (s || '').toLowerCase().replace(/\s+/g, '_');
+  const metadataIndex = bot.minecraft_version && bot.minecraft_version <= '1.16.5' ? 7 : 8;
   for (const it of visibleItems) {
     const id = it.id;
     const pos = it.position;
@@ -95,7 +97,19 @@ export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDr
     if (existing) {
       existing.pos = pos;
       existing.lastSeen = now;
-      if (!existing.name && it.displayName) existing.name = normalizeDisp(it.displayName);
+      if (!existing.name) {
+        let resolvedName = null;
+        try {
+          const itemMeta = it.metadata?.[metadataIndex];
+          const itemId = itemMeta?.itemId;
+          if (itemId != null) {
+            const mcName = MCData.getInstance().getItemName(itemId);
+            if (mcName) resolvedName = normalizeDisp(mcName);
+          }
+        } catch {}
+        if (!resolvedName && it.displayName) resolvedName = normalizeDisp(it.displayName);
+        if (resolvedName) existing.name = resolvedName;
+      }
     } else {
       let predictedMatchKey = null;
       let predictedSpawnTs = now;
@@ -107,15 +121,26 @@ export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDr
         }
       }
       if (predictedMatchKey) pendingDrops.delete(predictedMatchKey);
-      const itemNameNorm = normalizeDisp(it.displayName || '');
-      const matchesDesired = itemNameNorm === '' || desiredDropNamesNormalized.includes(itemNameNorm);
+      let itemNameNorm = null;
+      try {
+        const itemMeta = it.metadata?.[metadataIndex];
+        const itemId = itemMeta?.itemId;
+        if (itemId != null) {
+          const mcName = MCData.getInstance().getItemName(itemId);
+          if (mcName) itemNameNorm = normalizeDisp(mcName);
+        }
+      } catch {}
+      if (!itemNameNorm && it.displayName) {
+        itemNameNorm = normalizeDisp(it.displayName);
+      }
+      const matchesDesired = !itemNameNorm || desiredDropNamesNormalized.includes(itemNameNorm);
       if (matchesDesired) {
         pendingDrops.set(id, {
           pos: pos,
           spawnedAt: predictedSpawnTs,
           lastSeen: now,
           predicted: false,
-          name: itemNameNorm
+          name: itemNameNorm || null
         });
       }
     }
@@ -156,8 +181,10 @@ export async function chooseDetour(bot, targetPos, pendingDrops, desiredDropName
     finally {
       pendingDrops.delete(did);
     }
-    if (bot.interrupt_code) return;
+    if (bot.interrupt_code) return true;
+    return true;
   }
+  return false;
 }
 
 export function pruneCandidates(candidates, isCollecting, currentTargetKey, isValidTarget, isExcluded) {
