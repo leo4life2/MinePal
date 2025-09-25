@@ -154,37 +154,40 @@ export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDr
   }
 }
 
-export async function chooseDetour(bot, targetPos, pendingDrops, desiredDropNamesNormalized, DETOUR_BUDGET, URGENT_AGE_MS, DROP_NEAR_RADIUS, pf) {
-  const now = Date.now();
-  let bestDropEntry = null;
-  let bestDelta = Number.POSITIVE_INFINITY;
-  const cur = bot.entity.position;
-  const direct = cur.distanceTo(targetPos);
-  for (const [did, rec] of pendingDrops.entries()) {
-    const drop = rec.pos;
-    const delta = cur.distanceTo(drop) + drop.distanceTo(targetPos) - direct;
-    const urgent = (now - rec.spawnedAt) >= URGENT_AGE_MS;
-    const budget = urgent ? 3 * DETOUR_BUDGET : DETOUR_BUDGET;
-    const isDesired = rec.predicted || (rec.name && desiredDropNamesNormalized.includes(rec.name.toLowerCase()));
-    if (isDesired && delta <= budget && delta < bestDelta) {
-      bestDelta = delta;
-      bestDropEntry = [did, rec];
+export async function chooseDetour(bot, pendingDrops, desiredDropNamesNormalized, DROP_NEAR_RADIUS, pf) {
+  const candidates = Array.from(pendingDrops.entries()).filter(([, rec]) => {
+    if (rec.predicted) return false;
+    if (!rec.name) return true;
+    try {
+      return desiredDropNamesNormalized.includes(rec.name.toLowerCase());
+    } catch {
+      return false;
     }
+  });
+
+  if (candidates.length === 0) {
+    return false;
   }
-  if (bestDropEntry) {
-    const [did, rec] = bestDropEntry;
+
+  candidates.sort((a, b) => {
+    const aDist = bot.entity.position.distanceTo(a[1].pos);
+    const bDist = bot.entity.position.distanceTo(b[1].pos);
+    return aDist - bDist;
+  });
+
+  for (const [id, rec] of candidates) {
     try {
       bot.pathfinder.setMovements(new pf.Movements(bot));
       await bot.pathfinder.goto(new pf.goals.GoalNear(rec.pos.x, rec.pos.y, rec.pos.z, DROP_NEAR_RADIUS));
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise((r) => setTimeout(r, 120));
     } catch {}
     finally {
-      pendingDrops.delete(did);
+      pendingDrops.delete(id);
     }
-    if (bot.interrupt_code) return true;
-    return true;
+    if (bot.interrupt_code) break;
   }
-  return false;
+
+  return true;
 }
 
 export function pruneCandidates(candidates, isCollecting, currentTargetKey, isValidTarget, isExcluded) {

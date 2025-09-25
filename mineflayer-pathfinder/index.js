@@ -1029,6 +1029,16 @@ function inject(bot) {
       const eps = bot.pathfinder.stallDistanceEpsilon;
       const epsSq = eps * eps;
       const elapsed = now - lastStallTime;
+      console.log(
+        "[pathfinder][stall] evaluate distSq=%s epsSq=%s elapsed=%sms timeout=%sms pathLen=%s digging=%s placing=%s",
+        distSq.toFixed(3),
+        epsSq.toFixed(3),
+        Math.floor(elapsed),
+        bot.pathfinder.stallTimeout,
+        path.length,
+        digging,
+        placing
+      );
       if (bot.pathfinder.debugStallLogs) {
         console.log(
           "[pathfinder][stall] check distSq=%s epsSq=%s elapsed=%sms digging=%s placing=%s pathLen=%s",

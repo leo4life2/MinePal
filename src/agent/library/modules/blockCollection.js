@@ -18,8 +18,6 @@ import {
 import {
   FAR_DISTANCE,
   VERY_FAR_DISTANCE,
-  DETOUR_BUDGET,
-  URGENT_AGE_MS,
   DESPAWN_MS,
   ABOUT_TO_DESPAWN_MS,
   PRUNE_UNSEEN_MS,
@@ -212,21 +210,12 @@ export async function collectBlocks(
       }
 
       try {
-        const detoured = await chooseDetour(
-          bot,
-          targetPos,
-          pendingDrops,
-          desiredDropNamesNormalized,
-          DETOUR_BUDGET,
-          URGENT_AGE_MS,
-          DROP_NEAR_RADIUS,
-          pf
-        );
+        const detoured = await chooseDetour(bot, pendingDrops, desiredDropNamesNormalized, DROP_NEAR_RADIUS, pf);
         if (detoured) {
           continue;
         }
       } catch (err) {
-        console.log('[collectBlocks] chooseDetour threw', err);
+        console.warn('[collectBlocks] chooseDetour threw', err);
       }
 
       isCollecting = true;
