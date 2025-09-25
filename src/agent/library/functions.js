@@ -2,7 +2,7 @@ import pf from "mineflayer-pathfinder";
 import Vec3 from "vec3";
 import * as world from "./world.js";
 
-const NEAR_DISTANCE = 1;
+const NEAR_DISTANCE = 3.0;
 const DEBUG = true;
 
 async function equipForBlockSafe(bot, block) {
