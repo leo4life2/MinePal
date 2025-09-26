@@ -19,6 +19,7 @@ function inject(bot) {
   const ladderId = bot.registry.blocksByName.ladder.id;
   const vineId = bot.registry.blocksByName.vine.id;
   let stateMovements = new Movements(bot);
+  ensureStallPenaltyHook(stateMovements);
   let stateGoal = null;
   let astarContext = null;
   let astartTimedout = false;
@@ -47,6 +48,45 @@ function inject(bot) {
   let unstuckAction = null;
   let unstuckJump = false;
   const stallCounts = new Map(); // key: floored node pos "x|y|z" -> count
+
+  function nodeKey(node) {
+    if (!node || typeof node.x !== 'number' || typeof node.y !== 'number' || typeof node.z !== 'number') return null;
+    const x = Math.floor(node.x);
+    const y = Math.floor(node.y);
+    const z = Math.floor(node.z);
+    return `${x}|${y}|${z}`;
+  }
+
+  function penalizeNode(node) {
+    console.log("[pathfinder][penalizeNode] node=%j", node);
+    const key = nodeKey(node);
+    if (!key) return;
+    const nextCount = (stallCounts.get(key) || 0) + 1;
+    stallCounts.set(key, nextCount);
+  }
+
+  function clearPenaltyForNode(node) {
+    const key = nodeKey(node);
+    if (!key) return;
+    stallCounts.delete(key);
+  }
+
+  const stallPenaltyWeight = (block) => {
+    if (!block || !block.position) return 0;
+    const key = `${Math.floor(block.position.x)}|${Math.floor(block.position.y)}|${Math.floor(block.position.z)}`;
+    const count = stallCounts.get(key);
+    if (!count) return 0;
+    // Apply a steep penalty once a node has stalled at least once to encourage alternate routes.
+    return 1000 * count;
+  };
+
+  function ensureStallPenaltyHook(movements) {
+    if (!movements) return;
+    if (!movements._stallPenaltyHooked) {
+      movements.exclusionAreasStep.push(stallPenaltyWeight);
+      movements._stallPenaltyHooked = true;
+    }
+  }
 
   bot.pathfinder = {};
 
@@ -223,6 +263,7 @@ function inject(bot) {
 
   bot.pathfinder.setMovements = (movements) => {
     stateMovements = movements;
+    ensureStallPenaltyHook(stateMovements);
     resetPath("movements_updated");
   };
 
@@ -511,6 +552,7 @@ function inject(bot) {
 
   function stop() {
     stopPathing = false;
+    stallCounts.clear();
     stateGoal = null;
     path = [];
     bot.emit("path_stop");
@@ -893,7 +935,8 @@ function inject(bot) {
         stop();
         return;
       }
-      path.shift();
+      const reachedNode = path.shift();
+      clearPenaltyForNode(reachedNode);
       if (path.length === 0) {
         // done
         // If the block the bot is standing on is not a full block only checking for the floored position can fail as
@@ -1029,16 +1072,6 @@ function inject(bot) {
       const eps = bot.pathfinder.stallDistanceEpsilon;
       const epsSq = eps * eps;
       const elapsed = now - lastStallTime;
-      console.log(
-        "[pathfinder][stall] evaluate distSq=%s epsSq=%s elapsed=%sms timeout=%sms pathLen=%s digging=%s placing=%s",
-        distSq.toFixed(3),
-        epsSq.toFixed(3),
-        Math.floor(elapsed),
-        bot.pathfinder.stallTimeout,
-        path.length,
-        digging,
-        placing
-      );
       if (bot.pathfinder.debugStallLogs) {
         console.log(
           "[pathfinder][stall] check distSq=%s epsSq=%s elapsed=%sms digging=%s placing=%s pathLen=%s",
@@ -1052,6 +1085,7 @@ function inject(bot) {
         consecutiveStallTimeouts = 0;
       } else if (path.length > 0 && !digging && !placing && (elapsed > bot.pathfinder.stallTimeout)) {
         consecutiveStallTimeouts++;
+        penalizeNode(nextPoint);
         const centerFails = monitorMovement._centerFails || 0;
         console.log("[pathfinder][stall] TIMEOUT #%d node=%j centerFails=%s -> resetPath(stall_timeout)", consecutiveStallTimeouts, nextPoint, centerFails);
         resetPath("stall_timeout");
@@ -1074,7 +1108,10 @@ function inject(bot) {
           digging = false;
           placing = false;
           currentDigPos = null;
-          if (path.length > 0) path.shift();
+          if (path.length > 0) {
+            const skipped = path.shift();
+            clearPenaltyForNode(skipped);
+          }
           consecutiveStallTimeouts = 0;
         }
         return;
@@ -1090,6 +1127,7 @@ function inject(bot) {
       );
     }
     if (!digging && !placing && (futElapsed > 3500)) {
+      if (path.length > 0) penalizeNode(path[0]);
       console.log("[pathfinder][futility] STUCK -> resetPath(stuck)");
       // should never take this long to go to the next node
       resetPath("stuck");
