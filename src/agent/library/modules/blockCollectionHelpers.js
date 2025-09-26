@@ -52,14 +52,17 @@ export function createIsValidTarget(bot, blocktypes, grownCropsOnly, cropAgeMap,
   return (position, debug = false, dbgContext = 'scan') => {
     let actual;
     try { actual = bot.blockAt(position); } catch (e) {
+      console.log(`[collectBlocks][target] bot.blockAt threw via ${dbgContext}`, { position, error: e?.message || String(e) });
       if (debug) console.log(`[scanDebug] ${dbgContext} bot.blockAt threw`, { pos: position, error: e?.message || String(e) });
       return false;
     }
     if (!actual) {
+      console.log(`[collectBlocks][target] no block at ${dbgContext}`, { position });
       if (debug) console.log(`[scanDebug] ${dbgContext} no block at`, { pos: position });
       return false;
     }
     if (!blocktypes.includes(actual.name)) {
+      console.log(`[collectBlocks][target] reject name`, { position, name: actual.name, expectedAnyOf: blocktypes });
       if (debug) console.log(`[scanDebug] ${dbgContext} reject name`, { pos: position, name: actual.name, expectedAnyOf: blocktypes });
       return false;
     }
@@ -67,6 +70,7 @@ export function createIsValidTarget(bot, blocktypes, grownCropsOnly, cropAgeMap,
       const expectedAge = cropAgeMap[blockType];
       const actualAge = actual._properties?.age;
       if (actualAge !== expectedAge) {
+        console.log(`[collectBlocks][target] reject crop age`, { position, block: actual.name, actualAge, expectedAge });
         if (debug) console.log(`[scanDebug] ${dbgContext} reject crop age`, { pos: position, block: actual.name, actualAge, expectedAge });
         return false;
       }
@@ -154,40 +158,14 @@ export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDr
   }
 }
 
-export async function chooseDetour(bot, pendingDrops, desiredDropNamesNormalized, DROP_NEAR_RADIUS, pf) {
-  const candidates = Array.from(pendingDrops.entries()).filter(([, rec]) => {
-    if (rec.predicted) return false;
-    if (!rec.name) return true;
-    try {
-      return desiredDropNamesNormalized.includes(rec.name.toLowerCase());
-    } catch {
-      return false;
-    }
-  });
-
-  if (candidates.length === 0) {
-    return false;
+export function normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized) {
+  const entries = [];
+  for (const [id, rec] of pendingDrops.entries()) {
+    if (!rec || !rec.pos || rec.predicted) continue;
+    if (rec.name && !desiredDropNamesNormalized.includes(rec.name.toLowerCase())) continue;
+    entries.push([id, rec]);
   }
-
-  candidates.sort((a, b) => {
-    const aDist = bot.entity.position.distanceTo(a[1].pos);
-    const bDist = bot.entity.position.distanceTo(b[1].pos);
-    return aDist - bDist;
-  });
-
-  for (const [id, rec] of candidates) {
-    try {
-      bot.pathfinder.setMovements(new pf.Movements(bot));
-      await bot.pathfinder.goto(new pf.goals.GoalNear(rec.pos.x, rec.pos.y, rec.pos.z, DROP_NEAR_RADIUS));
-      await new Promise((r) => setTimeout(r, 120));
-    } catch {}
-    finally {
-      pendingDrops.delete(id);
-    }
-    if (bot.interrupt_code) break;
-  }
-
-  return true;
+  return entries;
 }
 
 export function pruneCandidates(candidates, isCollecting, currentTargetKey, isValidTarget, isExcluded) {
@@ -226,7 +204,11 @@ export function scanForCandidates(bot, world, blocktypes, candidates, isExcluded
     }
     if (!isValidTarget(pos, true, 'scan')) { continue; }
     const k = `${pos.x},${pos.y},${pos.z}`;
-    if (!candidates.has(k)) { candidates.set(k, pos); summary.added++; if (summary.sampleAdded.length < 5) summary.sampleAdded.push({ x: pos.x, y: pos.y, z: pos.z }); }
+    if (!candidates.has(k)) {
+      candidates.set(k, pos);
+      summary.added++;
+      if (summary.sampleAdded.length < 5) summary.sampleAdded.push({ x: pos.x, y: pos.y, z: pos.z });
+    }
   }
   if (candidates.size > MAX_CANDIDATES) {
     const trimmed = Array.from(candidates.values())
@@ -243,14 +225,43 @@ export function scanForCandidates(bot, world, blocktypes, candidates, isExcluded
 
 export const keyOfVec3 = (v) => `${v.x},${v.y},${v.z}`;
 
-export function selectNearestCandidate(candidates, lastDugPos, bot) {
-  if (candidates.size === 0) return null;
-  const nearest = Array.from(candidates.values())
-    .map(pos => ({ pos, dist: (lastDugPos ? lastDugPos.distanceTo(pos) : bot.entity.position.distanceTo(pos)) }))
-    .sort((a, b) => a.dist - b.dist)[0];
-  const targetPos = nearest.pos;
-  const targetKey = keyOfVec3(targetPos);
-  return { targetPos, targetKey };
+export function selectNearestCandidate(candidates, dropCandidates, lastCollectedPos, bot) {
+  const origin = lastCollectedPos || bot.entity.position;
+  const all = [];
+
+  for (const [key, pos] of candidates.entries()) {
+    if (!pos) continue;
+    const dist = origin.distanceTo(pos);
+    all.push({ type: 'block', key, pos, dist });
+  }
+
+  for (const [id, rec] of dropCandidates) {
+    if (!rec || !rec.pos) continue;
+    const dist = origin.distanceTo(rec.pos);
+    all.push({ type: 'drop', key: id, pos: rec.pos, dist, dropRec: rec });
+  }
+
+  if (all.length === 0) return null;
+
+  all.sort((a, b) => {
+    const distDelta = a.dist - b.dist;
+    if (Math.abs(distDelta) > 1e-6) return distDelta;
+    const yDelta = b.pos.y - a.pos.y;
+    if (yDelta !== 0) return yDelta;
+    if (a.type !== b.type) return a.type === 'drop' ? -1 : 1;
+    return String(a.key).localeCompare(String(b.key));
+  });
+
+  const best = all[0];
+  const targetKey = best.type === 'block' ? best.key : `drop:${best.key}`;
+  return {
+    type: best.type,
+    targetPos: best.pos,
+    targetKey,
+    blockKey: best.type === 'block' ? best.key : null,
+    dropId: best.type === 'drop' ? best.key : null,
+    dropRec: best.type === 'drop' ? best.dropRec : null
+  };
 }
 
 export function ensureHarvestable(bot, targetBlock, targetPos, { unreachableKeys, undiggableByBlock, cannotHarvestByBlockTool, candidates, targetKey }) {
@@ -309,46 +320,15 @@ export async function performDigAndPredict(bot, targetBlock, targetPos, countTar
       const now = bot.blockAt(targetPos);
       if (!now || now.name !== targetBlock.name) lastDugPosNew = targetPos.clone();
     } catch { lastDugPosNew = targetPos.clone(); }
-    const collectedTargetNow = countTarget() - baselineCount;
     digBatchInc = 1;
     const predId = `pred:${targetPos.x},${targetPos.y},${targetPos.z}:${Date.now()}`;
     pendingDrops.set(predId, { pos: targetPos.clone(), spawnedAt: Date.now(), lastSeen: Date.now(), predicted: true });
-    return { lastDugPosNew, digBatchInc };
+    return { lastDugPosNew, digBatchInc, collectedType: 'block', collectedPos: lastDugPosNew, predictedDropId: predId };
   } catch (err) {
     const name = err?.name || (err && typeof err === 'object' ? err.constructor?.name : String(err));
     const msg = err?.message || String(err);
-    return { lastDugPosNew: null, digBatchInc: 0 };
+    return { lastDugPosNew: null, digBatchInc: 0, collectedType: null, collectedPos: null, predictedDropId: null };
   }
-}
-
-export async function sweepPendingDropsIfNeeded(bot, pendingDrops, desiredDropNamesNormalized, DEBT_DROP_COUNT, ABOUT_TO_DESPAWN_MS, DROP_NEAR_RADIUS, pf) {
-  try {
-    const now = Date.now();
-    let oldestAge = 0;
-    for (const rec of pendingDrops.values()) {
-      if (rec.predicted) continue;
-      oldestAge = Math.max(oldestAge, now - rec.spawnedAt);
-    }
-    const pickupDebtTooHigh = pendingDrops.size >= DEBT_DROP_COUNT || oldestAge >= ABOUT_TO_DESPAWN_MS;
-    if (pickupDebtTooHigh && pendingDrops.size > 0) {
-      const ordered = Array.from(pendingDrops.entries())
-        .filter(([, rec]) => rec.predicted || (rec.name && desiredDropNamesNormalized.includes(rec.name.toLowerCase())))
-        .map(([id, rec]) => ({ id, rec, d: bot.entity.position.distanceTo(rec.pos) }))
-        .sort((a, b) => a.d - b.d)
-        .slice(0, 10);
-      for (const { id, rec } of ordered) {
-        try {
-          bot.pathfinder.setMovements(new pf.Movements(bot));
-          await bot.pathfinder.goto(new pf.goals.GoalNear(rec.pos.x, rec.pos.y, rec.pos.z, DROP_NEAR_RADIUS));
-          await new Promise(r => setTimeout(r, 120));
-        } catch {}
-        finally {
-          pendingDrops.delete(id);
-        }
-        if (bot.interrupt_code) break;
-      }
-    }
-  } catch {}
 }
 
 export function handleEmptyCandidatesExit({ emptyScans, collectedTarget, unreachableCount, candidatesSize, MCDataInstance, blocktypes, blockType, FAR_DISTANCE, bot }) {

@@ -7,22 +7,19 @@ import {
   createIsValidTarget,
   isExcludedFactory,
   updatePendingDropsFromVisible,
-  chooseDetour,
   pruneCandidates,
   scanForCandidates,
   handleEmptyCandidatesExit,
   selectNearestCandidate,
   performDigAndPredict,
-  sweepPendingDropsIfNeeded
+  normalizeDropCandidates
 } from "./blockCollectionHelpers.js";
 import {
   FAR_DISTANCE,
   VERY_FAR_DISTANCE,
   DESPAWN_MS,
-  ABOUT_TO_DESPAWN_MS,
   PRUNE_UNSEEN_MS,
   DROP_NEAR_RADIUS,
-  DEBT_DROP_COUNT,
   SCAN_EVERY_TICKS,
   PRUNE_EVERY_TICKS,
   MAX_CANDIDATES,
@@ -77,6 +74,9 @@ export async function collectBlocks(
   let isCollecting = false;
   let currentTargetKey = null;
   let tickIndex = 0;
+  let collectingWaitLogTs = 0;
+  let loopIteration = 0;
+  let loopHeartbeatTs = 0;
 
   const countTarget = createCountTarget(MCData.getInstance(), bot, desiredDropNames, world);
   const baselineCount = countTarget();
@@ -120,21 +120,33 @@ export async function collectBlocks(
 
   bot.on('physicsTick', onPhysicsTick);
 
-  let lastDugPos = null;
+  let lastCollectedPos = null;
   let unreachableCount = 0;
   let digBatchCount = 0;
   const undiggableByBlock = new Map();
   const cannotHarvestByBlockTool = new Map();
   try {
     while (true) {
+      loopIteration++;
+      const nowLoop = Date.now();
+      if (!loopHeartbeatTs || (nowLoop - loopHeartbeatTs) > 1000) {
+        loopHeartbeatTs = nowLoop;
+        console.log("[collectBlocks] loop heartbeat iter=%s collected=%s/%s candidates=%s pendingDrops=%s isCollecting=%s emptyScans=%s target=%s", loopIteration, countTarget() - baselineCount, num, candidates.size, pendingDrops.size, isCollecting, emptyScans, currentTargetKey);
+      }
       const collectedTarget = countTarget() - baselineCount;
       if (collectedTarget >= num) break;
       if (bot.interrupt_code) break;
       if (isCollecting) {
+        const nowTs = Date.now();
+        if (!collectingWaitLogTs || (nowTs - collectingWaitLogTs) > 300) {
+          collectingWaitLogTs = nowTs;
+          console.log("[collectBlocks] waiting for active dig to resolve target=%s", currentTargetKey);
+        }
         await new Promise(r => setTimeout(r, 50));
         continue;
       }
       if (candidates.size === 0) {
+        console.log("[collectBlocks] no candidates available emptyScans=%s pendingDrops=%s", emptyScans, pendingDrops.size);
         const exit = handleEmptyCandidatesExit({
           emptyScans,
           collectedTarget,
@@ -146,93 +158,107 @@ export async function collectBlocks(
           FAR_DISTANCE,
           bot
         });
-        if (exit.exit) break;
+        if (exit.exit) {
+          console.log("[collectBlocks] exiting due to empty candidates reason=%j", exit);
+          break;
+        }
         await new Promise(r => setTimeout(r, 100));
         continue;
       } else {
       }
 
-      const pick = selectNearestCandidate(candidates, lastDugPos, bot);
-      if (!pick) continue;
-      const { targetPos, targetKey } = pick;
+      const dropCandidates = normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized);
+      const pick = selectNearestCandidate(candidates, dropCandidates, lastCollectedPos, bot);
+      if (!pick) {
+        console.log("[collectBlocks] selectNearestCandidate returned null despite candidates size=%s", candidates.size);
+        continue;
+      }
+      const { type, targetPos, blockKey, dropId } = pick;
 
-      if (!isValidTarget(targetPos)) { candidates.delete(targetKey); continue; }
+      if (type === 'drop') {
+        try {
+          console.log("[collectBlocks] navigating to drop id=%s pos=%j", dropId, targetPos);
+          bot.pathfinder?.setMovements?.(new pf.Movements(bot));
+          await bot.pathfinder?.goto?.(new pf.goals.GoalNear(targetPos.x, targetPos.y, targetPos.z, DROP_NEAR_RADIUS));
+          await new Promise(r => setTimeout(r, 120));
+        } catch (err) {
+          console.warn('[collectBlocks] drop navigation failed', err);
+        } finally {
+          if (dropId && pendingDrops.has(dropId)) pendingDrops.delete(dropId);
+        }
+        lastCollectedPos = targetPos.clone();
+        continue;
+      }
+
+      const targetPosBlock = targetPos;
+      if (!isValidTarget(targetPosBlock)) { candidates.delete(blockKey); continue; }
 
       let targetBlock;
-      try { targetBlock = bot.blockAt(targetPos); } catch { candidates.delete(targetKey); continue; }
-      if (!targetBlock) { candidates.delete(targetKey); continue; }
+      try { targetBlock = bot.blockAt(targetPosBlock); } catch { candidates.delete(blockKey); continue; }
+      if (!targetBlock) { console.log("[collectBlocks] targetBlock missing at %j", targetPosBlock); candidates.delete(blockKey); continue; }
 
       try {
         if (targetBlock && targetBlock.diggable === false) {
           try {
-            unreachableKeys.add(targetKey);
+            unreachableKeys.add(blockKey);
             unreachableCount++;
             const bname = targetBlock.name;
             undiggableByBlock.set(bname, (undiggableByBlock.get(bname) || 0) + 1);
           } catch {}
-          candidates.delete(targetKey);
+          console.log("[collectBlocks] target not diggable pos=%j", targetPosBlock);
+          candidates.delete(blockKey);
           continue;
         }
       } catch {}
 
-      // Equip appropriate tool for block harvesting
       try { await bot.tool.equipForBlock(targetBlock); } catch {}
       const itemId = bot.heldItem ? bot.heldItem.type : null;
       try {
-        // Check if current tool can harvest the block
         if (!targetBlock.canHarvest(itemId)) {
-          // If tool cannot harvest block, add to unreachable list
           console.log(`[collectBlock] canHarvest false, cannot harvest block: ${targetBlock.name} with ${itemId}`);
           const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
           try {
-            unreachableKeys.add(targetKey);
+            unreachableKeys.add(blockKey);
             unreachableCount++;
             const bname = targetBlock.name;
             const key = `${bname}||${toolName}`;
             cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
           } catch {}
-          candidates.delete(targetKey);
+          candidates.delete(blockKey);
           continue;
         }
       } catch {
-        // If tool cannot harvest block, add to unreachable list
         console.log(`[collectBlock] catch, cannot harvest block: ${targetBlock.name} with ${itemId}`);
         try {
-          unreachableKeys.add(targetKey);
+          unreachableKeys.add(blockKey);
           unreachableCount++;
           const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
           const bname = targetBlock?.name || 'unknown';
           const key = `${bname}||${toolName}`;
           cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
         } catch {}
-        candidates.delete(targetKey);
+        candidates.delete(blockKey);
         continue;
       }
 
-      try {
-        const detoured = await chooseDetour(bot, pendingDrops, desiredDropNamesNormalized, DROP_NEAR_RADIUS, pf);
-        if (detoured) {
-          continue;
-        }
-      } catch (err) {
-        console.warn('[collectBlocks] chooseDetour threw', err);
-      }
-
       isCollecting = true;
-      currentTargetKey = targetKey;
-      candidates.delete(targetKey);
+      currentTargetKey = blockKey;
+      collectingWaitLogTs = 0;
+      candidates.delete(blockKey);
+      console.log("[collectBlocks] begin dig target=%s pos=%j", blockKey, targetPosBlock);
       {
-        const res = await performDigAndPredict(bot, targetBlock, targetPos, countTarget, baselineCount, pendingDrops);
-        if (res.lastDugPosNew) lastDugPos = res.lastDugPosNew;
+        const res = await performDigAndPredict(bot, targetBlock, targetPosBlock, countTarget, baselineCount, pendingDrops);
+        console.log("[collectBlocks] dig finished target=%s digBatchInc=%s lastDugPos=%s", blockKey, res.digBatchInc, res.lastDugPosNew ? `${res.lastDugPosNew.x},${res.lastDugPosNew.y},${res.lastDugPosNew.z}` : 'null');
+        if (res.lastDugPosNew) {
+          lastCollectedPos = res.lastDugPosNew;
+        }
         if (res.digBatchInc === 0) {
-          try { unreachableKeys.add(targetKey); unreachableCount++; } catch {}
+          try { unreachableKeys.add(blockKey); unreachableCount++; } catch {}
         }
         digBatchCount += res.digBatchInc;
       }
       isCollecting = false;
       currentTargetKey = null;
-
-      await sweepPendingDropsIfNeeded(bot, pendingDrops, desiredDropNamesNormalized, DEBT_DROP_COUNT, ABOUT_TO_DESPAWN_MS, DROP_NEAR_RADIUS, pf);
     }
   } finally {
     try { bot.removeListener('physicsTick', onPhysicsTick); } catch {}

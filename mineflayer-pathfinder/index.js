@@ -71,14 +71,14 @@ function inject(bot) {
     stallCounts.delete(key);
   }
 
-  const stallPenaltyWeight = (block) => {
+  function stallPenaltyWeight(block) {
     if (!block || !block.position) return 0;
     const key = `${Math.floor(block.position.x)}|${Math.floor(block.position.y)}|${Math.floor(block.position.z)}`;
     const count = stallCounts.get(key);
     if (!count) return 0;
     // Apply a steep penalty once a node has stalled at least once to encourage alternate routes.
     return 1000 * count;
-  };
+  }
 
   function ensureStallPenaltyHook(movements) {
     if (!movements) return;
