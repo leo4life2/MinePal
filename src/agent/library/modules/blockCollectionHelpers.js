@@ -83,7 +83,7 @@ export function isExcludedFactory(unreachableKeys, excluded, keyOf, posEq) {
   return (position) => unreachableKeys.has(keyOf(position)) || excluded.some(p => posEq(p, position));
 }
 
-export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDropNamesNormalized, PRUNE_UNSEEN_MS, DESPAWN_MS, world) {
+export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDropNamesNormalized, PRUNE_UNSEEN_MS, DESPAWN_MS, world, unreachableDropIds) {
   const visible = await world.getVisibleEntities(bot);
   const now = Date.now();
   const visibleItems = [];
@@ -97,6 +97,9 @@ export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDr
   for (const it of visibleItems) {
     const id = it.id;
     const pos = it.position;
+    if (unreachableDropIds && unreachableDropIds.has(id)) {
+      continue;
+    }
     const existing = pendingDrops.get(id);
     if (existing) {
       existing.pos = pos;
@@ -149,7 +152,11 @@ export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDr
       }
     }
   }
-  for (const [id, rec] of Array.from(pendingDrops.entries())) {
+    for (const [id, rec] of Array.from(pendingDrops.entries())) {
+    if (unreachableDropIds && unreachableDropIds.has(id)) {
+      pendingDrops.delete(id);
+      continue;
+    }
     const age = now - rec.spawnedAt;
     const unseen = now - rec.lastSeen;
     if (age >= DESPAWN_MS || unseen >= PRUNE_UNSEEN_MS) {
@@ -158,10 +165,11 @@ export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDr
   }
 }
 
-export function normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized) {
+export function normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized, unreachableDropIds) {
   const entries = [];
   for (const [id, rec] of pendingDrops.entries()) {
     if (!rec || !rec.pos || rec.predicted) continue;
+    if (unreachableDropIds && unreachableDropIds.has(id)) continue;
     if (rec.name && !desiredDropNamesNormalized.includes(rec.name.toLowerCase())) continue;
     entries.push([id, rec]);
   }
@@ -231,13 +239,31 @@ export function selectNearestCandidate(candidates, dropCandidates, lastCollected
 
   for (const [key, pos] of candidates.entries()) {
     if (!pos) continue;
+    if (Number.isNaN(pos.x) || Number.isNaN(pos.y) || Number.isNaN(pos.z)) {
+      console.warn('[collectBlocks][select] invalid block candidate coordinates', { key, pos });
+      candidates.delete(key);
+      continue;
+    }
     const dist = origin.distanceTo(pos);
+    if (!isFinite(dist)) {
+      console.warn('[collectBlocks][select] non-finite distance for block candidate', { key, pos, origin });
+      candidates.delete(key);
+      continue;
+    }
     all.push({ type: 'block', key, pos, dist });
   }
 
   for (const [id, rec] of dropCandidates) {
     if (!rec || !rec.pos) continue;
+    if (Number.isNaN(rec.pos.x) || Number.isNaN(rec.pos.y) || Number.isNaN(rec.pos.z)) {
+      console.warn('[collectBlocks][select] invalid drop candidate pos', { id, pos: rec.pos });
+      continue;
+    }
     const dist = origin.distanceTo(rec.pos);
+    if (!isFinite(dist)) {
+      console.warn('[collectBlocks][select] non-finite distance for drop candidate', { id, pos: rec.pos, origin });
+      continue;
+    }
     all.push({ type: 'drop', key: id, pos: rec.pos, dist, dropRec: rec });
   }
 
@@ -308,14 +334,24 @@ export function ensureHarvestable(bot, targetBlock, targetPos, { unreachableKeys
 export async function performDigAndPredict(bot, targetBlock, targetPos, countTarget, baselineCount, pendingDrops) {
   let lastDugPosNew = null;
   let digBatchInc = 0;
+  console.log('[collectBlocks][dig] prepare', {
+    target: targetBlock ? { name: targetBlock.name, x: targetBlock.position?.x, y: targetBlock.position?.y, z: targetBlock.position?.z } : null,
+    targetPos
+  });
   try {
+    console.log('[collectBlocks][dig] equipForBlock start');
     await bot.tool.equipForBlock?.(targetBlock);
+    console.log('[collectBlocks][dig] equipForBlock done');
   } catch {}
   try {
+    console.log('[collectBlocks][dig] setMovements start');
     await bot.pathfinder?.setMovements?.(new (require('mineflayer-pathfinder').Movements)(bot));
+    console.log('[collectBlocks][dig] setMovements done');
   } catch {}
   try {
+    console.log('[collectBlocks][dig] digBlock call start');
     await digBlock(bot, targetBlock);
+    console.log('[collectBlocks][dig] digBlock call success');
     try {
       const now = bot.blockAt(targetPos);
       if (!now || now.name !== targetBlock.name) lastDugPosNew = targetPos.clone();
@@ -323,11 +359,23 @@ export async function performDigAndPredict(bot, targetBlock, targetPos, countTar
     digBatchInc = 1;
     const predId = `pred:${targetPos.x},${targetPos.y},${targetPos.z}:${Date.now()}`;
     pendingDrops.set(predId, { pos: targetPos.clone(), spawnedAt: Date.now(), lastSeen: Date.now(), predicted: true });
-    return { lastDugPosNew, digBatchInc, collectedType: 'block', collectedPos: lastDugPosNew, predictedDropId: predId };
+    return { lastDugPosNew, digBatchInc, collectedType: 'block', collectedPos: lastDugPosNew, predictedDropId: predId, error: null };
   } catch (err) {
-    const name = err?.name || (err && typeof err === 'object' ? err.constructor?.name : String(err));
-    const msg = err?.message || String(err);
-    return { lastDugPosNew: null, digBatchInc: 0, collectedType: null, collectedPos: null, predictedDropId: null };
+    const errorName = err?.name || (err && typeof err === 'object' ? err.constructor?.name : typeof err);
+    const errorMessage = err?.message || String(err);
+    console.warn('[collectBlocks][dig] digBlock threw', {
+      target: { x: targetPos?.x, y: targetPos?.y, z: targetPos?.z, blockName: targetBlock?.name },
+      errorName,
+      errorMessage
+    });
+    return {
+      lastDugPosNew: null,
+      digBatchInc: 0,
+      collectedType: null,
+      collectedPos: null,
+      predictedDropId: null,
+      error: { name: errorName, message: errorMessage }
+    };
   }
 }
 

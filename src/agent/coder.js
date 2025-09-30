@@ -9,7 +9,6 @@ export class Coder {
         this.executingQueue = []; // Queue to hold executing promises
         this.generating = false;
         this.code_template = '';
-        this.timedout = false;
         readFile(`${this.agent.appPath}/bots/template.js`, 'utf8', (err, data) => {
             if (err) throw err;
             this.code_template = data;
@@ -111,7 +110,7 @@ export class Coder {
 
         let code_return = null;
         let failures = 0;
-        const interrupt_return = {success: true, message: null, interrupted: true, timedout: false};
+        const interrupt_return = {success: true, message: null, interrupted: true};
         for (let i=0; i<5; i++) {
             if (this.agent.bot.interrupt_code)
                 return interrupt_return;
@@ -133,10 +132,10 @@ export class Coder {
                     agent_history.add('system', code_return.message);
                     agent_history.add(this.agent.name, res);
                     this.agent.bot.chat(res);
-                    return {success: true, message: null, interrupted: false, timedout: false};
+                    return {success: true, message: null, interrupted: false};
                 }
                 if (failures >= 1) {
-                    return {success: false, message: 'Action failed, agent would not write code.', interrupted: false, timedout: false};
+                    return {success: false, message: 'Action failed, agent would not write code.', interrupted: false};
                 }
                 messages.push({
                     role: 'system', 
@@ -150,14 +149,14 @@ export class Coder {
             const execution_file = await this.stageCode(code);
             if (!execution_file) {
                 agent_history.add('system', 'Failed to stage code, something is wrong.');
-                return {success: false, message: null, interrupted: false, timedout: false};
+                return {success: false, message: null, interrupted: false};
             }
             code_return = await this.execute(async ()=>{
                 return await execution_file.main(this.agent.bot);
-            }, this.agent.settings.code_timeout_mins);
+            });
 
-            if (code_return.interrupted && !code_return.timedout)
-                return {success: false, message: null, interrupted: true, timedout: false};
+            if (code_return.interrupted)
+                return {success: false, message: null, interrupted: true};
             console.log("Code generation result:", code_return.success, code_return.message);
 
             messages.push({
@@ -169,10 +168,10 @@ export class Coder {
                 content: code_return.message
             });
         }
-        return {success: false, message: null, interrupted: false, timedout: true};
+        return {success: false, message: null, interrupted: false};
     }
 
-    async executeResume(func=null, name=null, timeout=10) {
+    async executeResume(func=null, name=null) {
         if (func != null) {
             this.resume_func = func;
             this.resume_name = name;
@@ -180,12 +179,12 @@ export class Coder {
         if (this.resume_func != null && this.agent.isIdle()) {
             console.log('resuming code...')
             this.interruptible = true;
-            let res = await this.execute(this.resume_func, timeout);
+            let res = await this.execute(this.resume_func);
             this.interruptible = false;
             this.resume_func = null; // Clear the resume function after execution
             return res;
         } else {
-            return {success: false, message: null, interrupted: false, timedout: false};
+            return {success: false, message: null, interrupted: false};
         }
     }
 
@@ -194,32 +193,26 @@ export class Coder {
         this.resume_name = null;
     }
 
-    // returns {success: bool, message: string, interrupted: bool, timedout: false}
-    async execute(func, timeout=10) {
-        if (!this.code_template) return {success: false, message: "Code template not loaded.", interrupted: false, timedout: false};
+    // returns {success: bool, message: string, interrupted: bool}
+    async execute(func) {
+        if (!this.code_template) return {success: false, message: "Code template not loaded.", interrupted: false};
 
-        let TIMEOUT;
         try {
             console.log('[CODERSTOP] executing code...\n');
             await this.stop();
             this.clear();
 
             this.executing = true;
-            if (timeout > 0)
-                TIMEOUT = this._startTimeout(timeout);
             await func(); // open fire
             this.executing = false;
-            clearTimeout(TIMEOUT);
 
             let output = this.formatOutput(this.agent.bot);
             let interrupted = this.agent.bot.interrupt_code;
-            let timedout = this.timedout;
             this.clear();
             if (!interrupted && !this.generating) this.agent.bot.emit('idle');
-            return {success:true, message: output, interrupted, timedout};
+            return {success:true, message: output, interrupted};
         } catch (err) {
             this.executing = false;
-            clearTimeout(TIMEOUT);
             this.cancelResume();
             await this.stop();
 
@@ -227,12 +220,12 @@ export class Coder {
             let interrupted = this.agent.bot.interrupt_code;
             this.clear();
             if (!interrupted && !this.generating) this.agent.bot.emit('idle');
-            return {success: false, message, interrupted, timedout: false};
+            return {success: false, message, interrupted};
         }
     }
 
     formatOutput(bot) {
-        if (bot.interrupt_code && !this.timedout) return '';
+        if (bot.interrupt_code) return '';
         let output = bot.output;
         const MAX_OUT = 500;
         if (output.length > MAX_OUT) {
@@ -270,16 +263,5 @@ export class Coder {
     clear() {
         this.agent.bot.output = '';
         this.agent.bot.interrupt_code = false;
-        this.timedout = false;
-    }
-
-    _startTimeout(TIMEOUT_MINS=10) {
-        return setTimeout(async () => {
-            console.warn(`Code execution timed out after ${TIMEOUT_MINS} minutes. Attempting force stop.`);
-            this.timedout = true;
-            this.agent.history.add('system', `Code execution timed out after ${TIMEOUT_MINS} minutes. Attempting force stop.`);
-            console.log("[CODERSTOP] Timeout.");
-            await this.stop(); // last attempt to stop
-        }, TIMEOUT_MINS*60*1000);
     }
 }

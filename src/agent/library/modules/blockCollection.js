@@ -77,6 +77,9 @@ export async function collectBlocks(
   let collectingWaitLogTs = 0;
   let loopIteration = 0;
   let loopHeartbeatTs = 0;
+  const dropPickCounts = new Map();
+  const dropFailureCounts = new Map();
+  const unreachableDropIds = new Set();
 
   const countTarget = createCountTarget(MCData.getInstance(), bot, desiredDropNames, world);
   const baselineCount = countTarget();
@@ -105,7 +108,7 @@ export async function collectBlocks(
         added = res.added;
       }
       if (doScan) {
-        try { updatePendingDropsFromVisible(bot, pendingDrops, desiredDropNamesNormalized, PRUNE_UNSEEN_MS, DESPAWN_MS, world); } catch {}
+        try { updatePendingDropsFromVisible(bot, pendingDrops, desiredDropNamesNormalized, PRUNE_UNSEEN_MS, DESPAWN_MS, world, unreachableDropIds); } catch {}
       }
       if (doPrune) pruneCandidates(candidates, isCollecting, currentTargetKey, isValidTarget, isExcluded);
       if (doScan) {
@@ -167,7 +170,7 @@ export async function collectBlocks(
       } else {
       }
 
-      const dropCandidates = normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized);
+      const dropCandidates = normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized, unreachableDropIds);
       const pick = selectNearestCandidate(candidates, dropCandidates, lastCollectedPos, bot);
       if (!pick) {
         console.log("[collectBlocks] selectNearestCandidate returned null despite candidates size=%s", candidates.size);
@@ -177,12 +180,26 @@ export async function collectBlocks(
 
       if (type === 'drop') {
         try {
+          const dropCount = (dropPickCounts.get(dropId) || 0) + 1;
+          dropPickCounts.set(dropId, dropCount);
+          if (dropCount > 1) {
+            console.log('[collectBlocks] drop %s re-selected times=%s pendingDrops=%s', dropId, dropCount, pendingDrops.size);
+          }
           console.log("[collectBlocks] navigating to drop id=%s pos=%j", dropId, targetPos);
           bot.pathfinder?.setMovements?.(new pf.Movements(bot));
           await bot.pathfinder?.goto?.(new pf.goals.GoalNear(targetPos.x, targetPos.y, targetPos.z, DROP_NEAR_RADIUS));
           await new Promise(r => setTimeout(r, 120));
         } catch (err) {
           console.warn('[collectBlocks] drop navigation failed', err);
+          if (dropId) {
+            const failures = (dropFailureCounts.get(dropId) || 0) + 1;
+            dropFailureCounts.set(dropId, failures);
+            if (failures >= 3) {
+              console.log('[collectBlocks] marking drop unreachable', dropId);
+              unreachableDropIds.add(dropId);
+            }
+          }
+          try { bot.pathfinder?.stop?.(); } catch {}
         } finally {
           if (dropId && pendingDrops.has(dropId)) pendingDrops.delete(dropId);
         }
@@ -191,11 +208,21 @@ export async function collectBlocks(
       }
 
       const targetPosBlock = targetPos;
-      if (!isValidTarget(targetPosBlock)) { candidates.delete(blockKey); continue; }
+      if (!isValidTarget(targetPosBlock)) {
+        candidates.delete(blockKey);
+        continue;
+      }
 
       let targetBlock;
-      try { targetBlock = bot.blockAt(targetPosBlock); } catch { candidates.delete(blockKey); continue; }
-      if (!targetBlock) { console.log("[collectBlocks] targetBlock missing at %j", targetPosBlock); candidates.delete(blockKey); continue; }
+      try { targetBlock = bot.blockAt(targetPosBlock); } catch {
+        candidates.delete(blockKey);
+        continue;
+      }
+      if (!targetBlock) {
+        console.log("[collectBlocks] targetBlock missing at %j", targetPosBlock);
+        candidates.delete(blockKey);
+        continue;
+      }
 
       try {
         if (targetBlock && targetBlock.diggable === false) {
@@ -248,25 +275,35 @@ export async function collectBlocks(
       console.log("[collectBlocks] begin dig target=%s pos=%j", blockKey, targetPosBlock);
       {
         const res = await performDigAndPredict(bot, targetBlock, targetPosBlock, countTarget, baselineCount, pendingDrops);
-        console.log("[collectBlocks] dig finished target=%s digBatchInc=%s lastDugPos=%s", blockKey, res.digBatchInc, res.lastDugPosNew ? `${res.lastDugPosNew.x},${res.lastDugPosNew.y},${res.lastDugPosNew.z}` : 'null');
+        console.log("[collectBlocks] dig finished target=%s digBatchInc=%s lastDugPos=%s error=%s", blockKey, res.digBatchInc, res.lastDugPosNew ? `${res.lastDugPosNew.x},${res.lastDugPosNew.y},${res.lastDugPosNew.z}` : 'null', res.error ? res.error.message : 'none');
         if (res.lastDugPosNew) {
           lastCollectedPos = res.lastDugPosNew;
         }
         if (res.digBatchInc === 0) {
-          try { unreachableKeys.add(blockKey); unreachableCount++; } catch {}
+          unreachableKeys.add(blockKey);
         }
         digBatchCount += res.digBatchInc;
       }
       isCollecting = false;
       currentTargetKey = null;
+      try { bot.pathfinder?.stop?.(); } catch {}
     }
   } finally {
     try { bot.removeListener('physicsTick', onPhysicsTick); } catch {}
   }
 
   const finalCollected = countTarget() - baselineCount;
-  if (unreachableCount > 0) {
-    bot.output += `Collected ${finalCollected} ${blockType}. Visible but unreachable: ${unreachableCount}.\n`;
+  
+  // Add appropriate final summary based on why we stopped
+  if (bot.interrupt_code) {
+    // Interrupted (timeout or manual stop)
+    bot.output += `Collected ${finalCollected}/${num} ${blockType} before being interrupted.\n`;
+  } else if (finalCollected >= num) {
+    // Successfully collected the requested amount
+    bot.output += `Collected ${finalCollected} ${blockType}.\n`;
+  } else if (unreachableCount > 0) {
+    // Stopped early due to unreachable blocks
+    bot.output += `Collected ${finalCollected}/${num} ${blockType}. Visible but unreachable: ${unreachableCount}.\n`;
     try {
       const details = [];
       if (undiggableByBlock.size > 0) {
@@ -285,6 +322,7 @@ export async function collectBlocks(
       }
     } catch {}
   }
-  bot.output += `Collected ${finalCollected} ${blockType}.\n`;
+  // Note: If stopped due to empty scans, handleEmptyCandidatesExit already added the message
+  
   return finalCollected > 0;
 }
