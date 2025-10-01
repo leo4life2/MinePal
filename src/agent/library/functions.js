@@ -44,7 +44,12 @@ export async function breakBlockAt(bot, x, y, z) {
     if (!block.canHarvest(itemId)) return false;
   }
   console.log('[functions.breakBlockAt] dig start', { block: block.name });
-  const ok = await bot.dig(block, true);
+  let ok = false;
+  try {
+    ok = await bot.dig(block, true);
+  } finally {
+    try { bot.stopDigging?.(); } catch {}
+  }
   console.log('[functions.breakBlockAt] dig done', { ok });
   if (ok && DEBUG) {
     console.log(`[functions.breakBlockAt] successfully broke ${block.name} @ ${x},${y},${z}`);
@@ -58,14 +63,18 @@ export async function digBlock(bot, block) {
   const targetPos = block.position;
   console.log('[functions.digBlock] invoked', { name: block.name, x: targetPos.x, y: targetPos.y, z: targetPos.z });
 
-  const ok = await breakBlockAt(bot, targetPos.x, targetPos.y, targetPos.z);
-  if (!ok) {
-    const err = new Error('BreakFailed');
-    err.code = 'BreakFailed';
-    throw err;
-  }
+  try {
+    const ok = await breakBlockAt(bot, targetPos.x, targetPos.y, targetPos.z);
+    if (!ok) {
+      const err = new Error('BreakFailed');
+      err.code = 'BreakFailed';
+      throw err;
+    }
 
-  console.log('[functions.digBlock] success', { name: block.name, x: targetPos.x, y: targetPos.y, z: targetPos.z });
+    console.log('[functions.digBlock] success', { name: block.name, x: targetPos.x, y: targetPos.y, z: targetPos.z });
+  } finally {
+    try { bot.stopDigging?.(); } catch {}
+  }
 
   return; // void
 }

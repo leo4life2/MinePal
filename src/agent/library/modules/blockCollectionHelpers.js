@@ -376,6 +376,8 @@ export async function performDigAndPredict(bot, targetBlock, targetPos, countTar
       predictedDropId: null,
       error: { name: errorName, message: errorMessage }
     };
+  } finally {
+    try { bot.stopDigging?.(); } catch {}
   }
 }
 
