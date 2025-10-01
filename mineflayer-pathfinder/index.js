@@ -150,7 +150,6 @@ function inject(bot) {
         return rb < min ? rb : min;
       }, Number.POSITIVE_INFINITY);
       const rbMinOut = isFinite(remainingBlocksMin) ? remainingBlocksMin : 'n/a';
-      console.log('[pathfinder][plan] status=%s pathLen=%s usesPlacement=%s remainingBlocksMin=%s', result?.status, path.length, usesPlacement, rbMinOut);
     } catch {}
     return result;
   };
@@ -232,10 +231,7 @@ function inject(bot) {
     bot.removeAllListeners("diggingCompleted", detectDiggingStopped);
   }
 
-  function resetPath(reason, clearStates = true) {
-    try {
-      console.log("[pathfinder][resetPath] reason=%s digging=%s placing=%s pathLen=%s", reason, digging, placing, path.length);
-    } catch {}
+  function resetPath(reason, clearStates = true) { 
     if (!stopPathing && path.length > 0) bot.emit("path_reset", reason);
     path = [];
     if (digging) {
@@ -272,7 +268,6 @@ function inject(bot) {
   bot.pathfinder.isBuilding = () => placing;
 
   bot.pathfinder.goto = (goal) => {
-    if (bot.pathfinder.debugPathExec) console.log('[pathfinder][goto] setGoal=%j', goal);
     // Wrap goto to ensure lingering dynamic goals are stopped on rejection
     return gotoUtil(bot, goal).catch((err) => {
       try { bot.pathfinder.stop(); } catch {}

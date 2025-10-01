@@ -73,12 +73,34 @@ export function truncCommandMessage(message) {
 function numRequiredParams(command) {
     if (!command.params) return 0;
     let requiredCount = 0;
-    for (const paramDesc of Object.values(command.params)) {
-        if (!paramDesc.toLowerCase().includes('optional)')) {
-            requiredCount++;
-        }
+    const defaults = command.paramDefaults || {};
+    for (const [paramName, paramDesc] of Object.entries(command.params)) {
+        const hasDefault = Object.prototype.hasOwnProperty.call(defaults, paramName);
+        const markedOptional = paramDesc.toLowerCase().includes('optional)');
+        if (!hasDefault && !markedOptional) requiredCount++;
     }
     return requiredCount;
+}
+
+function applyParamDefaults(command, args, agent) {
+    if (!command.params || !command.paramDefaults) return args;
+
+    const finalArgs = [...args];
+    const paramNames = Object.keys(command.params);
+
+    for (let i = 0; i < paramNames.length; i++) {
+        const paramName = paramNames[i];
+        if (!Object.prototype.hasOwnProperty.call(command.paramDefaults, paramName)) continue;
+
+        if (finalArgs.length <= i || finalArgs[i] === undefined) {
+            const defaultValue = command.paramDefaults[paramName];
+            finalArgs[i] = typeof defaultValue === 'function'
+                ? defaultValue({ agent, command, index: i, args: finalArgs })
+                : defaultValue;
+        }
+    }
+
+    return finalArgs;
 }
 
 export async function executeCommand(agent, message) {
@@ -122,8 +144,8 @@ export async function executeCommand(agent, message) {
         let isSuccess = true;
         let failReason = null;
         try {
-            // Use spread syntax; JS handles default parameters
-            result = await command.perform(agent, ...parsed.args);
+            const argsWithDefaults = applyParamDefaults(command, parsed.args, agent);
+            result = await command.perform(agent, ...argsWithDefaults);
             // Check for [ACTION_CRASH] in result string
             if (typeof result === 'string' && result.includes('[ACTION_CRASH]')) {
                 isSuccess = false;

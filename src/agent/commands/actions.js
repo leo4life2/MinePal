@@ -183,9 +183,13 @@ export const actionsList = [
     params: {
       type: "(string) The block type to collect.",
       num: "(number) The number of blocks to collect.",
-      grownCropsOnly: "(boolean) Whether to collect only fully grown crops.",
+      grownCropsOnly: "(boolean, optional) Whether to collect only fully grown crops. Defaults to true.",
     },
-    perform: wrapExecution(async (agent, type, num, grownCropsOnly = false) => {
+    paramDefaults: {
+      grownCropsOnly: true,
+    },
+    perform: wrapExecution(async (agent, type, num, grownCropsOnly) => {
+      if (grownCropsOnly === undefined) grownCropsOnly = true;
       await skills.collectBlock(agent.bot, type, num, null, grownCropsOnly);
     }, 10), // 10 minute timeout
   },

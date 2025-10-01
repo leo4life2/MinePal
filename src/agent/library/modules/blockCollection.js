@@ -70,6 +70,7 @@ export async function collectBlocks(
 
   const candidates = new Map();
   const pendingDrops = new Map();
+  const dropsInProgress = new Set();
   let emptyScans = 0;
   let isCollecting = false;
   let currentTargetKey = null;
@@ -108,7 +109,7 @@ export async function collectBlocks(
         added = res.added;
       }
       if (doScan) {
-        try { updatePendingDropsFromVisible(bot, pendingDrops, desiredDropNamesNormalized, PRUNE_UNSEEN_MS, DESPAWN_MS, world, unreachableDropIds); } catch {}
+        try { updatePendingDropsFromVisible(bot, pendingDrops, desiredDropNamesNormalized, PRUNE_UNSEEN_MS, DESPAWN_MS, world, unreachableDropIds, dropsInProgress); } catch {}
       }
       if (doPrune) pruneCandidates(candidates, isCollecting, currentTargetKey, isValidTarget, isExcluded);
       if (doScan) {
@@ -134,7 +135,6 @@ export async function collectBlocks(
       const nowLoop = Date.now();
       if (!loopHeartbeatTs || (nowLoop - loopHeartbeatTs) > 1000) {
         loopHeartbeatTs = nowLoop;
-        console.log("[collectBlocks] loop heartbeat iter=%s collected=%s/%s candidates=%s pendingDrops=%s isCollecting=%s emptyScans=%s target=%s", loopIteration, countTarget() - baselineCount, num, candidates.size, pendingDrops.size, isCollecting, emptyScans, currentTargetKey);
       }
       const collectedTarget = countTarget() - baselineCount;
       if (collectedTarget >= num) break;
@@ -143,12 +143,13 @@ export async function collectBlocks(
         const nowTs = Date.now();
         if (!collectingWaitLogTs || (nowTs - collectingWaitLogTs) > 300) {
           collectingWaitLogTs = nowTs;
-          console.log("[collectBlocks] waiting for active dig to resolve target=%s", currentTargetKey);
         }
         await new Promise(r => setTimeout(r, 50));
         continue;
       }
-      if (candidates.size === 0) {
+
+      const dropCandidates = normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized, unreachableDropIds, dropsInProgress);
+      if (candidates.size === 0 && dropCandidates.length === 0) {
         console.log("[collectBlocks] no candidates available emptyScans=%s pendingDrops=%s", emptyScans, pendingDrops.size);
         const exit = handleEmptyCandidatesExit({
           emptyScans,
@@ -167,25 +168,21 @@ export async function collectBlocks(
         }
         await new Promise(r => setTimeout(r, 100));
         continue;
-      } else {
       }
 
-      const dropCandidates = normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized, unreachableDropIds);
       const pick = selectNearestCandidate(candidates, dropCandidates, lastCollectedPos, bot);
       if (!pick) {
-        console.log("[collectBlocks] selectNearestCandidate returned null despite candidates size=%s", candidates.size);
         continue;
       }
       const { type, targetPos, blockKey, dropId } = pick;
 
       if (type === 'drop') {
+        if (dropId !== null && dropId !== undefined) {
+          dropsInProgress.add(dropId);
+        }
         try {
           const dropCount = (dropPickCounts.get(dropId) || 0) + 1;
           dropPickCounts.set(dropId, dropCount);
-          if (dropCount > 1) {
-            console.log('[collectBlocks] drop %s re-selected times=%s pendingDrops=%s', dropId, dropCount, pendingDrops.size);
-          }
-          console.log("[collectBlocks] navigating to drop id=%s pos=%j", dropId, targetPos);
           bot.pathfinder?.setMovements?.(new pf.Movements(bot));
           await bot.pathfinder?.goto?.(new pf.goals.GoalNear(targetPos.x, targetPos.y, targetPos.z, DROP_NEAR_RADIUS));
           await new Promise(r => setTimeout(r, 120));
@@ -195,13 +192,15 @@ export async function collectBlocks(
             const failures = (dropFailureCounts.get(dropId) || 0) + 1;
             dropFailureCounts.set(dropId, failures);
             if (failures >= 3) {
-              console.log('[collectBlocks] marking drop unreachable', dropId);
               unreachableDropIds.add(dropId);
             }
           }
           try { bot.pathfinder?.stop?.(); } catch {}
         } finally {
           if (dropId && pendingDrops.has(dropId)) pendingDrops.delete(dropId);
+          if (dropId !== null && dropId !== undefined) {
+            dropsInProgress.delete(dropId);
+          }
         }
         lastCollectedPos = targetPos.clone();
         continue;
@@ -219,7 +218,6 @@ export async function collectBlocks(
         continue;
       }
       if (!targetBlock) {
-        console.log("[collectBlocks] targetBlock missing at %j", targetPosBlock);
         candidates.delete(blockKey);
         continue;
       }
@@ -242,7 +240,6 @@ export async function collectBlocks(
       const itemId = bot.heldItem ? bot.heldItem.type : null;
       try {
         if (!targetBlock.canHarvest(itemId)) {
-          console.log(`[collectBlock] canHarvest false, cannot harvest block: ${targetBlock.name} with ${itemId}`);
           const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
           try {
             unreachableKeys.add(blockKey);
@@ -255,7 +252,6 @@ export async function collectBlocks(
           continue;
         }
       } catch {
-        console.log(`[collectBlock] catch, cannot harvest block: ${targetBlock.name} with ${itemId}`);
         try {
           unreachableKeys.add(blockKey);
           unreachableCount++;
@@ -272,10 +268,8 @@ export async function collectBlocks(
       currentTargetKey = blockKey;
       collectingWaitLogTs = 0;
       candidates.delete(blockKey);
-      console.log("[collectBlocks] begin dig target=%s pos=%j", blockKey, targetPosBlock);
       {
         const res = await performDigAndPredict(bot, targetBlock, targetPosBlock, countTarget, baselineCount, pendingDrops);
-        console.log("[collectBlocks] dig finished target=%s digBatchInc=%s lastDugPos=%s error=%s", blockKey, res.digBatchInc, res.lastDugPosNew ? `${res.lastDugPosNew.x},${res.lastDugPosNew.y},${res.lastDugPosNew.z}` : 'null', res.error ? res.error.message : 'none');
         if (res.lastDugPosNew) {
           lastCollectedPos = res.lastDugPosNew;
         }
