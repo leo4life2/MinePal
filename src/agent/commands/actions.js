@@ -178,7 +178,7 @@ export const actionsList = [
     }),
   },
   {
-    name: "!digToGetBlocks",
+    name: "!collectBlocks",
     description: "Collect the nearest blocks of a given type.",
     params: {
       type: "(string) The block type to collect.",
