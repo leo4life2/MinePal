@@ -388,7 +388,7 @@ export function handleEmptyCandidatesExit({ emptyScans, collectedTarget, unreach
     bot.output += `No reachable ${blockType} found nearby. Visible but unreachable: ${unreachableCount}.\n`;
     return { exit: true };
   } else {
-    bot.output += `No reachable ${blockType} found nearby. Scanner not populated yet.\n`;
+    bot.output += `No reachable ${blockType} found nearby.\n`;
     return { exit: true };
   }
 }
