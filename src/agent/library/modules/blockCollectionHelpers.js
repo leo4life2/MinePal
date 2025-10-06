@@ -16,7 +16,7 @@ export function buildBlockTypes(registry, blockDropMap, blockType) {
       .filter(([, drops]) => drops.includes(blockType))
       .map(([block]) => block);
     if (sourceBlocks.length > 0) {
-      blocktypes = sourceBlocks;
+      blocktypes = [...sourceBlocks, blockType];
       desiredDropNames = [blockType];
     } else {
       blocktypes = [blockType];
