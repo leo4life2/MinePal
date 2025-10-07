@@ -117,7 +117,28 @@ export function isExcludedFactory(unreachableKeys, excluded, keyOf, posEq) {
 }
 
 export async function updatePendingDropsFromVisible(bot, pendingDrops, desiredDropNamesNormalized, PRUNE_UNSEEN_MS, DESPAWN_MS, world, unreachableDropIds, dropsInProgress) {
-  const visible = await world.getVisibleEntities(bot);
+  const mergedEntities = new Map();
+  try {
+    const visible = await world.getVisibleEntities(bot);
+    for (const entity of visible || []) {
+      if (entity && entity.id != null) mergedEntities.set(entity.id, entity);
+    }
+  } catch (err) {
+    console.warn('[collectBlocks][drops] getVisibleEntities failed', err?.message || err);
+  }
+
+  try {
+    if (typeof world.getNearbyEntities === 'function') {
+      const nearby = await world.getNearbyEntities(bot, 16);
+      for (const entity of nearby || []) {
+        if (entity && entity.id != null) mergedEntities.set(entity.id, entity);
+      }
+    }
+  } catch (err) {
+    console.warn('[collectBlocks][drops] getNearbyEntities failed', err?.message || err);
+  }
+
+  const visible = Array.from(mergedEntities.values());
   const now = Date.now();
   const visibleItems = [];
   for (const e of visible) {

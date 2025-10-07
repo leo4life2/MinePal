@@ -149,20 +149,39 @@ export async function collectBlocks(
       const scanRadius = candidates.size === 0 ? VERY_FAR_DISTANCE : FAR_DISTANCE;
       let added = 0;
       if (doScan) {
-        const res = scanForCandidates(bot, world, blocktypes, candidates, isExcluded, isValidTarget, scanRadius, MAX_CANDIDATES, tickIndex, excludedReason, scanSummaryOut);
+        const res = scanForCandidates(
+          bot,
+          world,
+          blocktypes,
+          candidates,
+          isExcluded,
+          isValidTarget,
+          scanRadius,
+          MAX_CANDIDATES,
+          tickIndex,
+          excludedReason,
+          scanSummaryOut
+        );
         added = res.added;
-      }
-      if (doScan) {
-        try { updatePendingDropsFromVisible(bot, pendingDrops, desiredDropNamesNormalized, PRUNE_UNSEEN_MS, DESPAWN_MS, world, unreachableDropIds, dropsInProgress); } catch {}
-      }
-      if (doPrune) pruneCandidates(candidates, isCollecting, currentTargetKey, isValidTarget, isExcluded);
-      if (doScan) {
+        try {
+          updatePendingDropsFromVisible(
+            bot,
+            pendingDrops,
+            desiredDropNamesNormalized,
+            PRUNE_UNSEEN_MS,
+            DESPAWN_MS,
+            world,
+            unreachableDropIds,
+            dropsInProgress
+          );
+        } catch {}
         if (candidates.size === 0 && added === 0) {
           emptyScans++;
         } else {
           emptyScans = 0;
         }
       }
+      if (doPrune) pruneCandidates(candidates, isCollecting, currentTargetKey, isValidTarget, isExcluded);
     } catch {}
   };
 

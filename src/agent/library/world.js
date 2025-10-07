@@ -167,6 +167,41 @@ export async function getVisibleEntities(bot) {
     return visibleEntities;
 }
 
+export async function getNearbyEntities(bot, maxDistance = 16) {
+    /**
+     * Get a list of entities within a specified range, ignoring line-of-sight checks.
+     * Provides an "x-ray" style search limited by distance.
+     * @param {Bot} bot - The bot instance.
+     * @param {number} maxDistance - Maximum distance to include entities.
+     * @returns {Promise<Entity[]>}
+     */
+    const nearbyEntities = [];
+    if (!bot?.entity?.position || bot.entity.eyeHeight === undefined) {
+        return nearbyEntities;
+    }
+
+    try {
+        await bot.waitForChunksToLoad();
+    } catch (err) {
+        console.warn(`[getNearbyEntities] Error waiting for chunks: ${err.message}`);
+        return nearbyEntities;
+    }
+
+    const headPos = bot.entity.position.offset(0, bot.entity.eyeHeight, 0);
+    const allEntities = Object.values(bot.entities).filter(e => e !== bot.entity);
+
+    for (const entity of allEntities) {
+        if (!entity?.position) continue;
+        const targetPos = entity.position.offset(0, entity.height * 0.9, 0);
+        const range = headPos.distanceTo(targetPos);
+        if (!isFinite(range) || range === 0) continue;
+        if (maxDistance != null && range > maxDistance) continue;
+        nearbyEntities.push(entity);
+    }
+
+    return nearbyEntities;
+}
+
 export async function getNearbyPlayers(bot) {
     /**
      * Get a list of all visible players.
