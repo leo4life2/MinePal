@@ -61,6 +61,7 @@ export async function collectBlocks(
 
   const { blocktypes, desiredDropNames } = buildBlockTypes(MCData.getInstance(), BLOCK_DROP_MAP, blockType);
   const desiredDropNamesNormalized = desiredDropNames.map(n => n.toLowerCase());
+  const trackedItemNames = Array.from(new Set(desiredDropNames));
 
   // Use centralized crop age map
   const keyOf = (v) => `${v.x},${v.y},${v.z}`;
@@ -83,7 +84,50 @@ export async function collectBlocks(
   const unreachableDropIds = new Set();
 
   const countTarget = createCountTarget(MCData.getInstance(), bot, desiredDropNames, world);
+  const baselineCounts = (() => {
+    if (typeof countTarget.getCounts === 'function') {
+      const counts = countTarget.getCounts() || {};
+      const result = {};
+      for (const name of trackedItemNames) result[name] = counts[name] || 0;
+      return result;
+    }
+    const result = {};
+    for (const name of trackedItemNames) result[name] = 0;
+    return result;
+  })();
   const baselineCount = countTarget();
+
+  const summarizeCollected = () => {
+    if (typeof countTarget.getCounts !== 'function') {
+      const total = countTarget() - baselineCount;
+      const fallbackName = trackedItemNames[0] || blockType || 'items';
+      const parts = total > 0 ? [{ name: fallbackName, count: total }] : [];
+      return { total, parts };
+    }
+
+    const currentCounts = countTarget.getCounts() || {};
+    const parts = [];
+    for (const name of trackedItemNames) {
+      const delta = (currentCounts[name] || 0) - (baselineCounts[name] || 0);
+      if (delta > 0) parts.push({ name, count: delta });
+    }
+    const total = parts.reduce((sum, entry) => sum + entry.count, 0);
+    return { total, parts };
+  };
+
+  const formatSummaryForDisplay = (summary, { includeTotalPrefix = false } = {}) => {
+    const { total, parts } = summary || { total: 0, parts: [] };
+    const fallbackLabel = trackedItemNames[0] || blockType || 'items';
+    const label = parts.length === 1 ? parts[0].name : parts.length > 1 ? 'target items' : fallbackLabel;
+    const breakdown = parts.length > 1 ? parts.map(({ name, count }) => `${count} ${name}`).join(', ') : null;
+    if (parts.length === 1) {
+      return `${parts[0].count} ${parts[0].name}`;
+    }
+    if (parts.length > 1) {
+      return includeTotalPrefix ? `${total} ${label} (${breakdown})` : `${total} ${label} (${breakdown})`;
+    }
+    return `${total} ${label}`;
+  };
 
   const isValidTarget = createIsValidTarget(bot, blocktypes, grownCropsOnly, CROP_AGE_MAP, blockType);
   const isExcluded = isExcludedFactory(unreachableKeys, excluded, keyOf, posEq);
@@ -151,16 +195,19 @@ export async function collectBlocks(
       const dropCandidates = normalizeDropCandidates(pendingDrops, desiredDropNamesNormalized, unreachableDropIds, dropsInProgress);
       if (candidates.size === 0 && dropCandidates.length === 0) {
         console.log("[collectBlocks] no candidates available emptyScans=%s pendingDrops=%s", emptyScans, pendingDrops.size);
+        const collectedSummaryForExit = summarizeCollected();
         const exit = handleEmptyCandidatesExit({
           emptyScans,
           collectedTarget,
+          collectedSummary: collectedSummaryForExit,
           unreachableCount,
           candidatesSize: candidates.size,
           MCDataInstance: MCData.getInstance(),
           blocktypes,
           blockType,
           FAR_DISTANCE,
-          bot
+          bot,
+          summaryFormatter: formatSummaryForDisplay
         });
         if (exit.exit) {
           console.log("[collectBlocks] exiting due to empty candidates reason=%j", exit);
@@ -286,18 +333,21 @@ export async function collectBlocks(
     try { bot.removeListener('physicsTick', onPhysicsTick); } catch {}
   }
 
-  const finalCollected = countTarget() - baselineCount;
-  
+  const finalSummary = summarizeCollected();
+  const finalCollected = finalSummary.total;
+  const collectedDisplay = formatSummaryForDisplay(finalSummary, { includeTotalPrefix: true });
+  const miningContext = blockType ? ` while mining ${blockType}` : '';
+
   // Add appropriate final summary based on why we stopped
   if (bot.interrupt_code) {
     // Interrupted (timeout or manual stop)
-    bot.output += `Collected ${finalCollected}/${num} ${blockType} before being interrupted.\n`;
+    bot.output += `Collected ${collectedDisplay}${miningContext} before being interrupted.\n`;
   } else if (finalCollected >= num) {
     // Successfully collected the requested amount
-    bot.output += `Collected ${finalCollected} ${blockType}.\n`;
+    bot.output += `Collected ${collectedDisplay}${miningContext}.\n`;
   } else if (unreachableCount > 0) {
     // Stopped early due to unreachable blocks
-    bot.output += `Collected ${finalCollected}/${num} ${blockType}. Visible but unreachable: ${unreachableCount}.\n`;
+    bot.output += `Collected ${collectedDisplay} (target was ${num} ${blockType}). Visible but unreachable: ${unreachableCount}.\n`;
     try {
       const details = [];
       if (undiggableByBlock.size > 0) {

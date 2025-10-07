@@ -27,25 +27,58 @@ export function buildBlockTypes(registry, blockDropMap, blockType) {
 }
 
 export function createCountTarget(registry, bot, desiredDropNames, world) {
-  return () => {
+  const uniqueNames = [...new Set(desiredDropNames)];
+  const zeroCounts = () => {
+    const counts = {};
+    for (const name of uniqueNames) counts[name] = 0;
+    return counts;
+  };
+
+  const getCounts = () => {
+    const counts = zeroCounts();
     try {
-      if (bot.inventory && typeof bot.inventory.count === 'function' && desiredDropNames.length > 0) {
-        return desiredDropNames.reduce((sum, name) => {
+      if (bot.inventory && typeof bot.inventory.count === 'function' && uniqueNames.length > 0) {
+        for (const name of uniqueNames) {
           let id = null;
           try { id = registry.getItemId(name); } catch { id = null; }
-          if (id == null) return sum;
-          return sum + bot.inventory.count(id, null);
-        }, 0);
+          if (id == null) {
+            counts[name] = 0;
+            continue;
+          }
+          try {
+            counts[name] = bot.inventory.count(id, null);
+          } catch {
+            counts[name] = 0;
+          }
+        }
+        return counts;
       }
+
       const inv = world.getInventoryCounts(bot) || {};
-      if (desiredDropNames.length > 0) {
-        return desiredDropNames.reduce((sum, name) => sum + (inv[name] || 0), 0);
+      if (uniqueNames.length > 0) {
+        for (const name of uniqueNames) {
+          counts[name] = inv[name] || 0;
+        }
       }
-      return 0;
+      return counts;
+    } catch {
+      return zeroCounts();
+    }
+  };
+
+  const counter = () => {
+    try {
+      const counts = getCounts();
+      let sum = 0;
+      for (const name of Object.keys(counts)) sum += counts[name] || 0;
+      return sum;
     } catch {
       return 0;
     }
   };
+
+  counter.getCounts = getCounts;
+  return counter;
 }
 
 export function createIsValidTarget(bot, blocktypes, grownCropsOnly, cropAgeMap, blockType) {
@@ -379,10 +412,15 @@ export async function performDigAndPredict(bot, targetBlock, targetPos, countTar
   }
 }
 
-export function handleEmptyCandidatesExit({ emptyScans, collectedTarget, unreachableCount, candidatesSize, MCDataInstance, blocktypes, blockType, FAR_DISTANCE, bot }) {
+export function handleEmptyCandidatesExit({ emptyScans, collectedTarget, collectedSummary, unreachableCount, candidatesSize, MCDataInstance, blocktypes, blockType, FAR_DISTANCE, bot, summaryFormatter }) {
   if (emptyScans <= 3) return { exit: false };
+  const formatter = typeof summaryFormatter === 'function' ? summaryFormatter : null;
   if (collectedTarget > 0) {
-    bot.output += `You collected ${collectedTarget} ${blockType}, and don't see more ${blockType} around\n`;
+    const summaryText = formatter
+      ? formatter(collectedSummary, { includeTotalPrefix: true })
+      : `${collectedTarget} ${blockType}`;
+    const miningContext = blockType ? ` while mining ${blockType}` : '';
+    bot.output += `You collected ${summaryText}${miningContext}, and don't see more ${blockType} around\n`;
     return { exit: true };
   } else if (unreachableCount > 0) {
     bot.output += `No reachable ${blockType} found nearby. Visible but unreachable: ${unreachableCount}.\n`;
