@@ -1,4 +1,5 @@
 import Vec3 from "vec3";
+import pf from "mineflayer-pathfinder";
 import MCData from "../../../utils/mcdata.js";
 import { digBlock } from "../functions.js";
 
@@ -400,7 +401,12 @@ export async function performDigAndPredict(bot, targetBlock, targetPos, countTar
     await bot.tool.equipForBlock?.(targetBlock);
   } catch {}
   try {
-    await bot.pathfinder?.setMovements?.(new (require('mineflayer-pathfinder').Movements)(bot));
+    const movements = new pf.Movements(bot);
+    movements.canDig = true;
+    movements.allow1by1towers = true;
+    try {
+      bot.pathfinder?.setMovements?.(movements);
+    } catch {}
   } catch {}
   try {
     await digBlock(bot, targetBlock);
@@ -441,7 +447,7 @@ export function handleEmptyCandidatesExit({ emptyScans, collectedTarget, collect
       ? formatter(collectedSummary, { includeTotalPrefix: true })
       : `${collectedTarget} ${blockType}`;
     const miningContext = blockType ? ` while mining ${blockType}` : '';
-    bot.output += `You collected ${summaryText}${miningContext}, and don't see more ${blockType} around\n`;
+    bot.output += `You collected ${summaryText}${miningContext}\n`;
     return { exit: true };
   } else if (unreachableCount > 0) {
     bot.output += `No reachable ${blockType} found nearby. Visible but unreachable: ${unreachableCount}.\n`;

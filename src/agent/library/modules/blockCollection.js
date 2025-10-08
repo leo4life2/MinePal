@@ -249,7 +249,12 @@ export async function collectBlocks(
         try {
           const dropCount = (dropPickCounts.get(dropId) || 0) + 1;
           dropPickCounts.set(dropId, dropCount);
-          bot.pathfinder?.setMovements?.(new pf.Movements(bot));
+          const movements = new pf.Movements(bot);
+          movements.canDig = true;
+          movements.allow1by1towers = false;
+          try {
+            bot.pathfinder?.setMovements?.(movements);
+          } catch {}
           await bot.pathfinder?.goto?.(new pf.goals.GoalNear(targetPos.x, targetPos.y, targetPos.z, DROP_NEAR_RADIUS));
           await new Promise(r => setTimeout(r, 120));
         } catch (err) {
