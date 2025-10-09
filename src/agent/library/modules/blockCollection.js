@@ -139,10 +139,16 @@ export async function collectBlocks(
     return 'unknown';
   };
   const scanSummaryOut = { last: null };
+  let inventoryFull = false;
 
   const onPhysicsTick = () => {
     try {
       tickIndex++;
+      try {
+        if (bot.inventory && typeof bot.inventory.emptySlotCount === 'function') {
+          inventoryFull = bot.inventory.emptySlotCount() === 0;
+        }
+      } catch {}
       const doScan = (tickIndex % SCAN_EVERY_TICKS) === 0;
       const doPrune = (tickIndex % PRUNE_EVERY_TICKS) === 0;
       if (!doScan && !doPrune) return;
@@ -235,6 +241,11 @@ export async function collectBlocks(
         }
         await new Promise(r => setTimeout(r, 100));
         continue;
+      }
+
+      if (inventoryFull) {
+        console.log("[collectBlocks] inventory full, exiting loop");
+        break;
       }
 
       const pick = selectNearestCandidate(candidates, dropCandidates, lastCollectedPos, bot);
@@ -340,6 +351,12 @@ export async function collectBlocks(
   } else if (finalCollected >= num) {
     // Successfully collected the requested amount
     bot.output += `Collected ${collectedDisplay}${miningContext}.\n`;
+  } else if (inventoryFull) {
+    if (finalCollected > 0) {
+      bot.output += `Collected ${collectedDisplay}${miningContext} but inventory is full.\n`;
+    } else {
+      bot.output += `Inventory is full; unable to collect more ${blockType}.\n`;
+    }
   } else if (unreachableCount > 0) {
     // Stopped early due to unreachable blocks
     bot.output += `Collected ${collectedDisplay} (target was ${num} ${blockType}). Visible but unreachable: ${unreachableCount}.\n`;
