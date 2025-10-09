@@ -1,3 +1,7 @@
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const blockDropMap = require("./blockDropMap.json");
+
 // Block collection configuration and constants
 
 export const NEAR_DISTANCE = 4.5;
@@ -21,74 +25,65 @@ export const PRUNE_EVERY_TICKS = 10; // prune cadence (~2Hz)
 export const MAX_CANDIDATES = 200; // cap pool to avoid O(n) bloat
 
 // Static maps
-export const BLOCK_DROP_MAP = {
-  // Base stone/deepslate
-  stone: ["stone", "cobblestone"],
-  deepslate: ["deepslate", "cobbled_deepslate"],
-  cobblestone: ["cobblestone"],
-  cobbled_deepslate: ["cobbled_deepslate"],
+export const BLOCK_DROP_MAP = blockDropMap;
 
-  // Overworld ores (stone + deepslate)
-  coal_ore: ["coal_ore", "coal"],
-  deepslate_coal_ore: ["deepslate_coal_ore", "coal"],
-
-  iron_ore: ["iron_ore", "raw_iron"],
-  deepslate_iron_ore: ["deepslate_iron_ore", "raw_iron"],
-
-  copper_ore: ["copper_ore", "raw_copper"],
-  deepslate_copper_ore: ["deepslate_copper_ore", "raw_copper"],
-
-  gold_ore: ["gold_ore", "raw_gold"],
-  deepslate_gold_ore: ["deepslate_gold_ore", "raw_gold"],
-
-  redstone_ore: ["redstone_ore", "redstone"],
-  deepslate_redstone_ore: ["deepslate_redstone_ore", "redstone"],
-
-  lapis_ore: ["lapis_ore", "lapis_lazuli"],
-  deepslate_lapis_ore: ["deepslate_lapis_ore", "lapis_lazuli"],
-
-  diamond_ore: ["diamond_ore", "diamond"],
-  deepslate_diamond_ore: ["deepslate_diamond_ore", "diamond"],
-
-  emerald_ore: ["emerald_ore", "emerald"],
-  deepslate_emerald_ore: ["deepslate_emerald_ore", "emerald"],
-
-  // Nether ores & specials
-  nether_quartz_ore: ["nether_quartz_ore", "quartz"],
-  nether_gold_ore: ["nether_gold_ore", "gold_nugget"],
-  ancient_debris: ["ancient_debris"],
-  obsidian: ["obsidian"],
-
-  // Building / utility
-  bookshelf: ["bookshelf", "book"],
-  glass: ["glass"], // (no-drop without Silk Touch)
-  glowstone: ["glowstone", "glowstone_dust"],
-
-  // Ground blocks
-  grass_block: ["grass_block", "dirt"],
-  mycelium: ["mycelium", "dirt"],
-  podzol: ["podzol", "dirt"],
-  dirt: ["dirt"],
-  coarse_dirt: ["coarse_dirt"],
-  sand: ["sand"],
-  red_sand: ["red_sand"],
-  gravel: ["gravel", "flint"],
-  clay: ["clay", "clay_ball"],
-
-  // Logs & leaves (generic)
-  // If you enumerate species, map e.g. oak_log → ["oak_log"], etc.
-  logs_any: ["self"], // placeholder meaning “drops itself”
-  leaves_any: ["leaves", "sapling", "stick", "apple"],
-
-  // Misc nether/overworld blocks
-  netherrack: ["netherrack"],
-  basalt: ["basalt"],
-  blackstone: ["blackstone"],
-  soul_sand: ["soul_sand"],
-  soul_soil: ["soul_soil"],
-  magma_block: ["magma_block"],
-  shroomlight: ["shroomlight"],
-};
+export const SILK_TOUCH_REQUIRED = Object.freeze([
+  "bee_nest",
+  "black_stained_glass",
+  "black_stained_glass_pane",
+  "blue_ice",
+  "blue_stained_glass",
+  "blue_stained_glass_pane",
+  "brain_coral",
+  "brain_coral_fan",
+  "brown_stained_glass",
+  "brown_stained_glass_pane",
+  "bubble_coral",
+  "bubble_coral_fan",
+  "calibrated_sculk_sensor",
+  "chiseled_bookshelf",
+  "cyan_stained_glass",
+  "cyan_stained_glass_pane",
+  "glass",
+  "glass_pane",
+  "gray_stained_glass",
+  "gray_stained_glass_pane",
+  "green_stained_glass",
+  "green_stained_glass_pane",
+  "ice",
+  "large_amethyst_bud",
+  "light_blue_stained_glass",
+  "light_blue_stained_glass_pane",
+  "light_gray_stained_glass",
+  "light_gray_stained_glass_pane",
+  "lime_stained_glass",
+  "lime_stained_glass_pane",
+  "magenta_stained_glass",
+  "magenta_stained_glass_pane",
+  "medium_amethyst_bud",
+  "orange_stained_glass",
+  "orange_stained_glass_pane",
+  "packed_ice",
+  "pink_stained_glass",
+  "pink_stained_glass_pane",
+  "purple_stained_glass",
+  "purple_stained_glass_pane",
+  "red_stained_glass",
+  "red_stained_glass_pane",
+  "sculk",
+  "sculk_catalyst",
+  "sculk_sensor",
+  "sculk_shrieker",
+  "sculk_vein",
+  "small_amethyst_bud",
+  "tube_coral",
+  "tube_coral_fan",
+  "turtle_egg",
+  "white_stained_glass",
+  "white_stained_glass_pane",
+  "yellow_stained_glass",
+  "yellow_stained_glass_pane"
+]);
 
 export const CROP_AGE_MAP = { wheat: 7, beetroot: 3, carrot: 7, potato: 7 };
 

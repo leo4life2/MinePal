@@ -2,6 +2,9 @@ import Vec3 from "vec3";
 import pf from "mineflayer-pathfinder";
 import MCData from "../../../utils/mcdata.js";
 import { digBlock } from "../functions.js";
+import { SILK_TOUCH_REQUIRED } from "./blockCollectionConfig.js";
+
+const SILK_TOUCH_REQUIRED_SET = new Set(SILK_TOUCH_REQUIRED);
 
 export function buildBlockTypes(registry, blockDropMap, blockType) {
   let blocktypes = [];
@@ -353,6 +356,7 @@ export function selectNearestCandidate(candidates, dropCandidates, lastCollected
 }
 
 export function ensureHarvestable(bot, targetBlock, targetPos, { unreachableKeys, undiggableByBlock, cannotHarvestByBlockTool, candidates, targetKey }) {
+  
   try {
     if (targetBlock && targetBlock.diggable === false) {
       try {
@@ -366,10 +370,27 @@ export function ensureHarvestable(bot, targetBlock, targetPos, { unreachableKeys
   } catch {}
 
   try { bot.tool.equipForBlock(targetBlock); } catch {}
-  const itemId = bot.heldItem ? bot.heldItem.type : null;
+  const heldItem = bot.heldItem || null;
+  const toolName = heldItem?.name || 'empty hand';
+  const enchantments = Array.isArray(heldItem?.enchants) ? heldItem.enchants : [];
+
+  if (targetBlock && SILK_TOUCH_REQUIRED_SET.has(targetBlock.name)) {
+    const hasSilkTouch = enchantments.some((enc) => enc?.name === 'silk_touch');
+    if (!hasSilkTouch) {
+      try {
+        unreachableKeys.add(targetKey);
+        const bname = targetBlock.name;
+        const key = `${bname}||${toolName} (needs silk touch)`;
+        cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
+      } catch {}
+      candidates.delete(targetKey);
+      return { ok: false };
+    }
+  }
+
+  const itemId = heldItem ? heldItem.type : null;
   try {
     if (!targetBlock.canHarvest(itemId)) {
-      const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
       try {
         unreachableKeys.add(targetKey);
         const bname = targetBlock.name;
@@ -382,7 +403,6 @@ export function ensureHarvestable(bot, targetBlock, targetPos, { unreachableKeys
   } catch {
     try {
       unreachableKeys.add(targetKey);
-      const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
       const bname = targetBlock?.name || 'unknown';
       const key = `${bname}||${toolName}`;
       cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);

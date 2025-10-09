@@ -12,7 +12,8 @@ import {
   handleEmptyCandidatesExit,
   selectNearestCandidate,
   performDigAndPredict,
-  normalizeDropCandidates
+  normalizeDropCandidates,
+  ensureHarvestable
 } from "./blockCollectionHelpers.js";
 import {
   FAR_DISTANCE,
@@ -293,45 +294,15 @@ export async function collectBlocks(
         continue;
       }
 
-      try {
-        if (targetBlock && targetBlock.diggable === false) {
-          try {
-            unreachableKeys.add(blockKey);
-            unreachableCount++;
-            const bname = targetBlock.name;
-            undiggableByBlock.set(bname, (undiggableByBlock.get(bname) || 0) + 1);
-          } catch {}
-          console.log("[collectBlocks] target not diggable pos=%j", targetPosBlock);
-          candidates.delete(blockKey);
-          continue;
-        }
-      } catch {}
-
-      try { await bot.tool.equipForBlock(targetBlock); } catch {}
-      const itemId = bot.heldItem ? bot.heldItem.type : null;
-      try {
-        if (!targetBlock.canHarvest(itemId)) {
-          const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
-          try {
-            unreachableKeys.add(blockKey);
-            unreachableCount++;
-            const bname = targetBlock.name;
-            const key = `${bname}||${toolName}`;
-            cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
-          } catch {}
-          candidates.delete(blockKey);
-          continue;
-        }
-      } catch {
-        try {
-          unreachableKeys.add(blockKey);
-          unreachableCount++;
-          const toolName = (bot.heldItem && bot.heldItem.name) ? bot.heldItem.name : 'empty hand';
-          const bname = targetBlock?.name || 'unknown';
-          const key = `${bname}||${toolName}`;
-          cannotHarvestByBlockTool.set(key, (cannotHarvestByBlockTool.get(key) || 0) + 1);
-        } catch {}
-        candidates.delete(blockKey);
+      const { ok: harvestable } = ensureHarvestable(bot, targetBlock, targetPosBlock, {
+        unreachableKeys,
+        undiggableByBlock,
+        cannotHarvestByBlockTool,
+        candidates,
+        targetKey: blockKey
+      });
+      if (!harvestable) {
+        unreachableCount++;
         continue;
       }
 
