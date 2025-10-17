@@ -188,8 +188,10 @@ export class Proxy {
                     jsonContent.requires_more_actions = !!(jsonContent.next_action && jsonContent.next_action.trim() !== '');
                     return { json: jsonContent };
                 } catch (e) {
-                    console.error("OpenAI response JSON parsing error:", e, response.data.choices[0].message.content);
-                    return { json: { error: "Failed to parse OpenAI JSON response: " + e.message } };
+                    const rawContent = response?.data?.choices?.[0]?.message?.content;
+                    const truncatedRawContent = rawContent ? rawContent.slice(0, 200) + (rawContent.length > 200 ? '...' : '') : '<empty>';
+                    console.error("OpenAI response JSON parsing error:", e, rawContent);
+                    return { json: { error: `Failed to parse OpenAI JSON response: ${e.message}. Raw content (truncated): ${truncatedRawContent}` } };
                 }
 
             } else {
@@ -217,7 +219,7 @@ export class Proxy {
 
                 if (contentType && contentType.startsWith('multipart/mixed')) {
                     const boundaryMatch = contentType.match(/boundary=(.+)$/);
-                    if (!boundaryMatch) return { json: { error: "Multipart response missing boundary string."}};
+                    if (!boundaryMatch) return { json: { error: `Multipart response missing boundary string. Content-Type header: ${contentType}` }};
                     
                     const boundary = boundaryMatch[1];
                     let parsedJson = null;
@@ -239,7 +241,7 @@ export class Proxy {
                         return { json: parsedJson, audio: audioWavData }; // audioWavData will be null if not present
                     } catch (e) {
                         console.error("Multipart processing error:", e);
-                        return { json: { error: "Multipart processing error: " + e.message } };
+                        return { json: { error: `Multipart processing error: ${e.message}` } };
                     }
                 } else if (contentType && contentType.startsWith('application/json')) {
                     // Standard JSON response
@@ -257,10 +259,13 @@ export class Proxy {
                                 // Add requires_more_actions based on next_action
                                 actualJsonResponse.requires_more_actions = !!(actualJsonResponse.next_action && actualJsonResponse.next_action.trim() !== '');
                                 return { json: actualJsonResponse, audio_failed_but_text_ok: true };
-                            } catch (textParseError) {
-                                console.error("Failed to parse text_response in audio failure case (200 OK):", textParseError);
-                                // If parsing text_response fails, this is a more severe issue with the backend's response format.
-                                return { json: { error: "Audio failed, and text_response from backend was malformed." } };
+                    } catch (textParseError) {
+                        const truncatedTextResponse = typeof parsedJson.text_response === 'string'
+                            ? parsedJson.text_response.slice(0, 200) + (parsedJson.text_response.length > 200 ? '...' : '')
+                            : '<non-string payload>';
+                        console.error("Failed to parse text_response in audio failure case (200 OK):", textParseError, parsedJson.text_response);
+                        // If parsing text_response fails, this is a more severe issue with the backend's response format.
+                        return { json: { error: `Audio failed and backend text_response was malformed: ${textParseError.message}. Raw (truncated): ${truncatedTextResponse}` } };
                             }
                         } else {
                             // Normal successful JSON response
@@ -269,8 +274,11 @@ export class Proxy {
                             return { json: parsedJson };
                         }
                     } catch (e) {
-                        console.error("Failed to parse application/json response:", e);
-                        return { json: { error: "Failed to parse backend JSON response: " + e.message } };
+                        const truncatedJsonString = typeof responseBuffer === 'object' && responseBuffer
+                            ? responseBuffer.toString('utf-8', 0, Math.min(responseBuffer.length, 200)) + (responseBuffer.length > 200 ? '...' : '')
+                            : '<unavailable>';
+                        console.error("Failed to parse application/json response:", e, truncatedJsonString);
+                        return { json: { error: `Failed to parse backend JSON response: ${e.message}. Raw payload (truncated): ${truncatedJsonString}` } };
                     }
                 } else {
                     const errorMsg = `Unexpected content type: ${contentType}. Expected application/json or multipart/mixed.`;
@@ -322,9 +330,13 @@ export class Proxy {
                 errorResponseMessage += `Status ${err.response.status}: ${errorDetailText}`;
 
             } else if (err.request) {
-                 errorResponseMessage += "Cannot reach the service. Check internet connection or API endpoint.";
+                 const requestCode = err.code ? ` (${err.code})` : '';
+                 const requestDetail = (err.message && err.message !== 'AxiosError') ? ` Details: ${err.message}` : '';
+                 errorResponseMessage += `No response received from upstream service${requestCode}.${requestDetail}`;
             } else {
-                 errorResponseMessage += err.message || "An unexpected error occurred.";
+                 const fallbackCode = err.code ? ` (${err.code})` : '';
+                 const fallbackMessage = err.message && err.message !== 'AxiosError' ? err.message : 'An unexpected error occurred.';
+                 errorResponseMessage += `Client-side error${fallbackCode}: ${fallbackMessage}`;
             }
             // Log the more detailed error for server-side debugging
             console.error("[Proxy Send Error] Original Error:", err.message, "Formatted Response:", errorResponseMessage);
@@ -434,13 +446,15 @@ export class Proxy {
             } catch (err) {
                  // Specific handling for OpenAI 401/403 errors
                 if (this.openai_api_key && err.response && (err.response.status === 401 || err.response.status === 403)) {
-                    console.error(`[Proxy Embed Error] OpenAI API Key Error (${err.response.status}): ${err.response.data?.error?.message || 'Invalid Key or Permissions'}`);
-                    throw new Error(`OpenAI API Key Error (${err.response.status})`); 
+                    const apiMessage = err.response.data?.error?.message || 'Invalid Key or Permissions';
+                    console.error(`[Proxy Embed Error] OpenAI API Key Error (${err.response.status}): ${apiMessage}`);
+                    throw new Error(`OpenAI API Key Error (${err.response.status}): ${apiMessage}`); 
                 }
                  // Specific handling for Backend 403 errors (assuming JWT based)
                 if (!this.openai_api_key && err.response && err.response.status === 403) {
-                    console.error(`[Proxy Embed Error] Access Forbidden: ${err.response.data?.error || 'Check JWT or backend permissions'}`);
-                    throw new Error('Access forbidden: ' + (err.response.data?.error || 'Invalid JWT'));
+                    const backendMessage = err.response.data?.error || 'Check JWT or backend permissions';
+                    console.error(`[Proxy Embed Error] Access Forbidden: ${backendMessage}`);
+                    throw new Error(`Access forbidden: ${backendMessage}`);
                 }
                 
                 retryCount++;
