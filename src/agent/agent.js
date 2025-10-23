@@ -236,10 +236,8 @@ export class Agent {
         // --- Prompting State Management ---
         this.promptingState = 'idle'; // 'idle', 'prompting', 'executing'
         this.promptQueued = false; // Flag to indicate if a prompt needs to be processed
-        this.queuedPromptReason = null; // Reason prompt was queued ('autonomous', source like 'system' or username)
+        this.queuedPromptReason = null; // Reason prompt was queued
         this.processingLoopInterval = null; // To hold the interval ID
-        this.lastContinueAutonomously = false; // Track if the last cycle requested continuation
-        this.autonomousCycleCount = 0; // Counter for consecutive autonomous cycles
         // --- End Prompting State Management ---
     }
 
@@ -1229,8 +1227,7 @@ export class Agent {
         await this.history.add(source, message);
 
         // Queue a prompt processing cycle, storing the reason
-        this.queuedPromptReason = `[${source}] ${message}`;
-        this.promptQueued = true;
+        this._queuePrompt(`[${source}] ${message}`);
         // console.log(`[DEBUG] Prompt queued by ${source}. Reason: ${this.queuedPromptReason}. State: ${this.promptingState}`);
     }
 
@@ -1269,6 +1266,18 @@ export class Agent {
         }, delayMilliseconds);
     }
 
+    _queuePrompt(reason = null) {
+        if (this.promptQueued) {
+            return;
+        }
+
+        if (typeof reason === 'string' && reason.trim() !== '') {
+            this.queuedPromptReason = reason;
+        }
+
+        this.promptQueued = true;
+    }
+
     /**
      * Starts the main processing loop for handling queued prompts.
      */
@@ -1280,18 +1289,6 @@ export class Agent {
         const loopInterval = 1000; // Process every 1 second
         console.log(`[Agent] Starting processing loop with interval ${loopInterval}ms.`);
         this.processingLoopInterval = setInterval(async () => {
-            // --- Autonomous Cycle Management ---
-            // Check if the *last completed cycle* requested autonomous continuation
-            if (this.lastContinueAutonomously) {
-                this.autonomousCycleCount++;
-                // console.log(`[_processingLoop] Autonomous cycle requested. Count: ${this.autonomousCycleCount}`);
-            } else {
-                this.autonomousCycleCount = 0;
-            }
-            // Reset the flag *after* checking it for the current interval
-            this.lastContinueAutonomously = false;
-            // --- End Autonomous Cycle Management ---
-
             // --- Core Loop Logic ---
             if (this.promptQueued) {
                 let canProcess = false;
@@ -1301,9 +1298,9 @@ export class Agent {
                     canProcess = true;
                     console.log(`[DEBUG] Allowing processing of idle state.`);
                 }
-                // Allow processing if executing, but ONLY if it's NOT an autonomous trigger
-                else if (this.promptingState.startsWith('executing') && this.queuedPromptReason !== 'autonomous') {
-                    console.log(`[DEBUG] Allowing preemption of 'executing' state by non-autonomous trigger (${this.queuedPromptReason}).`);
+                // Allow processing if executing (new command will interrupt)
+                else if (this.promptingState.startsWith('executing')) {
+                    console.log(`[DEBUG] Allowing preemption of 'executing' state by queued trigger (${this.queuedPromptReason}).`);
                     canProcess = true;
                     commandToInterrupt = this.promptingState.split(' ')[1];
                     this.history.add('system', `[NOTICE] Previous command ${commandToInterrupt} is still executing. If you execute a new command, it will interrupt the previous one.`);
@@ -1311,19 +1308,6 @@ export class Agent {
 
                 if (canProcess) {
                     console.log(`[DEBUG] Will call LLM. promptingState: ${this.promptingState}, queuedPromptReason: ${this.queuedPromptReason}`);
-
-                    if (this.queuedPromptReason === 'autonomous' && this.autonomousCycleCount >= 10) {
-                        console.warn("[_processingLoop] Autonomous cycle limit reached. Stopping continuous prompting.");
-                        const timeStr = formatMinecraftTimeSimple(this.bot.time.timeOfDay);
-                        this.history.add('system', `[NOTICE | ${timeStr}] Autonomous cycle limit (10) reached. Stopping execution.`);
-                        await this.sendMessage(`/tell ${this.owner} [NOTICE] Autonomous execution limit reached. Stopping.`, true);
-                        this.promptQueued = false; // Prevent the prompt
-                        this.queuedPromptReason = null; // Clear reason
-                        this.autonomousCycleCount = 0; // Reset counter
-                        this.lastContinueAutonomously = false; // Ensure flag is reset
-                        return; // Skip the rest of this interval's processing
-                    }
-                    // --- End Autonomous Limit Check ---
 
                     // Consume the queue flag and reason
                     const reasonForPrompt = this.queuedPromptReason; // Capture reason before clearing
@@ -1384,7 +1368,7 @@ export class Agent {
     /**
      * The core logic for a single LLM prompt cycle, moved from handleMessage.
      * This function assumes it's called when state is 'prompting'.
-     * @param {string | null} reason - The reason this prompt cycle was triggered ('autonomous', source, etc.).
+     * @param {string | null} reason - The reason this prompt cycle was triggered (source, etc.).
      */
     async _processPromptCycle(reason) {
         // console.log(`[_processPromptCycle] Starting prompt cycle. Reason: ${reason || 'unknown'}`);
@@ -1452,7 +1436,6 @@ export class Agent {
         let chatMessage = responseData.say_in_game || null;
         let command = responseData.execute_command || null;
         let emoteToPerform = responseData.emote || null; // Extract emote
-        let requires_more_actions = responseData.requires_more_actions || false;
         let thought = responseData.thought || null;
         let current_goal_status = responseData.current_goal_status || null;
 
@@ -1516,47 +1499,10 @@ export class Agent {
         }
 
         if (command) {
-            this.promptingState = `executing ${command}`; // indicates executing a command
-            try {
-                // Handle Slash Commands (just send to chat)
-                if (command.startsWith('/')) {
-                    // console.log(`[_processPromptCycle] Sending slash command: "${command}"`);
-                    await this.sendMessage(command, true);
-                }
-                // Handle Internal Commands (!)
-                else {
-                    const command_name = containsCommand(command);
-                    if (!command_name) {
-                        console.error(`[_processPromptCycle] Invalid internal command format: ${command}`);
-                        this.history.add('system', `[ERROR | ${timeStr}] Invalid internal command format: ${command}`);
-                    } else if (!commandExists(command_name)) {
-                        console.log(`[_processPromptCycle] Hallucinated command: ${command_name}`);
-                        this.history.add('system', `[HALLUCINATION | ${timeStr}] Command ${command_name} does not exist.`);
-                    } else {
-                        // Execute the valid internal command
-                        // console.log(`[_processPromptCycle] Executing internal command: ${command_name}`);
-                        let execute_res;
-                        try {
-                            execute_res = await executeCommand(this, command);
-                            console.log(`[_processPromptCycle] Command ${command} finished. Result:`, execute_res);
-                            if (execute_res !== undefined && execute_res !== null) {
-                                this.history.add('system', `[EXEC_RES | ${timeStr}] Output of action ${command_name}: ${truncCommandMessage(String(execute_res))}`);
-                            }
-                        } catch (execError) {
-                            console.error(`[_processPromptCycle] Error executing command ${command_name}:`, execError);
-                            this.history.add('system', `[ERROR | ${timeStr}] Failed to execute action ${command_name}: ${execError.message}`);
-                            // commandExecuted remains false, state will reset in finally
-                        }
-                    }
-                }
-            } finally {
-                console.log(`[idle state] Command processing finished. Resetting state to 'idle'.`);
-                this.promptingState = 'idle';
-                this._ensureSilenceTimerRunning(); // Ensure timer restarts after execution attempt
-            }
+            await this._executeCommand(command, timeStr);
         } else {
-             this.promptingState = 'idle';
-             this._ensureSilenceTimerRunning(); // Ensure timer restarts if no command was run
+            this.promptingState = 'idle';
+            this._ensureSilenceTimerRunning(); // Ensure timer restarts if no command was run
         }
 
         // Save history after processing the response and potentially executing command
@@ -1568,14 +1514,6 @@ export class Agent {
         this.bot.emit('finished_executing');
         // console.log("[_processPromptCycle] Emitted 'finished_executing'.");
         
-        // --- Queue next prompt if autonomous continuation is requested ---        
-        this.lastContinueAutonomously = requires_more_actions; // Store for the loop to check next interval
-        if (requires_more_actions) {
-            // console.log("[_processPromptCycle] LLM requested autonomous continuation. Queuing next prompt.");
-            this.queuedPromptReason = 'autonomous'; // Set the reason
-            this.promptQueued = true;
-        }
-
         // --- Process Memory Management Operations ---
         const memoryOps = responseData.manage_memories || [];
         if (Array.isArray(memoryOps)) {
@@ -1619,6 +1557,54 @@ export class Agent {
             }
         } else {
             console.warn('[_processPromptCycle] manage_memories was not an array:', memoryOps);
+        }
+    }
+
+    async _executeCommand(command, timeStr) {
+        this.promptingState = `executing ${command}`;
+        let followUpReason = null;
+
+        try {
+            if (command.startsWith('/')) {
+                await this.sendMessage(command, true);
+                return; // Slash commands just dispatch to chat; no follow-up prompt unless output recorded
+            }
+
+            const command_name = containsCommand(command);
+            if (!command_name) {
+                console.error(`[_executeCommand] Invalid internal command format: ${command}`);
+                this.history.add('system', `[ERROR | ${timeStr}] Invalid internal command format: ${command}`);
+                followUpReason = `[system] Invalid command format for ${command}`;
+                return;
+            }
+
+            if (!commandExists(command_name)) {
+                console.log(`[_executeCommand] Hallucinated command: ${command_name}`);
+                this.history.add('system', `[HALLUCINATION | ${timeStr}] Command ${command_name} does not exist.`);
+                followUpReason = `[system] Hallucinated command ${command_name}`;
+                return;
+            }
+
+            try {
+                const executeRes = await executeCommand(this, command);
+                console.log(`[_executeCommand] Command ${command} finished. Result:`, executeRes);
+                if (executeRes !== undefined && executeRes !== null) {
+                    this.history.add('system', `[EXEC_RES | ${timeStr}] Output of action ${command_name}: ${truncCommandMessage(String(executeRes))}`);
+                    followUpReason = `[system] Action ${command_name} completed`;
+                }
+            } catch (execError) {
+                console.error(`[_executeCommand] Error executing command ${command_name}:`, execError);
+                this.history.add('system', `[ERROR | ${timeStr}] Failed to execute action ${command_name}: ${execError.message}`);
+                followUpReason = `[system] Action ${command_name} failed`;
+            }
+        } finally {
+            console.log('[idle state] Command processing finished. Resetting state to "idle".');
+            this.promptingState = 'idle';
+            this._ensureSilenceTimerRunning();
+
+            if (followUpReason) {
+                this._queuePrompt(followUpReason);
+            }
         }
     }
 
