@@ -308,7 +308,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Path artifacts/windows -Force | Out-Null
           $executables = Get-ChildItem -Path dist -Filter *.exe
-          if ($executables.Count -eq 0) {
+          if (-not $executables) {
             Write-Error "No Windows exe found in dist"
           }
           foreach ($file in $executables) {
