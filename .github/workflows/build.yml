@@ -312,7 +312,8 @@ jobs:
             Write-Error "No Windows exe found in dist"
           }
           foreach ($file in $executables) {
-            Copy-Item $file.FullName artifacts/windows/
+            $targetName = $file.Name -replace ' ', '-'
+            Copy-Item $file.FullName (Join-Path 'artifacts/windows' $targetName)
           }
           $yml = Join-Path dist 'latest.yml'
           if (!(Test-Path $yml)) {
