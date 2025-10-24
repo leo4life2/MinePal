@@ -336,6 +336,9 @@ jobs:
       - build-macos-arm
       - build-non-macos
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: Download macOS Intel artifacts
         uses: actions/download-artifact@v4
         with:
@@ -434,70 +437,10 @@ jobs:
       - name: Merge macOS latest-mac.yml
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-import pathlib
-import sys
-
-try:
-    import yaml
-except ImportError as exc:
-    print(f"Failed to import PyYAML: {exc}", file=sys.stderr)
-    sys.exit(1)
-
-intel_path = pathlib.Path('downloads/macos-intel/latest-mac-intel.yml')
-arm_path = pathlib.Path('downloads/macos-arm/latest-mac-arm.yml')
-output_path = pathlib.Path('publish-ready/latest-mac.yml')
-
-if not intel_path.exists():
-    raise SystemExit('latest-mac-intel.yml missing')
-if not arm_path.exists():
-    raise SystemExit('latest-mac-arm.yml missing')
-
-with intel_path.open('r', encoding='utf-8') as f:
-    intel_data = yaml.safe_load(f)
-with arm_path.open('r', encoding='utf-8') as f:
-    arm_data = yaml.safe_load(f)
-
-if not isinstance(intel_data, dict) or not isinstance(arm_data, dict):
-    raise SystemExit('latest-mac.yml files must contain YAML mappings')
-
-merged = dict(intel_data)
-
-def merge_list(key, identifier):
-    items = {}
-    for source in (intel_data, arm_data):
-        value = source.get(key)
-        if not isinstance(value, list):
-            continue
-        for entry in value:
-            if not isinstance(entry, dict):
-                continue
-            ident = entry.get(identifier)
-            if not ident:
-                continue
-            items[ident] = entry
-    if items:
-        merged[key] = sorted(items.values(), key=lambda x: x.get(identifier, ''))
-    elif key in merged:
-        merged.pop(key, None)
-
-merge_list('files', 'url')
-merge_list('packages', 'path')
-
-release_dates = [d for d in (intel_data.get('releaseDate'), arm_data.get('releaseDate')) if d]
-if release_dates:
-    merged['releaseDate'] = max(release_dates)
-
-version_values = {intel_data.get('version'), arm_data.get('version')} - {None}
-if len(version_values) > 1:
-    raise SystemExit('Version mismatch between macOS builds')
-elif version_values:
-    merged['version'] = version_values.pop()
-
-output_path.parent.mkdir(parents=True, exist_ok=True)
-with output_path.open('w', encoding='utf-8') as f:
-    yaml.safe_dump(merged, f, sort_keys=False)
-PY
+          python3 .github/scripts/merge_mac_latest.py \
+            downloads/macos-intel/latest-mac-intel.yml \
+            downloads/macos-arm/latest-mac-arm.yml \
+            publish-ready/latest-mac.yml
 
       - name: Create PublishReady zip
         run: |
