@@ -77,29 +77,37 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
           API_KEY_ID: ${{ vars.API_KEY_ID }}
           API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
-
-      - name: Organize Intel build for release
+      - name: Collect Intel artifacts
         run: |
-          mkdir -p release/intel
-          cp -r dist/* release/intel/
-          ls -la release/intel/
+          set -euo pipefail
+          mkdir -p artifacts/macos-intel
+          shopt -s nullglob
+          intel_dmg=(dist/*.dmg)
+          if [ ${#intel_dmg[@]} -eq 0 ]; then
+            echo "No macOS Intel dmg found in dist" >&2
+            exit 1
+          fi
+          cp "${intel_dmg[@]}" artifacts/macos-intel/
+          intel_zip=(dist/*.zip)
+          if [ ${#intel_zip[@]} -eq 0 ]; then
+            echo "No macOS Intel zip found in dist" >&2
+            exit 1
+          fi
+          cp "${intel_zip[@]}" artifacts/macos-intel/
+          if [ ! -f dist/latest-mac.yml ]; then
+            echo "latest-mac.yml not found for Intel build" >&2
+            exit 1
+          fi
+          cp dist/latest-mac.yml artifacts/macos-intel/latest-mac-intel.yml
+          shopt -u nullglob
+          ls -la artifacts/macos-intel
 
-      - name: Create Intel release archive
-        run: |
-          cd release
-          zip -r minepal-intel-${{ github.ref_name }}.zip intel/
-          ls -la *.zip
-
-      - name: Upload Intel build to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
+      - name: Upload Intel artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: release/minepal-intel-${{ github.ref_name }}.zip
-          tag_name: ${{ github.ref_name }}
-          draft: true
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: macos-intel
+          path: artifacts/macos-intel
+          if-no-files-found: error
 
   build-macos-arm:
     runs-on: macos-latest
@@ -172,29 +180,37 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
           API_KEY_ID: ${{ vars.API_KEY_ID }}
           API_KEY_ISSUER_ID: ${{ vars.API_KEY_ISSUER_ID }}
-
-      - name: Organize ARM build for release
+      - name: Collect ARM artifacts
         run: |
-          mkdir -p release/arm64
-          cp -r dist/* release/arm64/
-          ls -la release/arm64/
+          set -euo pipefail
+          mkdir -p artifacts/macos-arm
+          shopt -s nullglob
+          arm_dmg=(dist/*.dmg)
+          if [ ${#arm_dmg[@]} -eq 0 ]; then
+            echo "No macOS ARM dmg found in dist" >&2
+            exit 1
+          fi
+          cp "${arm_dmg[@]}" artifacts/macos-arm/
+          arm_zip=(dist/*.zip)
+          if [ ${#arm_zip[@]} -eq 0 ]; then
+            echo "No macOS ARM zip found in dist" >&2
+            exit 1
+          fi
+          cp "${arm_zip[@]}" artifacts/macos-arm/
+          if [ ! -f dist/latest-mac.yml ]; then
+            echo "latest-mac.yml not found for ARM build" >&2
+            exit 1
+          fi
+          cp dist/latest-mac.yml artifacts/macos-arm/latest-mac-arm.yml
+          shopt -u nullglob
+          ls -la artifacts/macos-arm
 
-      - name: Create ARM release archive
-        run: |
-          cd release
-          zip -r minepal-arm64-${{ github.ref_name }}.zip arm64/
-          ls -la *.zip
-
-      - name: Upload ARM build to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
+      - name: Upload ARM artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: release/minepal-arm64-${{ github.ref_name }}.zip
-          tag_name: ${{ github.ref_name }}
-          draft: true
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: macos-arm
+          path: artifacts/macos-arm
+          if-no-files-found: error
 
   build-non-macos:
     runs-on: ${{ matrix.os }}
@@ -255,3 +271,254 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Collect Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/linux
+          shopt -s nullglob
+          linux_appimage=(dist/*.AppImage dist/*.appimage)
+          if [ ${#linux_appimage[@]} -eq 0 ]; then
+            echo "No Linux AppImage found in dist" >&2
+            exit 1
+          fi
+          cp "${linux_appimage[@]}" artifacts/linux/
+          if [ ! -f dist/latest-linux.yml ]; then
+            echo "latest-linux.yml not found" >&2
+            exit 1
+          fi
+          cp dist/latest-linux.yml artifacts/linux/latest-linux.yml
+          shopt -u nullglob
+          ls -la artifacts/linux
+
+      - name: Upload Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: artifacts/linux
+          if-no-files-found: error
+
+      - name: Collect Windows artifacts
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path artifacts/windows -Force | Out-Null
+          $executables = Get-ChildItem -Path dist -Filter *.exe
+          if ($executables.Count -eq 0) {
+            Write-Error "No Windows exe found in dist"
+          }
+          foreach ($file in $executables) {
+            Copy-Item $file.FullName artifacts/windows/
+          }
+          $yml = Join-Path dist 'latest.yml'
+          if (!(Test-Path $yml)) {
+            Write-Error "latest.yml not found"
+          }
+          Copy-Item $yml artifacts/windows/latest.yml
+          Get-ChildItem artifacts/windows
+
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: artifacts/windows
+          if-no-files-found: error
+
+  publish-ready:
+    runs-on: ubuntu-latest
+    needs:
+      - build-macos-intel
+      - build-macos-arm
+      - build-non-macos
+    steps:
+      - name: Download macOS Intel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-intel
+          path: downloads/macos-intel
+
+      - name: Download macOS ARM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-arm
+          path: downloads/macos-arm
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: downloads/linux
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows
+          path: downloads/windows
+
+      - name: Install PyYAML
+        run: python3 -m pip install --user pyyaml
+
+      - name: Prepare PublishReady directory
+        run: |
+          set -euo pipefail
+          mkdir -p publish-ready
+          # Windows artifacts
+          if [ ! -d downloads/windows ]; then
+            echo "Windows artifacts missing" >&2
+            exit 1
+          fi
+          if [ ! -f downloads/windows/latest.yml ]; then
+            echo "latest.yml missing for Windows" >&2
+            exit 1
+          fi
+          cp downloads/windows/latest.yml publish-ready/latest.yml
+          mkdir -p publish-ready/to-be-signed
+          shopt -s nullglob
+          exe_found=0
+          for exe in downloads/windows/*.exe; do
+            cp "$exe" publish-ready/to-be-signed/
+            exe_found=1
+          done
+          shopt -u nullglob
+          if [ "$exe_found" -eq 0 ]; then
+            echo "No Windows exe files found" >&2
+            exit 1
+          fi
+
+          # Linux artifacts
+          if [ ! -d downloads/linux ]; then
+            echo "Linux artifacts missing" >&2
+            exit 1
+          fi
+          if [ ! -f downloads/linux/latest-linux.yml ]; then
+            echo "latest-linux.yml missing" >&2
+            exit 1
+          fi
+          cp downloads/linux/latest-linux.yml publish-ready/latest-linux.yml
+          shopt -s nullglob
+          appimage_found=0
+          for app in downloads/linux/*.AppImage downloads/linux/*.appimage; do
+            [ -e "$app" ] || continue
+            cp "$app" publish-ready/
+            appimage_found=1
+          done
+          shopt -u nullglob
+          if [ "$appimage_found" -eq 0 ]; then
+            echo "No Linux AppImage files found" >&2
+            exit 1
+          fi
+
+          # macOS artifacts
+          if [ ! -d downloads/macos-intel ] || [ ! -d downloads/macos-arm ]; then
+            echo "macOS artifacts missing" >&2
+            exit 1
+          fi
+          shopt -s nullglob
+          mac_found=0
+          for file in downloads/macos-intel/*.dmg downloads/macos-intel/*.zip downloads/macos-arm/*.dmg downloads/macos-arm/*.zip; do
+            [ -e "$file" ] || continue
+            cp "$file" publish-ready/
+            mac_found=1
+          done
+          shopt -u nullglob
+          if [ "$mac_found" -eq 0 ]; then
+            echo "No macOS installer files found" >&2
+            exit 1
+          fi
+
+      - name: Merge macOS latest-mac.yml
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+import pathlib
+import sys
+
+try:
+    import yaml
+except ImportError as exc:
+    print(f"Failed to import PyYAML: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+intel_path = pathlib.Path('downloads/macos-intel/latest-mac-intel.yml')
+arm_path = pathlib.Path('downloads/macos-arm/latest-mac-arm.yml')
+output_path = pathlib.Path('publish-ready/latest-mac.yml')
+
+if not intel_path.exists():
+    raise SystemExit('latest-mac-intel.yml missing')
+if not arm_path.exists():
+    raise SystemExit('latest-mac-arm.yml missing')
+
+with intel_path.open('r', encoding='utf-8') as f:
+    intel_data = yaml.safe_load(f)
+with arm_path.open('r', encoding='utf-8') as f:
+    arm_data = yaml.safe_load(f)
+
+if not isinstance(intel_data, dict) or not isinstance(arm_data, dict):
+    raise SystemExit('latest-mac.yml files must contain YAML mappings')
+
+merged = dict(intel_data)
+
+def merge_list(key, identifier):
+    items = {}
+    for source in (intel_data, arm_data):
+        value = source.get(key)
+        if not isinstance(value, list):
+            continue
+        for entry in value:
+            if not isinstance(entry, dict):
+                continue
+            ident = entry.get(identifier)
+            if not ident:
+                continue
+            items[ident] = entry
+    if items:
+        merged[key] = sorted(items.values(), key=lambda x: x.get(identifier, ''))
+    elif key in merged:
+        merged.pop(key, None)
+
+merge_list('files', 'url')
+merge_list('packages', 'path')
+
+release_dates = [d for d in (intel_data.get('releaseDate'), arm_data.get('releaseDate')) if d]
+if release_dates:
+    merged['releaseDate'] = max(release_dates)
+
+version_values = {intel_data.get('version'), arm_data.get('version')} - {None}
+if len(version_values) > 1:
+    raise SystemExit('Version mismatch between macOS builds')
+elif version_values:
+    merged['version'] = version_values.pop()
+
+output_path.parent.mkdir(parents=True, exist_ok=True)
+with output_path.open('w', encoding='utf-8') as f:
+    yaml.safe_dump(merged, f, sort_keys=False)
+PY
+
+      - name: Create PublishReady zip
+        run: |
+          set -euo pipefail
+          zip -r PublishReady.zip publish-ready
+          ls -la PublishReady.zip
+
+      - name: Upload PublishReady artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PublishReady
+          path: PublishReady.zip
+          if-no-files-found: error
+
+      - name: Upload PublishReady to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: PublishReady.zip
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
