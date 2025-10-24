@@ -50,15 +50,16 @@ export function getNearestBlocks(bot, block_types=null, distance=64, count=10000
      * let woodBlocks = world.getNearestBlocks(bot, ['oak_log', 'birch_log'], 16, 1);
      **/
     // if blocktypes is not a list, make it a list
+    const mcdata = MCData.getInstance();
     let block_ids = [];
     if (block_types === null) {
-        block_ids = MCData.getInstance().getAllBlockIds(['air']);
+        block_ids = mcdata.getAllBlockIds(['air']);
     }
     else {
         if (!Array.isArray(block_types))
             block_types = [block_types];
         for(let block_type of block_types) {
-            const id = MCData.getInstance().getBlockId(block_type);
+            const id = mcdata.getBlockId(block_type);
             if (id === null) {
                 console.log(`[getNearestBlocks] block type not found: ${block_type}`);
                 continue;

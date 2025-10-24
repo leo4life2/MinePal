@@ -890,6 +890,7 @@ export class Agent {
         newHUD.trackedBlocks.clear(); // Ensure empty
 
         nearbyBlockObjects.forEach(block => {
+            if (!block || !block.name || !block.position) return;
             const dist = parseFloat(calculateDistance(botPos, block.position).toFixed(0));
             // Store raw coords for comparison
             const x = Math.round(block.position.x);
