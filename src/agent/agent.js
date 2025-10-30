@@ -7,7 +7,9 @@ import MCData from '../utils/mcdata.js';
 import { containsCommand, commandExists, executeCommand, truncCommandMessage, getAllCommands } from './commands/index.js';
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
+import { createTree, createNLNode, createActionNode } from './taskTree.js';
 import fs from 'fs/promises';
+import path from 'path';
 import * as world from "./library/world.js";
 import { emote } from './library/skills.js';
 import * as skills from './library/skills.js';
@@ -232,6 +234,7 @@ export class Agent {
         this.botHurtCooldownActive = false; // Cooldown flag for bot hurt event
         this.reportedRareBlocks = new Set(); // Cache for reported rare block locations (stores "x,y,z")
         this.cheatsEnabled = false; // Track whether cheats are enabled on the server
+        this.taskTree = this._buildDemoTaskTree();
 
         // --- Prompting State Management ---
         this.promptingState = 'idle'; // 'idle', 'prompting', 'executing'
@@ -239,6 +242,133 @@ export class Agent {
         this.queuedPromptReason = null; // Reason prompt was queued
         this.processingLoopInterval = null; // To hold the interval ID
         // --- End Prompting State Management ---
+
+        // --- HUD Snapshot Tracking ---
+        this._hudOutputPath = null;
+        this._lastHudString = null;
+        this._taskTreeOutputPath = null;
+        this._lastTaskTreeString = null;
+        // --- End HUD Snapshot Tracking ---
+    }
+
+    _buildDemoTaskTree() {
+        const tree = createTree({ treeId: 'minepal-demo', label: 'MinePal Demo Plan' });
+        const root = tree.getNode(tree.rootId);
+        if (root) {
+            root.goalText = 'Guide MinePal through a productive demo session.';
+            root.notes = 'Auto-generated sample data for the visualizer.';
+            root.hints = { priority: 'demo' };
+            root.touch();
+        }
+
+        const establishBase = createNLNode({
+            id: 'nl-establish-base',
+            label: 'Establish Base',
+            goalText: 'Secure essential shelter and starter tools.'
+        });
+        tree.addNode(establishBase);
+        tree.attachChild(root.id, establishBase.id);
+
+        const gatherWood = createActionNode({
+            id: 'act-gather-wood',
+            label: 'Gather Oak Logs',
+            command: 'gather_wood'
+        });
+        tree.addNode(gatherWood);
+        tree.attachChild(establishBase.id, gatherWood.id);
+
+        const craftTable = createActionNode({
+            id: 'act-craft-table',
+            label: 'Craft Crafting Table',
+            command: 'craft_crafting_table'
+        });
+        tree.addNode(craftTable);
+        tree.attachChild(establishBase.id, craftTable.id);
+
+        const craftTools = createActionNode({
+            id: 'act-craft-tools',
+            label: 'Craft Stone Tools',
+            command: 'craft_stone_tools'
+        });
+        tree.addNode(craftTools);
+        tree.attachChild(establishBase.id, craftTools.id);
+
+        const lightCamp = createActionNode({
+            id: 'act-light-camp',
+            label: 'Light Temporary Camp',
+            command: 'place_torch_ring'
+        });
+        tree.addNode(lightCamp);
+        tree.attachChild(establishBase.id, lightCamp.id);
+
+        const exploreArea = createNLNode({
+            id: 'nl-explore-area',
+            label: 'Scout Surroundings',
+            goalText: 'Map nearby resources and landmarks.',
+            policy: 'selector'
+        });
+        tree.addNode(exploreArea);
+        tree.attachChild(root.id, exploreArea.id);
+
+        const scoutLandmarks = createActionNode({
+            id: 'act-scout-landmarks',
+            label: 'Identify Landmarks',
+            command: 'scan_landmarks'
+        });
+        tree.addNode(scoutLandmarks);
+        tree.attachChild(exploreArea.id, scoutLandmarks.id);
+
+        const markPoints = createActionNode({
+            id: 'act-mark-points',
+            label: 'Mark Notable Points',
+            command: 'map_markers'
+        });
+        tree.addNode(markPoints);
+        tree.attachChild(exploreArea.id, markPoints.id);
+
+        const supportOwner = createNLNode({
+            id: 'nl-support-owner',
+            label: 'Support Owner',
+            goalText: 'Prepare to assist the owner with resources and intel.'
+        });
+        tree.addNode(supportOwner);
+        tree.attachChild(root.id, supportOwner.id);
+
+        const checkIn = createActionNode({
+            id: 'act-check-in',
+            label: 'Check In With Owner',
+            command: 'send_status_update'
+        });
+        tree.addNode(checkIn);
+        tree.attachChild(supportOwner.id, checkIn.id);
+
+        const stockChest = createActionNode({
+            id: 'act-stock-chest',
+            label: 'Stock Starter Chest',
+            command: 'deposit_supplies'
+        });
+        tree.addNode(stockChest);
+        tree.attachChild(supportOwner.id, stockChest.id);
+
+        tree.setStatus(root.id, 'running');
+        tree.setStatus(establishBase.id, 'running');
+        tree.setStatus(gatherWood.id, 'succeeded');
+        tree.setStatus(craftTable.id, 'succeeded');
+        tree.setStatus(craftTools.id, 'running');
+        tree.setStatus(lightCamp.id, 'pending');
+        tree.setStatus(exploreArea.id, 'pending');
+        tree.setStatus(scoutLandmarks.id, 'pending');
+        tree.setStatus(markPoints.id, 'pending');
+        tree.setStatus(supportOwner.id, 'pending');
+        tree.setStatus(checkIn.id, 'pending');
+        tree.setStatus(stockChest.id, 'pending');
+
+        const validation = tree.validate();
+        if (!validation.ok) {
+            console.warn(`[TaskTree] Demo task tree failed validation: ${validation.errors.join('; ')}`);
+        }
+
+        return tree;
     }
 
     /**
@@ -1183,6 +1313,9 @@ export class Agent {
 
         // --- Final Assembly ---
         const finalHudString = hud.join('\n');
+
+        await this._writeHudSnapshot(finalHudString);
+
         // console.log(`\n\n[HUD DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
         // if (diffText) {
         //      console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
@@ -1363,6 +1496,85 @@ export class Agent {
         if (!this.silenceTimer) {
             // console.log("[DEBUG] Silence timer was not running. Restarting.");
             this._setNextSilenceTimer();
+        }
+    }
+
+    /**
+     * Writes the latest HUD snapshot to disk for external visualization.
+     * Uses an atomic rename and only updates when the content changes.
+     * @param {string} hudString - Rendered Markdown HUD string.
+     */
+    async _writeHudSnapshot(hudString) {
+        if (!this.userDataDir) return; // Agent not fully initialized
+
+        let runlogsDir;
+        if (!this._hudOutputPath) {
+            runlogsDir = path.join(this.userDataDir, 'runlogs');
+            try {
+                await fs.mkdir(runlogsDir, { recursive: true });
+            } catch (err) {
+                console.warn(`[HUD Snapshot] Unable to ensure runlogs directory: ${err.message}`);
+                return;
+            }
+            this._hudOutputPath = path.join(runlogsDir, 'latest_hud.md');
+        } else {
+            runlogsDir = path.dirname(this._hudOutputPath);
+        }
+
+        await this._writeTaskTreeSnapshot(runlogsDir);
+
+        if (this._lastHudString === hudString) {
+            return;
+        }
+
+        const tmpPath = `${this._hudOutputPath}.tmp`;
+        try {
+            await fs.writeFile(tmpPath, hudString, 'utf8');
+            await fs.rename(tmpPath, this._hudOutputPath);
+            this._lastHudString = hudString;
+        } catch (err) {
+            console.warn(`[HUD Snapshot] Failed to write HUD snapshot: ${err.message}`);
+            try {
+                await fs.unlink(tmpPath);
+            } catch (_) {
+                // noop
+            }
+        }
+    }
+
+    async _writeTaskTreeSnapshot(runlogsDir) {
+        if (!this.taskTree) return;
+        if (!runlogsDir) return;
+
+        if (!this._taskTreeOutputPath || path.dirname(this._taskTreeOutputPath) !== runlogsDir) {
+            this._taskTreeOutputPath = path.join(runlogsDir, 'latest_task_tree.json');
+            this._lastTaskTreeString = null;
+        }
+
+        let serialized;
+        try {
+            serialized = this.taskTree.serialize();
+        } catch (err) {
+            console.warn(`[TaskTree Snapshot] Failed to serialize task tree: ${err.message}`);
+            return;
+        }
+
+        if (this._lastTaskTreeString === serialized) {
+            return;
+        }
+
+        const tmpPath = `${this._taskTreeOutputPath}.tmp`;
+        try {
+            await fs.writeFile(tmpPath, serialized, 'utf8');
+            await fs.rename(tmpPath, this._taskTreeOutputPath);
+            this._lastTaskTreeString = serialized;
+        } catch (err) {
+            console.warn(`[TaskTree Snapshot] Failed to write task tree snapshot: ${err.message}`);
+            try {
+                await fs.unlink(tmpPath);
+            } catch (_) {
+                // noop
+            }
         }
     }
 
