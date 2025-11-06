@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { History } from './history.js';
 import { Coder } from './coder.js';
-import { Prompter } from './prompter.js';
+import { createPrompter } from './prompters/index.js';
 import { initModes } from './modes.js';
 import MCData from '../utils/mcdata.js';
 import { containsCommand, commandExists, executeCommand, truncCommandMessage, getAllCommands } from './commands/index.js';
@@ -672,7 +672,7 @@ export class Agent {
         this.lastBootDatetime = lastBootString ? new Date(lastBootString) : null;
         this.profile.lastBootDatetime = new Date().toISOString();
 
-        this.prompter = new Prompter(this);
+        this.prompter = createPrompter('gameEventDriven', this);
         this.name = this.prompter.getName();
         const settingsPath = `${this.userDataDir}/settings.json`;
         this.settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')); // Changed to instance variable
@@ -1622,7 +1622,7 @@ export class Agent {
         if (responseData && typeof responseData.error === 'string') {
             topLevelError = responseData.error;
         } else if (!responseData) {
-            // This case should ideally be covered by the catch block in prompter.js ensuring json.error exists
+            // This case should ideally be covered by the catch block in the active prompter ensuring json.error exists
             topLevelError = "LLM result processing failed: No JSON data received from prompter.";
         }
         // If responseData exists and has no .error, topLevelError remains null (success)
