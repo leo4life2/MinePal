@@ -141,7 +141,7 @@ export class GameEventDrivenPrompter extends ChatPrompter {
         return this.profile.modes;
     }
 
-    async replaceStrings(prompt, messages, prev_memory = null, to_summarize = [], last_goals = null) {
+    async injectContext(prompt, messages, prev_memory = null, to_summarize = [], last_goals = null) {
         prompt = prompt.replaceAll('$NAME', this.agent.name);
         prompt = prompt.replaceAll('$OWNER', this.agent.owner);
         prompt = prompt.replaceAll('$LANGUAGE', this.agent.settings.language);
@@ -225,7 +225,7 @@ export class GameEventDrivenPrompter extends ChatPrompter {
         // console.log('[Prompter] relevantMemories:', relevantMemories);
 
         let systemPrompt = this.profile.conversing;
-        systemPrompt = await this.replaceStrings(systemPrompt, messages, relevantMemories);
+        systemPrompt = await this.injectContext(systemPrompt, messages, relevantMemories);
         
         try {
             const voiceEnabled = Boolean(this.agent.profile.enable_voice);
