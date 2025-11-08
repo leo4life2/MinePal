@@ -1,6 +1,7 @@
 import { Proxy } from '../../models/proxy.js';
+import { getCommandDocs } from '../commands/index.js';
 
-export class ChatPrompter {
+export class BasePrompter {
     constructor(agent, options = {}) {
         this.agent = agent;
         this.profile = agent.profile;
@@ -25,6 +26,39 @@ export class ChatPrompter {
             responseSchema,
             extraRequestFields
         });
+    }
+
+    async injectContext(prompt, { messages = [], memory = null } = {}) {
+        let populated = prompt;
+
+        const replacements = {
+            '$NAME': this.agent.name ?? '',
+            '$OWNER': this.agent.owner ?? '',
+            '$LANGUAGE': this.agent.settings?.language ?? '',
+            '$PERSONALITY': this.profile?.personality ?? ''
+        };
+
+        for (const [token, value] of Object.entries(replacements)) {
+            if (populated.includes(token)) {
+                populated = populated.replaceAll(token, value);
+            }
+        }
+
+        if (populated.includes('$MEMORY')) {
+            const memoryText = await this._resolveMemoryPlaceholder(memory, messages);
+            populated = populated.replaceAll('$MEMORY', memoryText);
+        }
+
+        if (populated.includes('$HUD')) {
+            const { hudString } = await this.agent.headsUpDisplay();
+            populated = populated.replaceAll('$HUD', `Your heads up display:\n${hudString}`);
+        }
+
+        if (populated.includes('$COMMAND_DOCS')) {
+            populated = populated.replaceAll('$COMMAND_DOCS', getCommandDocs());
+        }
+
+        return populated;
     }
 
     _formatTurn(turn) {
@@ -77,6 +111,47 @@ export class ChatPrompter {
         }
 
         return goalStatusString;
+    }
+
+    async _resolveMemoryPlaceholder(providedMemory, messages) {
+        if (typeof providedMemory === 'string' && providedMemory.trim().length > 0) {
+            return providedMemory;
+        }
+
+        const queryText = BasePrompter._inferQueryText(messages);
+        if (!queryText || !this.agent?.history?.searchRelevant) {
+            return 'None.';
+        }
+
+        try {
+            const memories = await this.agent.history.searchRelevant(queryText);
+            if (!Array.isArray(memories) || memories.length === 0) {
+                return 'None.';
+            }
+
+            return memories
+                .map(m => `[${m.shortId}] ${m.text}`)
+                .join('\n');
+        } catch (err) {
+            console.warn('[BasePrompter] Failed to retrieve relevant memories:', err);
+            return 'None.';
+        }
+    }
+
+    static _inferQueryText(messages) {
+        if (!Array.isArray(messages)) return null;
+
+        const latestAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
+        if (latestAssistantMessage?.thought && typeof latestAssistantMessage.thought === 'string' && latestAssistantMessage.thought.trim()) {
+            return latestAssistantMessage.thought;
+        }
+
+        const latestUserMessage = [...messages].reverse().find(msg => msg.role === 'user');
+        if (latestUserMessage?.content && typeof latestUserMessage.content === 'string' && latestUserMessage.content.trim()) {
+            return latestUserMessage.content;
+        }
+
+        return null;
     }
 }
 

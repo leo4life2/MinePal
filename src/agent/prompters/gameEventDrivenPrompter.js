@@ -1,8 +1,6 @@
 import { writeFileSync } from 'fs';
-import { getCommandDocs } from '../commands/index.js';
-import { getSkillDocs } from '../library/index.js';
 import { stringifyTurns } from '../../utils/text.js';
-import { ChatPrompter } from './basePrompter.js';
+import { BasePrompter } from './basePrompter.js';
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -122,7 +120,7 @@ export const GAME_EVENT_DRIVEN_RESPONSE_SCHEMA = {
     }
 };
 
-export class GameEventDrivenPrompter extends ChatPrompter {
+export class GameEventDrivenPrompter extends BasePrompter {
     constructor(agent, options = {}) {
         super(agent, options);
 
@@ -142,54 +140,35 @@ export class GameEventDrivenPrompter extends ChatPrompter {
     }
 
     async injectContext(prompt, messages, prev_memory = null, to_summarize = [], last_goals = null) {
-        prompt = prompt.replaceAll('$NAME', this.agent.name);
-        prompt = prompt.replaceAll('$OWNER', this.agent.owner);
-        prompt = prompt.replaceAll('$LANGUAGE', this.agent.settings.language);
-        prompt = prompt.replaceAll('$PERSONALITY', this.profile.personality);
+        let populated = await super.injectContext(prompt, {
+            messages,
+            memory: prev_memory && prev_memory.trim().length > 0 ? prev_memory : null
+        });
 
-
-        if (prompt.includes('$HUD')) {
-            const { hudString } = await this.agent.headsUpDisplay();
-            prompt = prompt.replaceAll('$HUD', `Your heads up display: \n${hudString}`);
+        if (populated.includes('$TO_SUMMARIZE')) {
+            populated = populated.replaceAll('$TO_SUMMARIZE', stringifyTurns(to_summarize));
         }
-
-        if (prompt.includes('$COMMAND_DOCS'))
-            prompt = prompt.replaceAll('$COMMAND_DOCS', getCommandDocs());
-        if (prompt.includes('$CODE_DOCS'))
-            prompt = prompt.replaceAll('$CODE_DOCS', getSkillDocs());
-        if (prompt.includes('$MEMORY'))
-            prompt = prompt.replaceAll('$MEMORY', prev_memory ? prev_memory : 'None.');
-        if (prompt.includes('$TO_SUMMARIZE'))
-            prompt = prompt.replaceAll('$TO_SUMMARIZE', stringifyTurns(to_summarize));
-        if (prompt.includes('$CONVO'))
-            prompt = prompt.replaceAll('$CONVO', 'Recent conversation:\n' + stringifyTurns(messages));
-        if (prompt.includes('$LAST_GOALS')) {
+        if (populated.includes('$CONVO')) {
+            populated = populated.replaceAll('$CONVO', 'Recent conversation:\n' + stringifyTurns(messages));
+        }
+        if (populated.includes('$LAST_GOALS')) {
             let goal_text = '';
             for (let goal in last_goals) {
-                if (last_goals[goal])
+                if (last_goals[goal]) {
                     goal_text += `You recently successfully completed the goal ${goal}.\n`;
-                else
+                } else {
                     goal_text += `You recently failed to complete the goal ${goal}.\n`;
-            }
-            prompt = prompt.replaceAll('$LAST_GOALS', goal_text.trim());
-        }
-        if (prompt.includes('$BLUEPRINTS')) {
-            if (this.agent.npc.constructions) {
-                let blueprints = '';
-                for (let blueprint in this.agent.npc.constructions) {
-                    blueprints += blueprint + ', ';
                 }
-                prompt = prompt.replaceAll('$BLUEPRINTS', blueprints.slice(0, -2));
             }
+            populated = populated.replaceAll('$LAST_GOALS', goal_text.trim());
         }
 
-        // check if there are any remaining placeholders with syntax $<word>
-        let remaining = prompt.match(/\$[A-Z_]+/g);
+        const remaining = populated.match(/\$[A-Z_]+/g);
         if (remaining !== null) {
             console.warn('Unknown prompt placeholders:', remaining.join(', '));
         }
 
-        return prompt;
+        return populated;
     }
 
     async promptConvo(messages) {

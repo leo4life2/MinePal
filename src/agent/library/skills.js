@@ -23,6 +23,16 @@ export function log(bot, message, chat = false) {
   if (chat) bot.chat(message);
 }
 
+function success(bot, message = null, chat = false) {
+  if (message) log(bot, message, chat);
+  return true;
+}
+
+function failure(bot, message = null, chat = false) {
+  if (message) log(bot, message, chat);
+  return false;
+}
+
 async function autoLight(bot) {
   if (world.shouldPlaceTorch(bot)) {
     try {
@@ -92,7 +102,8 @@ export async function craftRecipe(bot, itemName, num = 1) {
       let hasTable = world.getInventoryCounts(bot)["crafting_table"] > 0;
       if (hasTable) {
         let pos = world.getNearestFreeSpace(bot, 1, 6);
-        await placeBlock(bot, "crafting_table", pos.x, pos.y, pos.z);
+        const placed = await placeBlock(bot, "crafting_table", pos.x, pos.y, pos.z);
+        if (!placed) return failure(bot, `Failed to place crafting table to craft ${itemName}.`);
         craftingTable = world.getNearestBlock(
           bot,
           "crafting_table",
@@ -137,13 +148,13 @@ export async function craftRecipe(bot, itemName, num = 1) {
     const allPotentialRecipes = bot.recipesAll(itemId, null, wasTableAttempted);
 
     if (!allPotentialRecipes || allPotentialRecipes.length === 0) {
-      log(bot, `No known recipes to craft ${itemName}${wasTableAttempted ? ' using a crafting table' : ' from inventory'}.`);
+      return failure(bot, `No known recipes to craft ${itemName}${wasTableAttempted ? ' using a crafting table' : ' from inventory'}.`);
     } else {
       const recipeToAnalyze = allPotentialRecipes[0]; // Analyze the first available recipe
       const recipeRequiresTable = recipeToAnalyze.requiresTable;
 
       if (recipeRequiresTable && !craftingTable) {
-         log(bot, `Cannot craft ${itemName} as it requires a crafting table, which is not available.`);
+          return failure(bot, `Cannot craft ${itemName} as it requires a crafting table, which is not available.`);
       } else {
         const targetCraftCount = Math.ceil(num / recipeToAnalyze.result.count);
         const missingReport = [];
@@ -161,16 +172,16 @@ export async function craftRecipe(bot, itemName, num = 1) {
         }
 
         if (missingReport.length > 0) {
-          log(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
+          return failure(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
         } else {
           // This case implies recipesFor failed but allPotentialRecipes[0] somehow suggests we have ingredients.
           // This should be rare if recipesFor is robust.
           // Or, it could mean recipeToAnalyze.result.count is 0 or invalid, leading to targetCraftCount issues.
-          log(bot, `Cannot craft ${itemName}. Resources might be unavailable or a conflicting recipe state was encountered (e.g. recipesFor failed but a recipe in recipesAll seems craftable).`);
+          return failure(bot, `Cannot craft ${itemName}. Resources might be unavailable or a conflicting recipe state was encountered (e.g. recipesFor failed but a recipe in recipesAll seems craftable).`);
         }
       }
     }
-    return false;
+    return failure(bot);
   }
 
   console.log("[craftRecipe] crafting " + itemName);
@@ -193,20 +204,17 @@ export async function craftRecipe(bot, itemName, num = 1) {
   }
 
   if (missingIngredientsReport.length > 0) {
-    log(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingIngredientsReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
-    return false;
+    return failure(bot, `Cannot craft ${num}x ${itemName}. Missing: ${missingIngredientsReport.join(', ')}. Try again once you have these items. Consider crafting them or sourcing them.`);
   }
 
   try {
     await bot.craft(recipe, actualNum, craftingTable);
-    log(
+    return success(
       bot,
       `Successfully crafted ${itemName}, you now have ${world.getInventoryCounts(bot)[itemName] || 0} ${itemName}.`
     );
-    return true;
   } catch (err) {
-    log(bot, `Crafting ${num}x ${itemName} failed during the actual crafting attempt: ${err.message}. This might be due to a quick inventory change or an internal crafting error.`);
-    return false;
+    return failure(bot, `Crafting ${num}x ${itemName} failed during the actual crafting attempt: ${err.message}. This might be due to a quick inventory change or an internal crafting error.`);
   }
 }
 
@@ -225,108 +233,67 @@ export async function smeltWithFurnace(bot, furnaceIdentifier, itemName, fuelIte
 
   // Validate and get the specific furnace block
   const { targetBlock: furnaceBlock, errorMsg: validationError } = await _getAndValidateContainer(bot, furnaceIdentifier);
-  if (validationError) {
-    if (validationError.includes("not appear to be a container")) {
-        return `Block ${furnaceIdentifier} is not a valid furnace.`;
-    }
-    return validationError;
-  }
+  if (validationError) return false;
 
   if (!furnaceBlock.name.includes('furnace')) {
-      const message = `Block ${furnaceIdentifier} is a ${furnaceBlock.name}, not a furnace.`;
-      log(bot, message);
-      return message;
+      return failure(bot, `Block ${furnaceIdentifier} is a ${furnaceBlock.name}, not a furnace.`);
   }
   
-  // Removed smeltable validation
-
   let furnace;
   try {
     furnace = await bot.openFurnace(furnaceBlock);
   } catch (err) {
-    const message = `Failed to open furnace ${furnaceIdentifier}: ${err.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to open furnace ${furnaceIdentifier}: ${err.message}`);
   }
 
-  let resultsMessage = `Preparing to smelt in ${furnaceIdentifier}:\n`;
-
-  // Check inventory and adjust quantity if needed
-  let inv_counts = world.getInventoryCounts(bot);
-  let amountToSmelt = num;
-  if (!inv_counts[itemName] || inv_counts[itemName] < num) {
-    const availableAmount = inv_counts[itemName] || 0;
-    if (availableAmount === 0) {
-        const message = `You do not have any ${itemName} to put in the furnace.`; // Updated wording
-        resultsMessage += `- Error: ${message}\n`;
-        log(bot, message);
-        await furnace.close();
-        return resultsMessage;
+  let successFlag = false;
+  try {
+    const inventoryCounts = world.getInventoryCounts(bot);
+    let amountToSmelt = num;
+    if (!inventoryCounts[itemName] || inventoryCounts[itemName] < num) {
+      const availableAmount = inventoryCounts[itemName] || 0;
+      if (availableAmount === 0) {
+        return failure(bot, `You do not have any ${itemName} to put in the furnace.`);
+      }
+      log(bot, `Not enough ${itemName} for ${num}. Using available ${availableAmount} instead.`);
+      amountToSmelt = availableAmount;
     }
-    const noticeMsg = `Not enough ${itemName} for ${num}. Will add all available ${availableAmount} instead.`;
-    resultsMessage += `- Notice: ${noticeMsg}\n`;
-    log(bot, noticeMsg);
-    amountToSmelt = availableAmount; 
-  }
 
-  // Fuel the furnace if necessary using the specified fuel item and quantity
-  if (!furnace.fuelItem()) {
-    let fuel = bot.inventory.items().find((item) => item.name === fuelItemName);
-    // Check if bot has enough of the specified fuel quantity
-    if (!fuel || fuel.count < fuelQuantity) {
-      const message = `Not enough ${fuelItemName} fuel (need ${fuelQuantity}, have ${fuel ? fuel.count : 0}). Cannot start smelting.`;
-      resultsMessage += `- Error: ${message}\n`;
-      log(bot, message);
-      await furnace.close();
-      return resultsMessage;
+    if (!furnace.fuelItem()) {
+      const fuelItem = bot.inventory.items().find((item) => item.name === fuelItemName);
+      if (!fuelItem || fuelItem.count < fuelQuantity) {
+        return failure(bot, `Not enough ${fuelItemName} fuel (need ${fuelQuantity}, have ${fuelItem ? fuelItem.count : 0}). Cannot start smelting.`);
+      }
+      try {
+        await furnace.putFuel(fuelItem.type, null, fuelQuantity);
+        log(bot, `Added ${fuelQuantity} ${fuelItemName} as fuel.`);
+      } catch (fuelErr) {
+        return failure(bot, `Failed to add ${fuelItemName} fuel: ${fuelErr.message}`);
+      }
     }
+
     try {
-        // Use the specified fuel quantity
-        await furnace.putFuel(fuel.type, null, fuelQuantity); 
-        const fuelMsg = `Added ${fuelQuantity} ${fuelItemName} as fuel.`; 
-        resultsMessage += `- ${fuelMsg}\n`;
-        log(bot, fuelMsg);
-    } catch (fuelErr) {
-        const message = `Failed to add ${fuelItemName} fuel: ${fuelErr.message}`;
-        resultsMessage += `- Error: ${message}\n`;
-        log(bot, message);
-        await furnace.close();
-        return resultsMessage;
+      const inputItemType = MCData.getInstance().getItemId(itemName);
+      if (!inputItemType) {
+        return failure(bot, `Item name "${itemName}" not found in registry.`);
+      }
+      await furnace.putInput(inputItemType, null, amountToSmelt);
+      log(bot, `Added ${amountToSmelt} ${itemName} to input slot.`);
+    } catch (inputErr) {
+      return failure(bot, `Failed to add ${itemName} to input: ${inputErr.message}`);
     }
-  } else {
-      resultsMessage += `- Furnace already has fuel.\n`;
-  }
 
-  // Put items in the furnace input slot
-  try {
-    // Ensure the item exists in registry before getting ID
-    const inputItemType = MCData.getInstance().getItemId(itemName);
-    if (!inputItemType) {
-      throw new Error(`Item name "${itemName}" not found in registry.`);
+    log(bot, `Successfully prepared ${furnaceIdentifier} with fuel and ${amountToSmelt} ${itemName}.`);
+    successFlag = true;
+  } finally {
+    try {
+      if (furnace) await furnace.close();
+    } catch (closeErr) {
+      log(bot, `Error closing furnace ${furnaceIdentifier}: ${closeErr.message}`);
+      successFlag = false;
     }
-    await furnace.putInput(inputItemType, null, amountToSmelt);
-    const inputMsg = `Added ${amountToSmelt} ${itemName} to input slot.`;
-    resultsMessage += `- ${inputMsg}\n`;
-    log(bot, inputMsg);
-  } catch (inputErr) {
-      const message = `Failed to add ${itemName} to input: ${inputErr.message}`;
-      resultsMessage += `- Error: ${message}\n`;
-      log(bot, message);
-      await furnace.close();
-      return resultsMessage;
   }
-
-  // Close the furnace - items are added, smelting will happen in the background
-  try {
-    await furnace.close();
-    resultsMessage += `- Closed furnace interface. Smelting should proceed in-game.\n`;
-  } catch (closeErr) {
-    console.warn(`Error closing furnace ${furnaceIdentifier} after adding items: ${closeErr.message}`);
-    resultsMessage += `- Warning: Error closing furnace interface: ${closeErr.message}\n`;
-  }
-
-  log(bot, `Successfully prepared ${furnaceIdentifier} with fuel and ${amountToSmelt} ${itemName}.`); // Updated log
-  return resultsMessage; // Return the summary of actions taken
+  return successFlag;
 }
 
 export async function lookInFurnace(bot, furnaceIdentifier) {
@@ -338,22 +305,18 @@ export async function lookInFurnace(bot, furnaceIdentifier) {
    */
   // Validate and get the specific furnace block
   const { targetBlock: furnaceBlock, errorMsg: validationError } = await _getAndValidateContainer(bot, furnaceIdentifier);
-  if (validationError) return validationError;
+  if (validationError) return false;
 
   // Ensure it's specifically a furnace
   if (!furnaceBlock.name.includes('furnace')) {
-      const message = `Block ${furnaceIdentifier} is a ${furnaceBlock.name}, not a furnace.`;
-      log(bot, message);
-      return message;
+      return failure(bot, `Block ${furnaceIdentifier} is a ${furnaceBlock.name}, not a furnace.`);
   }
 
   let furnace;
   try {
     furnace = await bot.openFurnace(furnaceBlock);
   } catch (err) {
-    const message = `Failed to open furnace ${furnaceIdentifier}: ${err.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to open furnace ${furnaceIdentifier}: ${err.message}`);
   }
 
   const inputItem = furnace.inputItem();
@@ -370,12 +333,14 @@ export async function lookInFurnace(bot, furnaceIdentifier) {
   
   log(bot, message);
 
+  let successFlag = true;
   try {
     await furnace.close();
   } catch (closeErr) {
-    console.warn(`Error closing furnace ${furnaceIdentifier}: ${closeErr.message}`);
+    log(bot, `Error closing furnace ${furnaceIdentifier}: ${closeErr.message}`);
+    successFlag = false;
   }
-  return message;
+  return successFlag;
 }
 
 export async function takeFromFurnace(bot, furnaceIdentifier, itemType) {
@@ -388,63 +353,56 @@ export async function takeFromFurnace(bot, furnaceIdentifier, itemType) {
    */
   // Validate and get the specific furnace block
   const { targetBlock: furnaceBlock, errorMsg: validationError } = await _getAndValidateContainer(bot, furnaceIdentifier);
-  if (validationError) return validationError;
+  if (validationError) return false;
 
   // Ensure it's specifically a furnace
   if (!furnaceBlock.name.includes('furnace')) {
-      const message = `Block ${furnaceIdentifier} is a ${furnaceBlock.name}, not a furnace.`;
-      log(bot, message);
-      return message;
+      return failure(bot, `Block ${furnaceIdentifier} is a ${furnaceBlock.name}, not a furnace.`);
   }
 
   let furnace;
   try {
     furnace = await bot.openFurnace(furnaceBlock);
   } catch (err) {
-    const message = `Failed to open furnace ${furnaceIdentifier}: ${err.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to open furnace ${furnaceIdentifier}: ${err.message}`);
   }
 
-  let itemTaken;
-  let success = false;
-  let errorMessage = null;
+  let successFlag = false;
 
   try {
+    let itemTaken;
     if (itemType === "input") {
-      if (!furnace.inputItem()) throw new Error("Input slot is empty.");
+      const slotItem = furnace.inputItem();
+      if (!slotItem) return failure(bot, `Input slot of ${furnaceIdentifier} is empty.`);
       itemTaken = await furnace.takeInput();
     } else if (itemType === "fuel") {
-      if (!furnace.fuelItem()) throw new Error("Fuel slot is empty.");
+      const slotItem = furnace.fuelItem();
+      if (!slotItem) return failure(bot, `Fuel slot of ${furnaceIdentifier} is empty.`);
       itemTaken = await furnace.takeFuel();
     } else if (itemType === "output") {
-      if (!furnace.outputItem()) throw new Error("Output slot is empty.");
+      const slotItem = furnace.outputItem();
+      if (!slotItem) return failure(bot, `Output slot of ${furnaceIdentifier} is empty.`);
       itemTaken = await furnace.takeOutput();
     } else {
-      throw new Error(`Invalid item type "${itemType}". Use 'input', 'fuel', or 'output'.`);
+      return failure(bot, `Invalid item type "${itemType}". Use 'input', 'fuel', or 'output'.`);
     }
-    success = true;
-  } catch (err) {
-    errorMessage = `Failed to take ${itemType} from ${furnaceIdentifier}: ${err.message}`;
+
+    if (!itemTaken) {
+      return failure(bot, `Furnace ${furnaceIdentifier} did not yield an item from ${itemType} slot.`);
+    }
+
+    log(bot, `Successfully took ${itemTaken.count} ${itemTaken.name} (${itemType}) from ${furnaceIdentifier}.`);
+    successFlag = true;
+  } finally {
+    try {
+      await furnace.close();
+    } catch (closeErr) {
+      log(bot, `Error closing furnace ${furnaceIdentifier}: ${closeErr.message}`);
+      successFlag = false;
+    }
   }
 
-  let finalMessage;
-  if (success && itemTaken) {
-      finalMessage = `Successfully took ${itemTaken.count} ${itemTaken.name} (${itemType}) from ${furnaceIdentifier}.`;
-  } else if (success && !itemTaken) { // Should not happen if takeX throws error correctly
-      finalMessage = `Took ${itemType} from ${furnaceIdentifier}, but received no item data?`;
-  } else {
-      finalMessage = errorMessage || `Failed to take ${itemType} from ${furnaceIdentifier}.`; // Default if no specific error
-  }
-
-  log(bot, finalMessage);
-
-  try {
-    await furnace.close();
-  } catch (closeErr) {
-    console.warn(`Error closing furnace ${furnaceIdentifier}: ${closeErr.message}`);
-  }
-  return finalMessage;
+  return successFlag;
 }
 
 export async function clearNearestFurnace(bot) {
@@ -864,20 +822,13 @@ export async function attackMultipleCreatures(bot, mobType, count) {
    */
   bot.modes.pause("cowardice");
   let killedCount = 0;
-  const maxRange = 24; // Note: maxRange is no longer used by getVisibleEntities
 
   for (let i = 0; i < count; i++) {
     if (bot.interrupt_code) {
-      const message = `Attack sequence interrupted after killing ${killedCount} ${mobType}(s).`;
-      log(bot, message);
-      return message;
+      return failure(bot, `Attack sequence interrupted after killing ${killedCount} ${mobType}(s).`);
     }
 
-    // Find the *current* nearest visible creature of the specified type in each iteration
-    // Replaced getNearbyEntities with await getVisibleEntities
     const visibleEntities = await world.getVisibleEntities(bot); 
-
-    // Need to sort by distance to find the nearest one
     visibleEntities.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
     
     const target = visibleEntities.find(
@@ -885,32 +836,23 @@ export async function attackMultipleCreatures(bot, mobType, count) {
     );
 
     if (!target) {
-      // Keep final log for no more targets
       const message = killedCount > 0
-        ? `Successfully killed ${killedCount} ${mobType}(s). Could not find any more visible nearby.` // Updated log
-        : `Action failed: Could not find any ${mobType} visible nearby to attack.`; // Updated log
-      log(bot, message);
-      return message;
+        ? `Successfully killed ${killedCount} ${mobType}(s) but no additional targets were visible.`
+        : `Action failed: Could not find any ${mobType} visible nearby to attack.`;
+      return failure(bot, message);
     }
 
-    const success = await attackEntity(bot, target, true); // Call attackEntity to handle the kill
+    const killSuccess = await attackEntity(bot, target, true);
 
-    if (success) {
-      killedCount++;
-    } else {
-      // attackEntity returned false, likely due to interruption or error during combat
-      const message = `Attack sequence stopped after killing ${killedCount} ${mobType}(s) due to an issue killing target #${i+1}.`;
-      log(bot, message);
-      return message;
+    if (!killSuccess) {
+      return failure(bot, `Attack sequence stopped after killing ${killedCount} ${mobType}(s) due to an issue killing target #${i + 1}.`);
     }
     
-    // Small delay to allow things to settle (e.g., item drops)
+    killedCount++;
     await new Promise(resolve => setTimeout(resolve, 300)); 
   }
 
-  const finalMessage = `Successfully completed attack sequence. Killed ${killedCount} ${mobType}(s).`;
-  log(bot, finalMessage);
-  return finalMessage;
+  return success(bot, `Successfully completed attack sequence. Killed ${killedCount} ${mobType}(s).`);
 }
 
 export async function editSign(bot, blockName, positionString, frontText, backText) {
@@ -925,9 +867,7 @@ export async function editSign(bot, blockName, positionString, frontText, backTe
    */
   // Validate block name
   if (!blockName || !blockName.includes("sign")) {
-    const message = `Invalid block name provided: "${blockName}". It must be a sign block type.`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Invalid block name provided: "${blockName}". It must be a sign block type.`);
   }
 
   // Parse position string
@@ -937,43 +877,32 @@ export async function editSign(bot, blockName, positionString, frontText, backTe
     if (!coords || coords.length < 6) {
       throw new Error("Invalid position string format. Expected (x,y,z).");
     }
-    // Use parseFloat for potentially non-integer coordinates, although block positions are usually integers.
     positionVec = new Vec3(parseFloat(coords[1]), parseFloat(coords[3]), parseFloat(coords[5])); 
   } catch (error) {
-    const message = `Failed to parse position string "${positionString}": ${error.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to parse position string "${positionString}": ${error.message}`);
   }
 
   // Find the block at the specified position
   const targetBlock = bot.blockAt(positionVec);
 
   if (!targetBlock) {
-    const message = `Could not find any block at position ${positionString}.`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Could not find any block at position ${positionString}.`);
   }
 
   // Verify the block is the correct type and is a sign
   if (targetBlock.name !== blockName) {
-    const message = `Block at ${positionString} is a ${targetBlock.name}, not the expected ${blockName}.`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Block at ${positionString} is a ${targetBlock.name}, not the expected ${blockName}.`);
   }
   if (!targetBlock.signText) { // Check if the block object has sign capabilities
-    const message = `Block at ${positionString} (${targetBlock.name}) does not appear to be a sign block.`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Block at ${positionString} (${targetBlock.name}) does not appear to be a sign block.`);
   }
 
   // Navigate closer if necessary
   if (bot.entity.position.distanceTo(targetBlock.position) > NEAR_DISTANCE) {
     log(bot, `Sign at ${positionString} is too far, moving closer...`);
-    const success = await goToPosition(bot, targetBlock.position.x, targetBlock.position.y, targetBlock.position.z, 2);
-    if (!success) {
-        const message = `Failed to navigate to the sign at ${positionString}.`;
-        log(bot, message);
-        return message;
+    const reached = await goToPosition(bot, targetBlock.position.x, targetBlock.position.y, targetBlock.position.z, 2);
+    if (!reached) {
+        return failure(bot, `Failed to navigate to the sign at ${positionString}.`);
     }
   }
   
@@ -982,15 +911,10 @@ export async function editSign(bot, blockName, positionString, frontText, backTe
 
   // Attempt to set the sign text
   try {
-    // The setSignText method exists on the bot, taking the block object as the first argument
-    await targetBlock.setSignText(frontText, backText); // Corrected: Call on targetBlock
-    const message = `Successfully updated sign at ${positionString}. Front: "${frontText}", Back: "${backText}"`;
-    log(bot, message);
-    return message;
+    await targetBlock.setSignText(frontText, backText);
+    return success(bot, `Successfully updated sign at ${positionString}. Front: "${frontText}", Back: "${backText}"`);
   } catch (error) {
-    const message = `Failed to edit sign at ${positionString}: ${error.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to edit sign at ${positionString}: ${error.message}`);
   }
 }
 
@@ -1529,26 +1453,30 @@ export async function discard(bot, itemName, num = -1) {
    * @example
    * await skills.discard(bot, "oak_log");
    **/
+  const desiredAmount = num === -1 ? Infinity : num;
   let discarded = 0;
-  while (true) {
-    let item = bot.inventory.items().find((item) => item.name === itemName);
-    if (!item) {
-      break;
-    }
-    let to_discard =
-      num === -1 ? item.count : Math.min(num - discarded, item.count);
-    await bot.toss(item.type, null, to_discard);
-    discarded += to_discard;
-    if (num !== -1 && discarded >= num) {
-      break;
-    }
+
+  const items = bot.inventory.items().filter((item) => item.name === itemName);
+  if (items.length === 0) {
+    return failure(bot, `You do not have any ${itemName} to discard.`);
   }
-  if (discarded === 0) {
-    log(bot, `You do not have any ${itemName} to discard.`);
-    return false;
+
+  for (const item of items) {
+    if (discarded >= desiredAmount) break;
+    const toDiscard = desiredAmount === Infinity ? item.count : Math.min(desiredAmount - discarded, item.count);
+    try {
+      await bot.toss(item.type, null, toDiscard);
+    } catch (err) {
+      return failure(bot, `Failed to discard ${toDiscard} ${itemName}: ${err.message}`);
+    }
+    discarded += toDiscard;
   }
-  log(bot, `Successfully discarded ${discarded} ${itemName}.`);
-  return true;
+
+  if ((num !== -1 && discarded !== num) || discarded === 0) {
+    return failure(bot, `Could not discard the requested amount of ${itemName}. Discarded ${discarded}.`);
+  }
+
+  return success(bot, `Successfully discarded ${discarded} ${itemName}.`);
 }
 
 export async function eat(bot, foodName = "") {
@@ -1569,13 +1497,15 @@ export async function eat(bot, foodName = "") {
     name = "food";
   }
   if (!item) {
-    log(bot, `You do not have any ${name} to eat.`);
-    return false;
+    return failure(bot, `You do not have any ${name} to eat.`);
   }
-  await bot.equip(item, "hand");
-  await bot.consume();
-  log(bot, `Successfully ate ${item.name}.`);
-  return true;
+  try {
+    await bot.equip(item, "hand");
+    await bot.consume();
+    return success(bot, `Successfully ate ${item.name}.`);
+  } catch (err) {
+    return failure(bot, `Failed to eat ${item.name}: ${err.message}`);
+  }
 }
 
 export async function giveToPlayer(bot, username, items) {
@@ -1593,35 +1523,52 @@ export async function giveToPlayer(bot, username, items) {
     .map((item) => {
       const [name, quantity] = item.split(":");
       if (!name || isNaN(quantity)) {
-        log(
-          bot,
-          `Invalid items format. Use 'item1:quantity1,item2:quantity2,...'`
-        );
         return null;
       }
       return { name, quantity: parseInt(quantity, 10) };
     })
-    .filter((item) => item !== null);
+    .filter((item) => item !== null && item.quantity > 0);
 
-  let player = bot.players[username].entity;
-  if (!player) {
-    log(bot, `Could not find ${username}.`);
-    return false;
+  if (itemsList.length === 0) {
+    return failure(bot, `Invalid items format. Use 'item1:quantity1,item2:quantity2,...'.`);
   }
-  await goToPlayer(bot, username);
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  await bot.lookAt(player.position);
-  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  const playerEntity = bot.players[username]?.entity;
+  if (!playerEntity) {
+    return failure(bot, `Could not find ${username}.`);
+  }
+
+  const inventoryCounts = world.getInventoryCounts(bot);
   for (const { name, quantity } of itemsList) {
-    await discard(bot, name, quantity);
+    if (!inventoryCounts[name] || inventoryCounts[name] < quantity) {
+      return failure(bot, `Cannot give ${quantity} ${name}; only ${inventoryCounts[name] || 0} available.`);
+    }
   }
-  // After tossing items, step back a bit to avoid picking them up ourselves
+
+  const reached = await goToPlayer(bot, username);
+  if (!reached) {
+    return failure(bot, `Failed to reach ${username} to hand over items.`);
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  await bot.lookAt(playerEntity.position);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  for (const { name, quantity } of itemsList) {
+    const tossed = await discard(bot, name, quantity);
+    if (!tossed) {
+      return failure(bot, `Failed to toss ${quantity} ${name} to ${username}.`);
+    }
+  }
+
   try {
     bot.setControlState("back", true);
-    await new Promise((resolve) => setTimeout(resolve, 200)); // ~two short steps
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  } finally {
     bot.setControlState("back", false);
-  } catch (_) {}
-  return true;
+  }
+
+  return success(bot, `Successfully gave specified items to ${username}.`);
 }
 
 export async function goToPosition(bot, x, y, z, min_distance = 2) {
@@ -1638,18 +1585,20 @@ export async function goToPosition(bot, x, y, z, min_distance = 2) {
    * await skills.goToPosition(bot, position.x, position.y, position.x + 20);
    **/
   if (x == null || y == null || z == null) {
-    log(bot, `Missing coordinates, given x:${x} y:${y} z:${z}`);
-    return false;
+    return failure(bot, `Missing coordinates, given x:${x} y:${y} z:${z}`);
   }
   if (bot.modes.isOn("cheat")) {
     bot.chat("/tp @s " + x + " " + y + " " + z);
-    log(bot, `Teleported to ${x}, ${y}, ${z}.`);
-    return true;
+    return success(bot, `Teleported to ${x}, ${y}, ${z}.`);
   }
   bot.pathfinder.setMovements(new pf.Movements(bot));
   await bot.pathfinder.goto(new pf.goals.GoalNear(x, y, z, min_distance));
-  log(bot, `You have reached at ${x}, ${y}, ${z}.`);
-  return true;
+  const destination = new Vec3(x, y, z);
+  const distance = bot.entity.position.distanceTo(destination);
+  if (distance > min_distance) {
+    return failure(bot, `Failed to reach ${x}, ${y}, ${z}. Current distance: ${distance.toFixed(2)}.`);
+  }
+  return success(bot, `You have reached ${x}, ${y}, ${z}.`);
 }
 
 export async function goToPlayer(bot, username, distance = 1) {
@@ -1663,8 +1612,7 @@ export async function goToPlayer(bot, username, distance = 1) {
 
   if (bot.modes.isOn("cheat")) {
     bot.chat("/tp @s " + username);
-    log(bot, `Teleported to ${username}.`);
-    return true;
+    return success(bot, `Teleported to ${username}.`);
   }
 
   bot.modes.pause("self_defense");
@@ -1676,11 +1624,10 @@ export async function goToPlayer(bot, username, distance = 1) {
   const resolvePlayer = () => bot.players[username]?.entity || null;
   let player = resolvePlayer();
   if (!player) {
-    log(
+    return failure(
       bot,
       `${username} is too far for me to detect. Ask if player wants me to teleport directly, or press F3 and tell me your coordinates in chat.`
     );
-    return false;
   }
 
   // Use dynamic GoalFollow instead of goto() so we continuously track moving targets
@@ -1690,23 +1637,20 @@ export async function goToPlayer(bot, username, distance = 1) {
 
   try {
     while (true) {
-      if (bot.interrupt_code) return false;
+    if (bot.interrupt_code) return failure(bot, `Navigation to ${username} interrupted.`);
       // Refresh player entity (can change as players re-entity)
       player = resolvePlayer();
-      if (!player) return false;
+      if (!player) return failure(bot, `Lost track of ${username} while navigating.`);
 
       const dist = bot.entity.position.distanceTo(player.position);
       if (dist <= Math.max(2, distance)) {
-        // Arrived
         bot.pathfinder.stop();
-        log(bot, `You have reached ${username}.`);
-        return true;
+        return success(bot, `You have reached ${username}.`);
       }
 
       if (Date.now() - startTs > maxMs) {
         bot.pathfinder.stop();
-        log(bot, `Failed to reach ${username}: navigation timed out.`);
-        return false;
+        return failure(bot, `Failed to reach ${username}: navigation timed out.`);
       }
 
       await new Promise((r) => setTimeout(r, 200));
@@ -1714,8 +1658,10 @@ export async function goToPlayer(bot, username, distance = 1) {
   } catch (_err) {
     // Ensure we stop any residual goal on error
     try { bot.pathfinder.stop(); } catch {}
-    return false;
+    return failure(bot, `Navigation to ${username} encountered an unexpected error.`);
   }
+
+  return failure(bot, `Navigation to ${username} ended unexpectedly.`);
 }
 
 export async function teleportToPlayer(bot, username, agent) {
@@ -1729,26 +1675,22 @@ export async function teleportToPlayer(bot, username, agent) {
    * await skills.teleportToPlayer(bot, "player", agent);
    **/
   if (!username) {
-    log(bot, `No username provided.`);
-    return false;
+    return failure(bot, "No username provided.");
   }
 
   if (!agent.cheatsEnabled) {
-    log(bot, "Cannot teleport: Cheats are not enabled for you.");
-    return false;
+    return failure(bot, "Cannot teleport: Cheats are not enabled for you.");
   }
 
   bot.chat("/tp @s " + username);
-  await new Promise((resolve) => setTimeout(resolve, 500)); // wait for tp to complete
+  await new Promise((resolve) => setTimeout(resolve, 500));
   
-  let player = bot.players[username]?.entity;
+  const player = bot.players[username]?.entity;
   if (player && bot.entity.position.distanceTo(player.position) <= 0.5) {
-    log(bot, `Teleported to ${username}.`);
-    return true;
-  } else {
-    log(bot, "Teleport failed - you're not next to the player.");
-    return false;
+    return success(bot, `Teleported to ${username}.`);
   }
+
+  return failure(bot, "Teleport failed - you're not next to the player.");
 }
 
 export async function followPlayer(bot, username, distance = 4) {
@@ -1761,22 +1703,18 @@ export async function followPlayer(bot, username, distance = 4) {
    * @example
    * await skills.followPlayer(bot, "player");
    **/
-  let player = bot.players[username]?.entity;
+  const player = bot.players[username]?.entity;
   if (!player) {
-      log(bot, `Could not find player ${username} to follow.`);
-      return false;
+      return failure(bot, `Could not find player ${username} to follow.`);
   }
 
-  // Activate the follow_target mode
   if (bot.modes && bot.modes.modes_map['follow_target']) {
-      const agent = bot;
-      bot.modes.modes_map['follow_target'].setTarget(agent, player, distance);
-      log(bot, `Now following ${username}.`);
-      return true;
-  } else {
-      log(bot, "Error: Follow mode is not available.");
-      return false;
+      const agentContext = bot;
+      bot.modes.modes_map['follow_target'].setTarget(agentContext, player, distance);
+      return success(bot, `Now following ${username}.`);
   }
+
+  return failure(bot, "Error: Follow mode is not available.");
 }
 
 export async function moveAway(bot, distance) {
@@ -1788,28 +1726,24 @@ export async function moveAway(bot, distance) {
    * @example
    * await skills.moveAway(bot, 8);
    **/
-  const pos = bot.entity.position;
-  let goal = new pf.goals.GoalNear(pos.x, pos.y, pos.z, distance);
-  let inverted_goal = new pf.goals.GoalInvert(goal);
-  bot.pathfinder.setMovements(new pf.Movements(bot));
-
   if (bot.modes.isOn("cheat")) {
-    const path = await bot.pathfinder.getPathTo(move, inverted_goal, 10000);
-    let last_move = path.path[path.path.length - 1];
-    console.log(last_move);
-    if (last_move) {
-      let x = Math.floor(last_move.x);
-      let y = Math.floor(last_move.y);
-      let z = Math.floor(last_move.z);
-      bot.chat("/tp @s " + x + " " + y + " " + z);
-      return true;
-    }
+    return failure(bot, "Cannot move away while cheat mode is active.");
   }
 
-  await bot.pathfinder.goto(inverted_goal);
-  let new_pos = bot.entity.position;
-  log(bot, `Moved away from nearest entity to ${new_pos}.`);
-  return true;
+  const startPos = bot.entity.position.clone();
+  const goal = new pf.goals.GoalNear(startPos.x, startPos.y, startPos.z, distance);
+  const invertedGoal = new pf.goals.GoalInvert(goal);
+  bot.pathfinder.setMovements(new pf.Movements(bot));
+
+  await bot.pathfinder.goto(invertedGoal);
+  const newPos = bot.entity.position.clone();
+  const moved = startPos.distanceTo(newPos);
+
+  if (moved + 0.1 < distance) {
+    return failure(bot, `Failed to move away sufficiently. Distance moved: ${moved.toFixed(2)} (target ${distance}).`);
+  }
+
+  return success(bot, `Moved away from nearest entity to ${newPos}.`);
 }
 
 export async function avoidEnemies(bot, distance = 16) {
@@ -1823,6 +1757,7 @@ export async function avoidEnemies(bot, distance = 16) {
    **/
   bot.modes.pause("self_preservation"); // prevents damage-on-low-health from interrupting the bot
   let enemy = null;
+  let interrupted = false;
 
   while (true) { // Loop until no visible, close hostile enemies are found
     const visibleEntities = await world.getVisibleEntities(bot);
@@ -1847,13 +1782,27 @@ export async function avoidEnemies(bot, distance = 16) {
     await new Promise((resolve) => setTimeout(resolve, 500)); // Wait for movement
 
     if (bot.interrupt_code) {
+      interrupted = true;
       break;
     }
   }
 
   bot.pathfinder.stop();
-  log(bot, `Moved ${distance} away from enemies.`);
-  return true;
+
+  if (interrupted) {
+    return failure(bot, "Avoid enemies action interrupted.");
+  }
+
+  const remainingHostiles = (await world.getVisibleEntities(bot)).filter(entity =>
+    MCData.getInstance().isHostile(entity) &&
+    bot.entity.position.distanceTo(entity.position) <= distance
+  );
+
+  if (remainingHostiles.length > 0) {
+    return failure(bot, "Enemies are still within the danger radius.");
+  }
+
+  return success(bot, `Moved ${distance} away from enemies.`);
 }
 
 
@@ -1867,50 +1816,70 @@ export async function useDoor(bot, door_pos = null) {
    * let door = world.getNearestBlock(bot, "oak_door", 16).position;
    * await skills.useDoor(bot, door);
    **/
-  if (!door_pos) {
-    for (let door_type of [
-      "oak_door",
-      "spruce_door",
-      "birch_door",
-      "jungle_door",
-      "acacia_door",
-      "dark_oak_door",
-      "mangrove_door",
-      "cherry_door",
-      "bamboo_door",
-      "crimson_door",
-      "warped_door",
-    ]) {
-      door_pos = world.getNearestBlock(bot, door_type, 16).position;
-      if (door_pos) break;
-    }
+  const doorTypes = [
+    "oak_door",
+    "spruce_door",
+    "birch_door",
+    "jungle_door",
+    "acacia_door",
+    "dark_oak_door",
+    "mangrove_door",
+    "cherry_door",
+    "bamboo_door",
+    "crimson_door",
+    "warped_door",
+  ];
+
+  let targetPos;
+  if (door_pos) {
+    targetPos = new Vec3(Math.floor(door_pos.x), Math.floor(door_pos.y), Math.floor(door_pos.z));
   } else {
-    door_pos = Vec3(door_pos.x, door_pos.y, door_pos.z);
-  }
-  if (!door_pos) {
-    log(bot, `Could not find a door to use.`);
-    return false;
-  }
-
-  bot.pathfinder.setGoal(
-    new pf.goals.GoalNear(door_pos.x, door_pos.y, door_pos.z, 1)
-  );
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  while (bot.pathfinder.isMoving()) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (const doorType of doorTypes) {
+      const found = world.getNearestBlock(bot, doorType, 16);
+      if (found) {
+        targetPos = found.position;
+        break;
+      }
+    }
   }
 
-  let door_block = bot.blockAt(door_pos);
-  await bot.lookAt(door_pos);
-  if (!door_block._properties.open) await bot.activateBlock(door_block);
+  if (!targetPos) {
+    return failure(bot, "Could not find a door to use.");
+  }
 
-  bot.setControlState("forward", true);
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  bot.setControlState("forward", false);
-  await bot.activateBlock(door_block);
+  const reached = await goToPosition(bot, targetPos.x, targetPos.y, targetPos.z, 1);
+  if (!reached) {
+    return failure(bot, `Failed to reach door at ${targetPos}.`);
+  }
 
-  log(bot, `Used door at ${door_pos}.`);
-  return true;
+  const doorBlock = bot.blockAt(targetPos);
+  if (!doorBlock || !doorBlock.name.includes("door")) {
+    return failure(bot, `Block at ${targetPos} is not a usable door.`);
+  }
+
+  try {
+    await bot.lookAt(targetPos);
+    const wasClosed = !doorBlock._properties.open;
+    if (wasClosed) {
+      await bot.activateBlock(doorBlock);
+    }
+
+    bot.setControlState("forward", true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    bot.setControlState("forward", false);
+
+    if (wasClosed) {
+      const updatedDoorBlock = bot.blockAt(targetPos);
+      if (updatedDoorBlock && updatedDoorBlock._properties.open) {
+        await bot.activateBlock(updatedDoorBlock);
+      }
+    }
+  } catch (err) {
+    bot.setControlState("forward", false);
+    return failure(bot, `Failed to use door at ${targetPos}: ${err.message}`);
+  }
+
+  return success(bot, `Used door at ${targetPos}.`);
 }
 
 export async function goToBed(bot) {
@@ -1929,8 +1898,7 @@ export async function goToBed(bot) {
   });
 
   if (beds.length === 0) {
-    log(bot, `Could not find any beds nearby to sleep in.`);
-    return false;
+    return failure(bot, "Could not find any beds nearby to sleep in.");
   }
 
   for (const loc of beds) {
@@ -1938,10 +1906,9 @@ export async function goToBed(bot) {
 
     // Check distance and navigate if necessary
     if (bot.entity.position.distanceTo(bedPosition) > NEAR_DISTANCE) {
-      try {
-        await goToPosition(bot, bedPosition.x, bedPosition.y, bedPosition.z, 1); // Aim close
-      } catch (navErr) {
-        continue; // Skip to the next bed if navigation fails
+      const reached = await goToPosition(bot, bedPosition.x, bedPosition.y, bedPosition.z, 1);
+      if (!reached) {
+        continue;
       }
     }
       
@@ -1960,27 +1927,22 @@ export async function goToBed(bot) {
       while (bot.isSleeping) {
         await new Promise((resolve) => setTimeout(resolve, 500));
         if (bot.interrupt_code) {
-           log(bot, "Sleep interrupted.");
-           // Might need to wake up manually if interrupted? Mineflayer usually handles this.
-           return false; // Indicate interruption
+           return failure(bot, "Sleep interrupted.");
         }
       }
-      log(bot, `You have woken up.`);
-      return true; // Successfully slept and woke up
+      return success(bot, `You slept and woke up safely.`);
 
     } catch (err) {
       // Do nothing
     }
     
     if (bot.interrupt_code) {
-        log(bot, "goToBed sequence interrupted.");
-        return false;
+        return failure(bot, "goToBed sequence interrupted.");
     }
   }
 
   // If loop finishes without returning true
-  log(bot, "Tried all nearby beds, but could not sleep in any.");
-  return false;
+  return failure(bot, "Tried all nearby beds, but could not sleep in any.");
 }
 
 export async function goIntoNetherPortal(bot) {
@@ -1992,8 +1954,7 @@ export async function goIntoNetherPortal(bot) {
   const portalBlock = world.getNearestBlock(bot, "nether_portal", MID_DISTANCE);
 
   if (!portalBlock) {
-    log(bot, "Could not find a Nether Portal nearby.");
-    return false;
+    return failure(bot, "Could not find a Nether Portal nearby.");
   }
 
   log(bot, `Found Nether Portal at ${portalBlock.position}. Moving into it...`);
@@ -2003,13 +1964,13 @@ export async function goIntoNetherPortal(bot) {
 
   try {
     await bot.pathfinder.goto(goal);
-    // Once the bot reaches the goal coordinates, it should be inside the portal
-    // The game handles the teleportation delay.
-    log(bot, "Entered Nether Portal block space. Waiting for teleportation...");
-    return true; // Indicates the bot reached the portal coordinates
+    const distance = bot.entity.position.distanceTo(portalBlock.position);
+    if (distance > 0.5) {
+      return failure(bot, "Failed to stand inside the Nether Portal.");
+    }
+    return success(bot, "Entered Nether Portal block space. Waiting for teleportation...");
   } catch (err) {
-    log(bot, `Failed to move into the Nether Portal: ${err.message}`);
-    return false;
+    return failure(bot, `Failed to move into the Nether Portal: ${err.message}`);
   }
 }
 
@@ -2022,8 +1983,7 @@ export async function goIntoEndPortal(bot) {
   const portalBlock = world.getNearestBlock(bot, "end_portal", MID_DISTANCE);
 
   if (!portalBlock) {
-    log(bot, "Could not find an End Portal nearby.");
-    return false;
+    return failure(bot, "Could not find an End Portal nearby.");
   }
 
   log(bot, `Found End Portal at ${portalBlock.position}. Moving into it...`);
@@ -2033,11 +1993,13 @@ export async function goIntoEndPortal(bot) {
 
   try {
     await bot.pathfinder.goto(goal);
-    log(bot, "Entered End Portal block space. Waiting for teleportation...");
-    return true;
+    const distance = bot.entity.position.distanceTo(portalBlock.position);
+    if (distance > 0.5) {
+      return failure(bot, "Failed to stand inside the End Portal.");
+    }
+    return success(bot, "Entered End Portal block space. Waiting for teleportation...");
   } catch (err) {
-    log(bot, `Failed to move into the End Portal: ${err.message}`);
-    return false;
+    return failure(bot, `Failed to move into the End Portal: ${err.message}`);
   }
 }
 
@@ -2054,39 +2016,39 @@ export async function tillAndSow(bot, x, y, z, seedType = null) {
    * let position = world.getPosition(bot);
    * await skills.till(bot, position.x, position.y - 1, position.x);
    **/
-  console.log(x, y, z);
   x = Math.round(x);
   y = Math.round(y);
   z = Math.round(z);
   let block = bot.blockAt(new Vec3(x, y, z));
-  console.log(x, y, z);
   if (
     block.name !== "grass_block" &&
     block.name !== "dirt" &&
     block.name !== "farmland"
   ) {
-    log(bot, `Cannot till ${block.name}, must be grass_block or dirt.`);
-    return false;
+    return failure(bot, `Cannot till ${block.name}, must be grass_block or dirt.`);
   }
   let above = bot.blockAt(new Vec3(x, y + 1, z));
   if (above.name !== "air") {
-    log(bot, `Cannot till, there is ${above.name} above the block.`);
-    return false;
+    return failure(bot, `Cannot till, there is ${above.name} above the block.`);
   }
   // if distance is too far, move to the block
   if (bot.entity.position.distanceTo(block.position) > NEAR_DISTANCE) {
-    let pos = block.position;
-    bot.pathfinder.setMovements(new pf.Movements(bot));
-    await bot.pathfinder.goto(new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+    const reached = await goToPosition(bot, block.position.x, block.position.y, block.position.z, 1);
+    if (!reached) {
+      return failure(bot, `Unable to reach block at ${block.position}.`);
+    }
   }
   if (block.name !== "farmland") {
     let hoe = bot.inventory.items().find((item) => item.name.includes("hoe"));
     if (!hoe) {
-      log(bot, `Cannot till, no hoes.`);
-      return false;
+      return failure(bot, `Cannot till, no hoes.`);
     }
-    await bot.equip(hoe, "hand");
-    await bot.activateBlock(block);
+    try {
+      await bot.equip(hoe, "hand");
+      await bot.activateBlock(block);
+    } catch (err) {
+      return failure(bot, `Failed to till block at ${x}, ${y}, ${z}: ${err.message}`);
+    }
     log(
       bot,
       `Tilled block x:${x.toFixed(1)}, y:${y.toFixed(1)}, z:${z.toFixed(1)}.`
@@ -2098,12 +2060,14 @@ export async function tillAndSow(bot, x, y, z, seedType = null) {
       seedType += "s"; // fixes common mistake
     let seeds = bot.inventory.items().find((item) => item.name === seedType);
     if (!seeds) {
-      log(bot, `No ${seedType} to plant.`);
-      return false;
+      return failure(bot, `No ${seedType} to plant.`);
     }
-    await bot.equip(seeds, "hand");
-
-    await bot.placeBlock(block, new Vec3(0, -1, 0));
+    try {
+      await bot.equip(seeds, "hand");
+      await bot.placeBlock(block, new Vec3(0, -1, 0));
+    } catch (err) {
+      return failure(bot, `Failed to plant ${seedType} at ${x}, ${y}, ${z}: ${err.message}`);
+    }
     log(
       bot,
       `Planted ${seedType} at x:${x.toFixed(1)}, y:${y.toFixed(
@@ -2111,7 +2075,7 @@ export async function tillAndSow(bot, x, y, z, seedType = null) {
       )}, z:${z.toFixed(1)}.`
     );
   }
-  return true;
+  return success(bot, `Finished tilling${seedType ? " and sowing" : ""} at ${x}, ${y}, ${z}.`);
 }
 
 export async function activateNearestBlock(bot, type) {
@@ -2123,24 +2087,27 @@ export async function activateNearestBlock(bot, type) {
    * @example
    * await skills.activateNearestBlock(bot, "lever");
    **/
-  let block = world.getNearestBlock(bot, type, 16);
+  const block = world.getNearestBlock(bot, type, 16);
   if (!block) {
-    log(bot, `Could not find any ${type} to activate.`);
-    return false;
+    return failure(bot, `Could not find any ${type} to activate.`);
   }
   if (bot.entity.position.distanceTo(block.position) > NEAR_DISTANCE) {
-    let pos = block.position;
-    bot.pathfinder.setMovements(new pf.Movements(bot));
-    await bot.pathfinder.goto(new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+    const reached = await goToPosition(bot, block.position.x, block.position.y, block.position.z, 1);
+    if (!reached) {
+      return failure(bot, `Failed to reach ${type} at ${block.position}.`);
+    }
   }
-  await bot.activateBlock(block);
-  log(
+  try {
+    await bot.activateBlock(block);
+  } catch (err) {
+    return failure(bot, `Failed to activate ${type}: ${err.message}`);
+  }
+  return success(
     bot,
     `Activated ${type} at x:${block.position.x.toFixed(
       1
     )}, y:${block.position.y.toFixed(1)}, z:${block.position.z.toFixed(1)}.`
   );
-  return true;
 }
 
 export async function activateItem(bot, offHand = false) {
@@ -2154,14 +2121,11 @@ export async function activateItem(bot, offHand = false) {
    * await skills.activateItem(bot, true); // activate off-hand item
    **/
   try {
-    // TODO: not working for spawn eggs
     await bot.activateItem(offHand);
     const handName = offHand ? "off hand" : "main hand";
-    log(bot, `Activated item in ${handName}.`);
-    return true;
+    return success(bot, `Activated item in ${handName}.`);
   } catch (error) {
-    log(bot, `Failed to activate item: ${error.message}`);
-    return false;
+    return failure(bot, `Failed to activate item: ${error.message}`);
   }
 }
 
@@ -2178,8 +2142,7 @@ export async function activateNearestEntity(bot, entityType) {
   const targetEntities = visibleEntities.filter(entity => entity.name === entityType);
 
   if (targetEntities.length === 0) {
-    log(bot, `Could not find any visible ${entityType} to activate.`);
-    return false;
+    return failure(bot, `Could not find any visible ${entityType} to activate.`);
   }
 
   // Sort by distance to find the nearest
@@ -2187,22 +2150,25 @@ export async function activateNearestEntity(bot, entityType) {
   let entity = targetEntities[0];
 
   if (entity === bot.vehicle) {
-    log(bot, `Already riding the nearest ${entityType}.`);
-    return false;
+    return failure(bot, `Already riding the nearest ${entityType}.`);
   }
   if (bot.entity.position.distanceTo(entity.position) > NEAR_DISTANCE) {
-    let pos = entity.position;
-    bot.pathfinder.setMovements(new pf.Movements(bot));
-    await bot.pathfinder.goto(new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+    const reached = await goToPosition(bot, entity.position.x, entity.position.y, entity.position.z, 1);
+    if (!reached) {
+      return failure(bot, `Unable to reach ${entityType} to activate.`);
+    }
   }
-  await bot.activateEntity(entity);
-  log(
+  try {
+    await bot.activateEntity(entity);
+  } catch (err) {
+    return failure(bot, `Failed to activate ${entityType}: ${err.message}`);
+  }
+  return success(
     bot,
     `Activated ${entityType} at x:${entity.position.x.toFixed(
       1
     )}, y:${entity.position.y.toFixed(1)}, z:${entity.position.z.toFixed(1)}.`
   );
-  return true;
 }
 
 export async function useItemOnEntity(bot, entityName, itemName) {
@@ -2216,21 +2182,18 @@ export async function useItemOnEntity(bot, entityName, itemName) {
    * await skills.useItemOnEntity(bot, "cow", "wheat");
    **/
   if (!entityName) {
-    log(bot, `No target entity specified.`);
-    return false;
+    return failure(bot, `No target entity specified.`);
   }
 
   // Replaced getNearbyEntities with await getVisibleEntities
   const visibleEntities = await world.getVisibleEntities(bot);
   const targetEntity = visibleEntities.find((e) => e.name === entityName);
   if (!targetEntity) {
-    // Get names from visibleEntities, not nearbyEntities
     const visibleEntityNames = visibleEntities.map((e) => e.name || e.username || `ID ${e.id}`).join(", ");
-    log(
+    return failure(
       bot,
       `${entityName} does not exist nearby. Visible entities: ${visibleEntityNames}`
     );
-    return false;
   }
 
   const item = bot.inventory.items().find((item) => item.name === itemName);
@@ -2239,33 +2202,28 @@ export async function useItemOnEntity(bot, entityName, itemName) {
       .items()
       .map((i) => i.name)
       .join(", ");
-    log(
+    return failure(
       bot,
       `No ${itemName} found in inventory. Inventory contains: ${inventoryItems}`
     );
-    return false;
   }
 
   // Ensure the bot is close enough to the target entity
   const distance = bot.entity.position.distanceTo(targetEntity.position);
   if (distance > NEAR_DISTANCE) {
-    log(bot, `Target entity is too far away, moving closer...`);
     const move = new pf.Movements(bot);
     bot.pathfinder.setMovements(move);
     await bot.pathfinder.goto(new pf.goals.GoalFollow(targetEntity, 2));
   }
 
-  // Ensure the bot is looking at the target entity
   await bot.lookAt(targetEntity.position);
 
   try {
     await bot.equip(item, "hand");
     await bot.useOn(targetEntity);
-    log(bot, `Successfully used ${itemName} on ${entityName}.`);
-    return true;
+    return success(bot, `Successfully used ${itemName} on ${entityName}.`);
   } catch (err) {
-    log(bot, `Failed to use ${itemName} on ${entityName}: ${err.message}`);
-    return false;
+    return failure(bot, `Failed to use ${itemName} on ${entityName}: ${err.message}`);
   }
 }
 
@@ -2446,7 +2404,7 @@ export function startCrouching(bot) {
    * skills.startCrouching(bot);
    **/
   bot.pathfinder.sneak = true;
-  log(bot, "Started crouching.");
+  return success(bot, "Started crouching.");
 }
 
 export function stopCrouching(bot) {
@@ -2457,7 +2415,7 @@ export function stopCrouching(bot) {
    * skills.stopCrouching(bot);
    **/
   bot.pathfinder.sneak = false;
-  log(bot, "Stopped crouching.");
+  return success(bot, "Stopped crouching.");
 }
 
 export async function consume(bot, itemName) {
@@ -2471,18 +2429,15 @@ export async function consume(bot, itemName) {
    **/
   const item = bot.inventory.items().find((item) => item.name === itemName);
   if (!item) {
-    log(bot, `No ${itemName} found in inventory.`);
-    return false;
+    return failure(bot, `No ${itemName} found in inventory.`);
   }
 
   try {
     await bot.equip(item, "hand");
     await bot.consume();
-    log(bot, `Consumed ${itemName}`);
-    return true;
+    return success(bot, `Consumed ${itemName}`);
   } catch (err) {
-    log(bot, `Unable to consume ${itemName}: ${err.message}`);
-    return false;
+    return failure(bot, `Unable to consume ${itemName}: ${err.message}`);
   }
 }
 
@@ -2495,17 +2450,14 @@ export async function dismount(bot) {
    * await skills.dismount(bot);
    **/
   if (!bot.vehicle) {
-    log(bot, "The bot is not riding any entity.");
-    return false;
+    return failure(bot, "The bot is not riding any entity.");
   }
 
   try {
     await bot.dismount();
-    log(bot, "Successfully dismounted.");
-    return true;
+    return success(bot, "Successfully dismounted.");
   } catch (err) {
-    log(bot, `Failed to dismount: ${err.message}`);
-    return false;
+    return failure(bot, `Failed to dismount: ${err.message}`);
   }
 }
 
@@ -2602,34 +2554,33 @@ export async function lookInContainer(bot, containerIdentifier) {
    * @returns {Promise<string>} A message summarizing the contents or an error.
    */
   const { targetBlock, errorMsg } = await _getAndValidateContainer(bot, containerIdentifier);
-  if (errorMsg) return errorMsg; // Error already logged by helper
+  if (errorMsg) return false;
 
   let container;
   try {
     container = await bot.openContainer(targetBlock);
   } catch (err) {
-    const message = `Failed to open container ${containerIdentifier}: ${err.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to open container ${containerIdentifier}: ${err.message}`);
   }
 
-  const itemsInContainer = container.containerItems().map((item) => `${item.name} x${item.count}`);
-  let message;
-  if (itemsInContainer.length === 0) {
-    message = `Container ${containerIdentifier} is empty.`;
-  } else {
-    message = `Container ${containerIdentifier} contents:\n- ` + itemsInContainer.join('\n- ');
-    message += `\n if you wish to withdraw items, use withdrawFromContainer.`;
-  }
-  log(bot, message); 
-
+  let successFlag = true;
   try {
-    await container.close();
-  } catch (closeErr) {
-    // Non-critical, just log
-    console.warn(`Error closing container ${containerIdentifier}: ${closeErr.message}`);
+    const itemsInContainer = container.containerItems().map((item) => `${item.name} x${item.count}`);
+    if (itemsInContainer.length === 0) {
+      log(bot, `Container ${containerIdentifier} is empty.`);
+    } else {
+      log(bot, `Container ${containerIdentifier} contents:\n- ${itemsInContainer.join('\n- ')}\n if you wish to withdraw items, use withdrawFromContainer.`);
+    }
+  } finally {
+    try {
+      await container.close();
+    } catch (closeErr) {
+      log(bot, `Error closing container ${containerIdentifier}: ${closeErr.message}`);
+      successFlag = false;
+    }
   }
-  return message; // Return the content summary
+
+  return successFlag;
 }
 
 export async function depositToContainer(bot, containerIdentifier, itemsString) {
@@ -2641,9 +2592,8 @@ export async function depositToContainer(bot, containerIdentifier, itemsString) 
    * @returns {Promise<string>} A message summarizing the deposit action or an error.
    */
   const { targetBlock, errorMsg: validationError } = await _getAndValidateContainer(bot, containerIdentifier);
-  if (validationError) return validationError; 
+  if (validationError) return false; 
 
-  // Parse items string
   const itemsList = itemsString.split(',').map(item => {
       const [name, quantity] = item.split(':');
       const qty = parseInt(quantity, 10);
@@ -2652,66 +2602,62 @@ export async function depositToContainer(bot, containerIdentifier, itemsString) 
   }).filter(item => item !== null);
 
   if (itemsList.length === 0) {
-    const message = `Invalid or empty items string provided: \"${itemsString}\". Format: 'item1:qty1,item2:qty2,...'`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Invalid or empty items string provided: "${itemsString}". Format: 'item1:qty1,item2:qty2,...'`);
   }
 
   let container;
   try {
     container = await bot.openContainer(targetBlock);
   } catch (err) {
-    const message = `Failed to open container ${containerIdentifier}: ${err.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to open container ${containerIdentifier}: ${err.message}`);
   }
 
-  let depositedSummary = [];
-  let errorSummary = [];
-
-  for (const { name, quantity } of itemsList) {
-    const itemInInventory = bot.inventory.items().find(invItem => invItem.name === name);
-    if (!itemInInventory) {
-      errorSummary.push(`You do not have any ${name} to deposit.`);
-      continue; 
-    }
-    // Cannot deposit more than available
-    const depositAmount = Math.min(quantity, itemInInventory.count); 
-    if (depositAmount <= 0) continue; // Should not happen with parsing check, but safe
-
-    try {
-      await container.deposit(itemInInventory.type, null, depositAmount);
-      depositedSummary.push(`${depositAmount} ${name}`);
-    } catch (err) {
-      errorSummary.push(`Could not deposit ${depositAmount} ${name}: ${err.message}`);
-    }
-    if (bot.interrupt_code) {
-        errorSummary.push("Deposit action interrupted.");
-        break;
-    }
-  }
-
+  let successFlag = true;
   try {
-    await container.close();
-  } catch (closeErr) {
-      console.warn(`Error closing container ${containerIdentifier}: ${closeErr.message}`);
+    const inventoryCounts = world.getInventoryCounts(bot);
+
+    for (const { name, quantity } of itemsList) {
+      if (!inventoryCounts[name] || inventoryCounts[name] < quantity) {
+        return failure(bot, `Cannot deposit ${quantity} ${name}; only ${inventoryCounts[name] || 0} available.`);
+      }
+
+      let remaining = quantity;
+      for (const item of bot.inventory.items()) {
+        if (item.name !== name) continue;
+        const amount = Math.min(item.count, remaining);
+        if (amount <= 0) continue;
+        try {
+          await container.deposit(item.type, null, amount);
+        } catch (err) {
+          return failure(bot, `Unable to deposit ${amount} ${name}: ${err.message}`);
+        }
+        remaining -= amount;
+        if (remaining === 0) break;
+      }
+
+      if (remaining !== 0) {
+        return failure(bot, `Failed to deposit full quantity for ${name}. Remaining: ${remaining}.`);
+      }
+
+      log(bot, `Deposited ${quantity} ${name} into ${containerIdentifier}.`);
+
+      if (bot.interrupt_code) {
+        return failure(bot, `Deposit action interrupted after depositing ${name}.`);
+      }
+    }
+  } finally {
+    try {
+      await container.close();
+    } catch (closeErr) {
+      log(bot, `Error closing container ${containerIdentifier}: ${closeErr.message}`);
+      successFlag = false;
+    }
   }
 
-  // Construct final message
-  let finalMessage = `Deposit action for ${containerIdentifier}:
-`;
-  if (depositedSummary.length > 0) {
-    finalMessage += `- Deposited: ${depositedSummary.join(', ')}.\n`;
+  if (successFlag) {
+    log(bot, `Successfully deposited requested items into ${containerIdentifier}.`);
   }
-  if (errorSummary.length > 0) {
-    finalMessage += `- Errors: ${errorSummary.join('; ')}.`;
-  }
-  if (depositedSummary.length === 0 && errorSummary.length === 0) {
-      finalMessage += `- No items were specified or found to deposit.`;
-  }
-
-  log(bot, finalMessage); // Log the detailed message
-  return finalMessage;
+  return successFlag;
 }
 
 export async function withdrawFromContainer(bot, containerIdentifier, itemsString) {
@@ -2723,9 +2669,8 @@ export async function withdrawFromContainer(bot, containerIdentifier, itemsStrin
    * @returns {Promise<string>} A message summarizing the withdrawal action or an error.
    */
   const { targetBlock, errorMsg: validationError } = await _getAndValidateContainer(bot, containerIdentifier);
-  if (validationError) return validationError;
+  if (validationError) return false;
 
-  // Parse items string
   const itemsList = itemsString.split(',').map(item => {
       const [name, quantity] = item.split(':');
       const qty = parseInt(quantity, 10);
@@ -2734,76 +2679,56 @@ export async function withdrawFromContainer(bot, containerIdentifier, itemsStrin
   }).filter(item => item !== null);
 
   if (itemsList.length === 0) {
-    const message = `Invalid or empty items string provided: \"${itemsString}\". Format: 'item1:qty1,item2:qty2,...'`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Invalid or empty items string provided: "${itemsString}". Format: 'item1:qty1,item2:qty2,...'`);
   }
 
   let container;
   try {
     container = await bot.openContainer(targetBlock);
   } catch (err) {
-    const message = `Failed to open container ${containerIdentifier}: ${err.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to open container ${containerIdentifier}: ${err.message}`);
   }
 
-  // Log the initial contents
-  const itemsInContainer = container.containerItems().map((item) => `${item.name} x${item.count}`);
-  let initialContentsMessage;
-  if (itemsInContainer.length === 0) {
-    initialContentsMessage = `Container ${containerIdentifier} is empty.`;
-  } else {
-    initialContentsMessage = `Container ${containerIdentifier} contents before withdrawal:\n- ` + itemsInContainer.join('\n- ');
-  }
-  log(bot, initialContentsMessage); // Log contents to bot output
-
-  let withdrawnSummary = [];
-  let errorSummary = [];
-
-  for (const { name, quantity } of itemsList) {
-    const itemInContainer = container.containerItems().find(contItem => contItem.name === name);
-    if (!itemInContainer) {
-      errorSummary.push(`No ${name} found in the container.`);
-      continue;
-    }
-    // Cannot withdraw more than available
-    const withdrawAmount = Math.min(quantity, itemInContainer.count);
-    if (withdrawAmount <= 0) continue;
-
-    try {
-      await container.withdraw(itemInContainer.type, null, withdrawAmount);
-      withdrawnSummary.push(`${withdrawAmount} ${name}`);
-    } catch (err) { 
-      errorSummary.push(`Could not withdraw ${withdrawAmount} ${name}: ${err.message}`);
-    }
-    if (bot.interrupt_code) {
-        errorSummary.push("Withdraw action interrupted.");
-        break;
-    }
-  }
-
+  let successFlag = true;
   try {
-    await container.close();
-  } catch (closeErr) {
-      console.warn(`Error closing container ${containerIdentifier}: ${closeErr.message}`);
+    const contentsBefore = container.containerItems().map((item) => `${item.name} x${item.count}`);
+    if (contentsBefore.length === 0) {
+      log(bot, `Container ${containerIdentifier} is empty.`);
+    } else {
+      log(bot, `Container ${containerIdentifier} contents before withdrawal:\n- ${contentsBefore.join('\n- ')}`);
+    }
+
+    for (const { name, quantity } of itemsList) {
+      const availableItem = container.containerItems().find(contItem => contItem.name === name);
+      if (!availableItem || availableItem.count < quantity) {
+        return failure(bot, `Container ${containerIdentifier} does not have required ${quantity} ${name}.`);
+      }
+
+      try {
+        await container.withdraw(availableItem.type, null, quantity);
+      } catch (err) {
+        return failure(bot, `Could not withdraw ${quantity} ${name}: ${err.message}`);
+      }
+
+      log(bot, `Withdrew ${quantity} ${name} from ${containerIdentifier}.`);
+
+      if (bot.interrupt_code) {
+        return failure(bot, `Withdraw action interrupted after withdrawing ${name}.`);
+      }
+    }
+  } finally {
+    try {
+      await container.close();
+    } catch (closeErr) {
+      log(bot, `Error closing container ${containerIdentifier}: ${closeErr.message}`);
+      successFlag = false;
+    }
   }
 
-  // Construct final message
-  let finalMessage = `Withdraw action for ${containerIdentifier}:
-`;
-  if (withdrawnSummary.length > 0) {
-    finalMessage += `- Withdrew: ${withdrawnSummary.join(', ')}.\n`;
+  if (successFlag) {
+    log(bot, `Successfully withdrew requested items from ${containerIdentifier}.`);
   }
-  if (errorSummary.length > 0) {
-    finalMessage += `- Errors: ${errorSummary.join('; ')}.`;
-  }
-  if (withdrawnSummary.length === 0 && errorSummary.length === 0) {
-      finalMessage += `- No items were specified or found to withdraw.`;
-  }
-
-  log(bot, finalMessage); // Log the detailed message
-  return finalMessage;
+  return successFlag;
 }
 
 export async function unequip(bot, destination) {
@@ -2817,21 +2742,14 @@ export async function unequip(bot, destination) {
    * await skills.unequip(bot, 'off-hand');
    */
   if (!destination) {
-    const message = "No destination specified for unequipping.";
-    log(bot, message);
-    return message;
+    return failure(bot, "No destination specified for unequipping.");
   }
 
   try {
     await bot.unequip(destination);
-    const message = `Your ${destination} armor is now in your backpack.`;
-    log(bot, message);
-    return message;
+    return success(bot, `Your ${destination} armor is now in your backpack.`);
   } catch (err) {
-    // Catch potential errors, although bot.unequip is usually forgiving.
-    const message = `Failed to unequip from ${destination}: ${err.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to unequip from ${destination}: ${err.message}`);
   }
 }
 
@@ -2847,28 +2765,20 @@ export async function checkCheats(bot, ownerUsername, agent) {
    * @returns {Promise<string>} A message indicating the result.
    */
   try {
-
     bot.chat(`/tp @s ${ownerUsername}`);
-    await new Promise((resolve) => setTimeout(resolve, 25)); // Wait for teleport
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const ownerEntity = bot.players[ownerUsername]?.entity;
-    if (ownerEntity && bot.entity.position.distanceTo(ownerEntity.position) <= 0.5) {
-      agent.cheatsEnabled = true;
-      const distance = bot.entity.position.distanceTo(ownerEntity.position);
-      const message = `Cheats are ENABLED for you.`;
-      log(bot, message);
-      return message;
-    } else {
-      agent.cheatsEnabled = false;
-      const message = `Cheats are DISABLED for you.`;
-      log(bot, message);
-      return message;
+    const nearOwner = ownerEntity && bot.entity.position.distanceTo(ownerEntity.position) <= 0.5;
+    agent.cheatsEnabled = !!nearOwner;
+
+    if (nearOwner) {
+      return success(bot, "Cheats are ENABLED for you.");
     }
 
+    return success(bot, "Cheats are DISABLED for you.");
   } catch (err) {
-    const message = `Failed to check cheats: ${err.message}`;
-    log(bot, message);
-    return message;
+    return failure(bot, `Failed to check cheats: ${err.message}`);
   }
 }
 
@@ -2882,113 +2792,68 @@ export async function generateStructure(bot, structure_id, agent) {
    * @example
    * await skills.generateStructure(bot, 1, agent);
    */
-  try {
-    // Check if cheats are enabled using the agent's instance variable
-    if (!agent.cheatsEnabled) {
-      const message = "Cannot generate structure: Cheats are not enabled for you. Structure generation requires operator permissions or cheats to be enabled.";
-      log(bot, message);
-      return message;
-    }
-
-    // Fetch structure data from local API
-    let structureResponse;
-    try {
-      structureResponse = await axios.get(`http://localhost:10101/structure/${structure_id}`);
-    } catch (error) {
-      if (error.response?.status === 404) {
-        const message = `Structure ID ${structure_id} does not exist. Please check the ID and try again.`;
-        log(bot, message);
-        return message;
-      }
-      const message = `Failed to fetch structure ${structure_id}: ${error.response?.data?.error || error.message}`;
-      log(bot, message);
-      return message;
-    }
-    
-    const operations = structureResponse.data.buildscript;
-    const structurePrompt = structureResponse.data.prompt;
-    
-    if (!operations || !Array.isArray(operations)) {
-      const message = `Invalid structure data format for ${structure_id}. Expected buildscript to be an array of operations.`;
-      log(bot, message);
-      return message;
-    }
-    
-    // Get bot's current position as the origin for the structure
-    const botPos = bot.entity.position;
-    const originX = Math.floor(botPos.x);
-    const originY = Math.floor(botPos.y);
-    const originZ = Math.floor(botPos.z);
-    
-    let successCount = 0;
-    let errorCount = 0;
-
-    // Execute each operation
-    for (let i = 0; i < operations.length; i++) {
-      const operation = operations[i];
-      
-      if (bot.interrupt_code) {
-        log(bot, "Structure generation interrupted.");
-        break;
-      }
-
-      try {
-        let command = "";
-        
-        if (operation.op === "fill") {
-          // Format: /fill x1 y1 z1 x2 y2 z2 block
-          // Add bot's position to make it relative to bot
-          const [x1, y1, z1] = operation.from;
-          const [x2, y2, z2] = operation.to;
-          const worldX1 = originX + x1;
-          const worldY1 = originY + y1;
-          const worldZ1 = originZ + z1;
-          const worldX2 = originX + x2;
-          const worldY2 = originY + y2;
-          const worldZ2 = originZ + z2;
-          command = `/fill ${worldX1} ${worldY1} ${worldZ1} ${worldX2} ${worldY2} ${worldZ2} ${operation.block}`;
-        } else if (operation.op === "setBlock") {
-          // Format: /setblock x y z block
-          // Add bot's position to make it relative to bot
-          const worldX = originX + operation.x;
-          const worldY = originY + operation.y;
-          const worldZ = originZ + operation.z;
-          command = `/setblock ${worldX} ${worldY} ${worldZ} ${operation.block}`;
-        } else {
-          console.warn(`[generateStructure] Unknown operation type: ${operation.op}`);
-          errorCount++;
-          continue;
-        }
-
-        // Execute the command
-        bot.chat(command);
-        successCount++;
-      } catch (err) {
-        console.error(`[generateStructure] Error executing operation ${i}:`, err);
-        errorCount++;
-      }
-    }
-
-    // Update the generations counter via API
-    try {
-      await axios.post(`http://localhost:10101/structure/${structure_id}/increment-generations`);
-    } catch (updateErr) {
-      console.error(`[generateStructure] Error updating generations counter:`, updateErr.response?.data?.error || updateErr.message);
-    }
-
-    const message = `Structure ${structure_id} generation completed. Successfully executed ${successCount} operations${errorCount > 0 ? `, with ${errorCount} errors` : ''}.`;
-    log(bot, message);
-    
-    // Tell the bot what it just built
-    log(bot, `You just built: ${structurePrompt}`);
-    
-    return message;
-
-  } catch (err) {
-    const message = `Failed to generate structure: ${err.message}`;
-    log(bot, message);
-    return message;
+  if (!agent.cheatsEnabled) {
+    return failure(bot, "Cannot generate structure: Cheats are not enabled for you. Structure generation requires operator permissions or cheats to be enabled.");
   }
+
+  let structureResponse;
+  try {
+    structureResponse = await axios.get(`http://localhost:10101/structure/${structure_id}`);
+  } catch (error) {
+    if (error.response?.status === 404) {
+      return failure(bot, `Structure ID ${structure_id} does not exist. Please check the ID and try again.`);
+    }
+    return failure(bot, `Failed to fetch structure ${structure_id}: ${error.response?.data?.error || error.message}`);
+  }
+  
+  const operations = structureResponse.data.buildscript;
+  const structurePrompt = structureResponse.data.prompt;
+  
+  if (!operations || !Array.isArray(operations) || operations.length === 0) {
+    return failure(bot, `Invalid structure data format for ${structure_id}. Expected buildscript to be a non-empty array of operations.`);
+  }
+  
+  const botPos = bot.entity.position;
+  const originX = Math.floor(botPos.x);
+  const originY = Math.floor(botPos.y);
+  const originZ = Math.floor(botPos.z);
+  
+  for (let i = 0; i < operations.length; i++) {
+    const operation = operations[i];
+    
+    if (bot.interrupt_code) {
+      return failure(bot, "Structure generation interrupted.");
+    }
+
+    let command;
+    if (operation.op === "fill") {
+      if (!operation.from || !operation.to || !operation.block) {
+        return failure(bot, `Invalid fill operation at index ${i}.`);
+      }
+      const [x1, y1, z1] = operation.from;
+      const [x2, y2, z2] = operation.to;
+      command = `/fill ${originX + x1} ${originY + y1} ${originZ + z1} ${originX + x2} ${originY + y2} ${originZ + z2} ${operation.block}`;
+    } else if (operation.op === "setBlock") {
+      if (typeof operation.x !== 'number' || typeof operation.y !== 'number' || typeof operation.z !== 'number' || !operation.block) {
+        return failure(bot, `Invalid setBlock operation at index ${i}.`);
+      }
+      command = `/setblock ${originX + operation.x} ${originY + operation.y} ${originZ + operation.z} ${operation.block}`;
+    } else {
+      return failure(bot, `[generateStructure] Unknown operation type: ${operation.op}`);
+    }
+
+    bot.chat(command);
+  }
+
+  try {
+    await axios.post(`http://localhost:10101/structure/${structure_id}/increment-generations`);
+  } catch (updateErr) {
+    return failure(bot, `[generateStructure] Error updating generations counter: ${updateErr.response?.data?.error || updateErr.message}`);
+  }
+
+  log(bot, `Structure ${structure_id} generation completed successfully.`);
+  log(bot, `You just built: ${structurePrompt}`);
+  return true;
 }
 
 // --- Emote Skills ---
@@ -3112,33 +2977,23 @@ export async function emote(bot, emoteType) {
    * Attempts to look at the nearest entity during non-look-based emotes.
    * @returns {Promise<string>} A message indicating success or failure.
    */
-  if (emotes[emoteType]) {
-    try {
-      // Find nearest entity to look at (similar to idle_staring)
-      const entity = bot.nearestEntity((e) => e.type !== 'object' && e.type !== 'orb' && e.name !== 'enderman' && e.name !== 'item'); // Filter out objects/items/endermen
-      if (entity && entity.position.distanceTo(bot.entity.position) < 10) {
-          // Find nearest PLAYER entity to look at
-          const entity = bot.nearestEntity((e) => e.type === 'player');
-          // Players don't have a 'baby' state affecting height this way, use standard player height
-          const height = 1.62; // Standard player eye height
-
-          // Perform the lookAt here, once, before calling the specific emote.
-          const targetPosition = entity.position.offset(0, height, 0);
-          await bot.lookAt(targetPosition);
-      }
-      // No need to pass targetPosition to the emote function
-      await emotes[emoteType](bot);
-      const message = `Successfully performed emote: ${emoteType}.`;
-      return message;
-    } catch (error) {
-      const message = `Failed to perform emote ${emoteType}: ${error.message}`;
-      console.error(error); // Log full error for debugging
-      return message;
-    }
-  } else {
+  if (!emotes[emoteType]) {
     const validEmotes = Object.keys(emotes).join(', ');
-    const message = `Invalid emote type "${emoteType}". Valid emotes are: ${validEmotes}.`;
-    return message;
+    return failure(bot, `Invalid emote type "${emoteType}". Valid emotes are: ${validEmotes}.`);
+  }
+
+  try {
+    const nearbyEntity = bot.nearestEntity((e) => e.type === 'player');
+    if (nearbyEntity && nearbyEntity.position.distanceTo(bot.entity.position) < 10) {
+      const height = 1.62;
+      await bot.lookAt(nearbyEntity.position.offset(0, height, 0));
+    }
+
+    await emotes[emoteType](bot);
+    return success(bot, `Successfully performed emote: ${emoteType}.`);
+  } catch (error) {
+    console.error(error);
+    return failure(bot, `Failed to perform emote ${emoteType}: ${error.message}`);
   }
 }
 
