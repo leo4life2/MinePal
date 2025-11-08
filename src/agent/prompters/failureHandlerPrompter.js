@@ -1,5 +1,4 @@
-import { getCommandDocs } from '../commands/index.js';
-import { ChatPrompter } from './basePrompter.js';
+import { BasePrompter } from './basePrompter.js';
 
 export const FAILURE_HANDLER_SYSTEM_PROMPT = `
 You are the MinePal agent's task decomposer. 
@@ -20,8 +19,16 @@ Always return a JSON list of children ordered in a logical execution sequence.
 Do not explain reasoning; output only the structured list.
 
 
-Available actions:
-{{ACTIONS_CATALOG}}
+Command docs:
+$COMMAND_DOCS
+
+Context:
+- Agent name: $NAME
+- Owner name: $OWNER
+- Language: $LANGUAGE
+- Personality: $PERSONALITY
+- Relevant memory: $MEMORY
+- HUD snapshot: $HUD
 `;
 
 export const FAILURE_HANDLER_RESPONSE_SCHEMA = {
@@ -77,10 +84,9 @@ const formatMetadata = (metadata) => {
     }
 };
 
-export class FailureHandlerPrompter extends ChatPrompter {
-    _injectContext(basePrompt, failureSummary, metadata) {
-        const actionsCatalog = getCommandDocs();
-        const promptWithActions = basePrompt.replace('{{ACTIONS_CATALOG}}', actionsCatalog);
+export class FailureHandlerPrompter extends BasePrompter {
+    async _injectContext(basePrompt, failureSummary, metadata, messages) {
+        const enrichedPrompt = await super.injectContext(basePrompt, { messages });
 
         const formattedSummary = failureSummary && failureSummary.trim().length > 0
             ? failureSummary.trim()
@@ -91,14 +97,15 @@ export class FailureHandlerPrompter extends ChatPrompter {
             ? `\nAdditional failure context (JSON):\n${formattedMetadata}`
             : '';
 
-        return `${promptWithActions}\nFailure summary: ${formattedSummary}${metadataSection}`;
+        return `${enrichedPrompt}\nFailure summary: ${formattedSummary}${metadataSection}`;
     }
 
     async promptFailure({ messages = [], failureSummary = '', metadata = {} } = {}) {
-        const systemPrompt = this._injectContext(
+        const systemPrompt = await this._injectContext(
             FAILURE_HANDLER_SYSTEM_PROMPT,
             failureSummary,
-            metadata
+            metadata,
+            messages
         );
 
         return this.completeChat({
