@@ -40,24 +40,28 @@ export async function collectBlocks(
   console.log(`[collectBlock(producer-consumer)] start: ${blockType}, num: ${num}`);
 
   if (typeof num !== 'number') {
-    bot.output += `Invalid type for num: ${typeof num}. Expected a number.\n`;
-    return false;
+    const error = `Invalid type for num: ${typeof num}. Expected a number.\n`;
+    bot.output += error;
+    return { success: false, collected: 0, error };
   }
   if (num < 1) {
-    bot.output += `Invalid number of blocks to collect: ${num}.\n`;
-    return false;
+    const error = `Invalid number of blocks to collect: ${num}.\n`;
+    bot.output += error;
+    return { success: false, collected: 0, error };
   }
 
   // Early validation: ensure provided block type exists in MCData registry
   try {
     const id = MCData.getInstance().getBlockId(blockType);
     if (id === null) {
-      bot.output += `Invalid block type: ${blockType}.\n`;
-      return false;
+      const error = `Invalid block type: ${blockType}.\n`;
+      bot.output += error;
+      return { success: false, collected: 0, error };
     }
   } catch {
-    bot.output += `Invalid block type: ${blockType}.\n`;
-    return false;
+    const error = `Invalid block type: ${blockType}.\n`;
+    bot.output += error;
+    return { success: false, collected: 0, error };
   }
 
   const { blocktypes, desiredDropNames } = buildBlockTypes(MCData.getInstance(), BLOCK_DROP_MAP, blockType);
@@ -381,5 +385,13 @@ export async function collectBlocks(
   }
   // Note: If stopped due to empty scans, handleEmptyCandidatesExit already added the message
   
-  return finalCollected > 0;
+  const success = !bot.interrupt_code && finalCollected >= num;
+  return {
+    success,
+    collected: finalCollected,
+    required: num,
+    interrupted: Boolean(bot.interrupt_code),
+    inventoryFull,
+    unreachableCount,
+  };
 }
