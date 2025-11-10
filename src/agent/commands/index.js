@@ -103,6 +103,22 @@ function applyParamDefaults(command, args, agent) {
     return finalArgs;
 }
 
+function normalizeResult(result) {
+    if (result && typeof result === 'object' && result !== null && 'success' in result) {
+        return {
+            success: Boolean(result.success),
+            message: typeof result.message === 'string' ? result.message : ''
+        };
+    }
+    if (typeof result === 'boolean') {
+        return { success: result, message: '' };
+    }
+    if (result === undefined || result === null) {
+        return { success: true, message: '' };
+    }
+    return { success: true, message: String(result) };
+}
+
 export async function executeCommand(agent, message) {
     let parsed = parseCommandMessage(message);
     if (parsed) {
@@ -110,7 +126,7 @@ export async function executeCommand(agent, message) {
         
         // Validate that the command exists
         if (!command) {
-            return `Command ${parsed.commandName} does not exist`;
+            return { success: false, message: `Command ${parsed.commandName} does not exist` };
         }
         
         console.log('Executing command:', command.name);
@@ -128,51 +144,52 @@ export async function executeCommand(agent, message) {
         if (providedArgs < requiredParams) {
             const paramNames = command.params ? Object.keys(command.params) : [];
             const paramDescriptions = paramNames.map(name => `${name}: ${command.params[name]}`).join('\n  ');
-            return `Command ${command.name} requires ${requiredParams} argument(s) but got ${providedArgs}. ` +
-                   `Expected format: ${command.name}(${paramNames.join(', ')})\n` +
-                   `Parameters:\n  ${paramDescriptions}`;
+            return {
+                success: false,
+                message:
+                    `Command ${command.name} requires ${requiredParams} argument(s) but got ${providedArgs}. ` +
+                    `Expected format: ${command.name}(${paramNames.join(', ')})\n` +
+                    `Parameters:\n  ${paramDescriptions}`
+            };
         }
         
         // Check if we have too many arguments
         if (providedArgs > totalParams) {
             const paramNames = command.params ? Object.keys(command.params) : [];
-            return `Command ${command.name} accepts at most ${totalParams} argument(s) but got ${providedArgs}. ` +
-                   `Expected format: ${command.name}(${paramNames.join(', ')})`;
+            return {
+                success: false,
+                message:
+                    `Command ${command.name} accepts at most ${totalParams} argument(s) but got ${providedArgs}. ` +
+                    `Expected format: ${command.name}(${paramNames.join(', ')})`
+            };
         }
 
-        let result;
-        let isSuccess = true;
-        let failReason = null;
+        let normalized;
         try {
             const argsWithDefaults = applyParamDefaults(command, parsed.args, agent);
-            result = await command.perform(agent, ...argsWithDefaults);
-            // Check for [ACTION_CRASH] in result string
-            if (typeof result === 'string' && result.includes('[ACTION_CRASH]')) {
-                isSuccess = false;
-                // Extract error message after [ACTION_CRASH]
-                const match = result.match(/\[ACTION_CRASH\](.*)/s);
-                failReason = match ? match[1].trim() : 'Unknown error';
-            }
+            const rawResult = await command.perform(agent, ...argsWithDefaults);
+            normalized = normalizeResult(rawResult);
         } catch (error) {
             console.error(`Error executing command ${command.name}:`, error);
-            result = `Error executing command ${command.name}: ${error.message}. Please check arguments.`;
-            isSuccess = false;
-            failReason = error.message;
+            normalized = {
+                success: false,
+                message: `Error executing command ${command.name}: ${error.message}. Please check arguments.`
+            };
         }
         // Log the action event
         try {
             await axios.post('http://localhost:10101/log-action-event', {
                 action: message,
-                is_success: isSuccess,
-                fail_reason: failReason,
+                is_success: normalized.success,
+                fail_reason: normalized.success ? null : (normalized.message || null),
                 props: null
             });
         } catch (logErr) {
             console.error('[ACTION_EVENT_LOG] Failed to log action event:', logErr?.response?.data || logErr.message);
         }
-        return result;
+        return normalized;
     } else
-        return `Command is incorrectly formatted. Commands should be in the format: !commandName(arg1, arg2, ...) or !commandName() for no arguments.`;
+        return { success: false, message: `Command is incorrectly formatted. Commands should be in the format: !commandName(arg1, arg2, ...) or !commandName() for no arguments.` };
 }
 
 export function getAllCommands() {

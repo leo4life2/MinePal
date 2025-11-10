@@ -1095,7 +1095,21 @@ export async function collectBlock(
   exclude = null,
   grownCropsOnly = false
 ) {
-  return await collectBlocks(bot, { blockType, num, exclude, grownCropsOnly });
+  const result = await collectBlocks(bot, { blockType, num, exclude, grownCropsOnly });
+
+  if (!result || typeof result !== 'object') {
+    return failure(bot, `Collecting ${num} ${blockType} failed due to unexpected return value.`);
+  }
+
+  if (result.interrupted) {
+    return failure(bot, `Collecting ${blockType} interrupted.`);
+  }
+
+  if (result.collected < num) {
+    return failure(bot, `Collected ${result.collected}/${num} ${blockType}.`);
+  }
+
+  return success(bot, `Collected ${result.collected} ${blockType}.`);
 }
 
 export async function pickupNearbyItems(bot) {
@@ -1107,61 +1121,52 @@ export async function pickupNearbyItems(bot) {
    * await skills.pickupNearbyItems(bot);
    **/
   const distance = MID_DISTANCE;
+  let initialInventory = bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
   let pickedUp = 0;
 
-  while (true) { // Loop until no more visible items are nearby or movement fails
+  while (true) {
     const visibleEntities = await world.getVisibleEntities(bot);
     const nearbyItems = visibleEntities.filter(entity =>
       entity.name === "item" &&
       bot.entity.position.distanceTo(entity.position) < distance
     );
 
-    if (nearbyItems.length === 0) {
-      break; // No more items to pick up
-    }
+    if (nearbyItems.length === 0) break;
 
-    // Sort by distance to get the nearest
     nearbyItems.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position));
     const nearestItem = nearbyItems[0];
 
     try {
       bot.pathfinder.setMovements(new pf.Movements(bot));
       await bot.pathfinder.goto(new pf.goals.GoalFollow(nearestItem, 0.8), true);
-      await new Promise(resolve => setTimeout(resolve, 200)); // Wait for bot to potentially pick up item
-
-      // Check if the specific item entity still exists and is visible
-      // This is a simple check; more robust would involve tracking entity IDs
-      const stillVisibleItems = (await world.getVisibleEntities(bot)).filter(entity =>
-          entity.name === "item" &&
-          bot.entity.position.distanceTo(entity.position) < distance &&
-          entity.id === nearestItem.id // Check if the same entity ID is still around
-      );
-
-      if (stillVisibleItems.length === 0) {
-          pickedUp++; // Assume item was picked up if it's no longer visible/nearby
-      } else {
-          // Item might still be there, maybe pathfinding failed or pickup was slow.
-          // Could implement a retry mechanism or just break if stuck.
-          // For simplicity, let's check if we are stuck on the same item.
-          const currentNearestItem = stillVisibleItems.sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position))[0];
-          if (currentNearestItem && currentNearestItem.id === nearestItem.id && bot.entity.position.distanceTo(currentNearestItem.position) < 1.5) {
-              log(bot, "Seems stuck trying to pick up an item, stopping pickup attempt.");
-              break; // Break if potentially stuck
-          }
-      }
+      await new Promise(resolve => setTimeout(resolve, 200));
     } catch (err) {
-        log(bot, `Error during pathfinding/pickup for item ${nearestItem.id}: ${err.message}. Stopping.`);
-        break; // Stop if pathfinding throws an error
+      return failure(bot, `Error during pathfinding/pickup for item ${nearestItem.id}: ${err.message}.`);
+    }
+
+    const stillVisibleItems = (await world.getVisibleEntities(bot)).filter(entity =>
+        entity.name === "item" &&
+        bot.entity.position.distanceTo(entity.position) < distance &&
+        entity.id === nearestItem.id
+    );
+
+    if (stillVisibleItems.length === 0) {
+      pickedUp++;
+    } else if (bot.entity.position.distanceTo(nearestItem.position) < 1.5) {
+      return failure(bot, "Seems stuck trying to pick up an item.");
     }
 
     if (bot.interrupt_code) {
-        log(bot, "Pickup items interrupted.");
-        break;
+      return failure(bot, "Pickup items interrupted.");
     }
   }
 
-  log(bot, `Picked up ${pickedUp} items.`);
-  return true;
+  const finalInventory = bot.inventory.items().reduce((sum, item) => sum + item.count, 0);
+  if (finalInventory <= initialInventory) {
+    return failure(bot, "No items were picked up.");
+  }
+
+  return success(bot, `Picked up ${pickedUp} items.`);
 }
 
 // Deprecated: moved to library/functions.js
@@ -1177,7 +1182,12 @@ export async function breakBlockAt(bot, x, y, z) {
    * let position = world.getPosition(bot);
    * await skills.breakBlockAt(bot, position.x, position.y - 1, position.x);
    **/
-  return functionsBreakBlockAt(bot, x, y, z);
+  const successFlag = await functionsBreakBlockAt(bot, x, y, z);
+  const target = `(${x}, ${y}, ${z})`;
+  if (!successFlag) {
+    return failure(bot, `Failed to break block at ${target}.`);
+  }
+  return success(bot, `Broke block at ${target}.`);
 }
 
 export async function placeBlock(
@@ -1282,6 +1292,11 @@ export async function placeBlock(
     return true;
   }
 
+  const inventoryCounts = world.getInventoryCounts(bot);
+  const hasItemAvailable = inventoryCounts[blockType] && inventoryCounts[blockType] > 0;
+  if (!hasItemAvailable && bot.game.gameMode !== "creative") {
+    return failure(bot, `Don't have any ${blockType} to place.`);
+  }
   let block = bot.inventory.items().find((item) => item.name === blockType);
   if (!block && bot.game.gameMode === "creative") {
     await bot.creative.setInventorySlot(
@@ -1291,8 +1306,7 @@ export async function placeBlock(
     block = bot.inventory.items().find((item) => item.name === blockType);
   }
   if (!block) {
-    log(bot, `Don't have any ${blockType} to place.`);
-    return false;
+    return failure(bot, `Failed to equip ${blockType} for placement.`);
   }
 
   const targetBlock = bot.blockAt(target_dest);
@@ -1399,28 +1413,27 @@ export async function placeBlock(
     await bot.pathfinder.goto(inverted_goal);
   }
   if (bot.entity.position.distanceTo(targetBlock.position) > NEAR_DISTANCE) {
-    // too far
-    let pos = targetBlock.position;
-    let movements = new pf.Movements(bot);
-    bot.pathfinder.setMovements(movements);
-    await bot.pathfinder.goto(
-      new pf.goals.GoalNear(pos.x, pos.y, pos.z, NEAR_DISTANCE)
-    );
+    const reached = await goToPosition(bot, targetBlock.position.x, targetBlock.position.y, targetBlock.position.z, NEAR_DISTANCE);
+    if (!reached) {
+      return failure(bot, `Failed to reach placement location ${target_dest}.`);
+    }
   }
 
-  await bot.equip(block, "hand");
-  await bot.lookAt(buildOffBlock.position);
-
-  // will throw error if an entity is in the way, and sometimes even if the block was placed
   try {
+    await bot.equip(block, "hand");
+    await bot.lookAt(buildOffBlock.position);
     await bot.placeBlock(buildOffBlock, faceVec);
-    log(bot, `Successfully placed ${blockType} at ${target_dest}.`);
     await new Promise((resolve) => setTimeout(resolve, 200));
-    return true;
   } catch (err) {
-    log(bot, `Failed to place ${blockType} at ${target_dest}.`);
-    return false;
+    return failure(bot, `Failed to place ${blockType} at ${target_dest}: ${err.message}`);
   }
+
+  const placedBlock = bot.blockAt(target_dest);
+  if (!placedBlock || placedBlock.name !== blockType) {
+    return failure(bot, `Placement verification failed for ${blockType} at ${target_dest}.`);
+  }
+
+  return success(bot, `Successfully placed ${blockType} at ${target_dest}.`);
 }
 
 export async function equip(bot, itemName, bodyPart) {

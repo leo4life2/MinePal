@@ -1,4 +1,5 @@
 import { BasePrompter } from './basePrompter.js';
+import { createTree, createNLNode, createActionNode } from '../taskTree.js';
 
 export const FAILURE_HANDLER_SYSTEM_PROMPT = `
 You are the MinePal agent's task decomposer. 
@@ -113,5 +114,88 @@ export class FailureHandlerPrompter extends BasePrompter {
             turns: messages,
             responseSchema: FAILURE_HANDLER_RESPONSE_SCHEMA
         });
+    }
+
+    async generateRecoveryTree({
+        commandName = 'unknown action',
+        failureSummary = '',
+        metadata = {},
+        messages = []
+    } = {}) {
+        const summary = failureSummary && failureSummary.trim().length > 0
+            ? failureSummary.trim()
+            : `Action ${commandName} failed.`;
+
+        const treeId = `failure-${Date.now()}`;
+        const treeLabel = `Failure: ${commandName}`;
+        const tree = createTree({ treeId, label: treeLabel });
+        const rootNode = tree.getNode(tree.rootId);
+
+        tree.setLabel(rootNode.id, treeLabel);
+        rootNode.goalText = summary;
+        rootNode.meta = { ...(metadata || {}), commandName };
+        rootNode.touch();
+
+        let responseJson = null;
+        try {
+            const response = await this.promptFailure({
+                messages,
+                failureSummary: summary,
+                metadata
+            });
+            responseJson = response?.json ?? null;
+        } catch (err) {
+            rootNode.notes = `Failure handler invocation error: ${err.message}`;
+            return tree;
+        }
+
+        const subtasks = Array.isArray(responseJson?.children) ? responseJson.children : [];
+        if (subtasks.length === 0) {
+            if (responseJson?.error) {
+                rootNode.notes = `Failure handler returned error: ${responseJson.error}`;
+            }
+            return tree;
+        }
+
+        subtasks.forEach((child, index) => {
+            if (!child || typeof child !== 'object') return;
+            const childId = `child-${index + 1}`;
+            const description = child.description && child.description.trim().length > 0
+                ? child.description.trim()
+                : child.name ?? `Subtask ${index + 1}`;
+
+            if (child.type === 'action') {
+                if (!child.name || typeof child.name !== 'string' || child.name.trim() === '') {
+                    return;
+                }
+                const node = createActionNode({
+                    id: childId,
+                    label: description,
+                    command: child.name,
+                    notes: description,
+                    meta: { args: child.args ?? {} }
+                });
+                tree.addNode(node);
+                tree.attachChild(rootNode.id, node.id);
+                return;
+            }
+
+            if (child.type === 'goal') {
+                const goalLabel = child.name && child.name.trim().length > 0
+                    ? child.name.trim()
+                    : description;
+                const node = createNLNode({
+                    id: childId,
+                    label: goalLabel,
+                    goalText: description,
+                    notes: description,
+                    meta: { args: child.args ?? {} }
+                });
+                tree.addNode(node);
+                tree.attachChild(rootNode.id, node.id);
+            }
+        });
+
+        return tree;
     }
 }

@@ -7,7 +7,6 @@ import MCData from '../utils/mcdata.js';
 import { containsCommand, commandExists, executeCommand, truncCommandMessage, getAllCommands } from './commands/index.js';
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
-import { createTree, createNLNode, createActionNode } from './taskTree.js';
 import fs from 'fs/promises';
 import path from 'path';
 import * as world from "./library/world.js";
@@ -234,7 +233,7 @@ export class Agent {
         this.botHurtCooldownActive = false; // Cooldown flag for bot hurt event
         this.reportedRareBlocks = new Set(); // Cache for reported rare block locations (stores "x,y,z")
         this.cheatsEnabled = false; // Track whether cheats are enabled on the server
-        this.taskTree = this._buildDemoTaskTree();
+        this.taskTree = null;
 
         // --- Prompting State Management ---
         this.promptingState = 'idle'; // 'idle', 'prompting', 'executing'
@@ -249,126 +248,8 @@ export class Agent {
         this._taskTreeOutputPath = null;
         this._lastTaskTreeString = null;
         // --- End HUD Snapshot Tracking ---
-    }
 
-    _buildDemoTaskTree() {
-        const tree = createTree({ treeId: 'minepal-demo', label: 'MinePal Demo Plan' });
-        const root = tree.getNode(tree.rootId);
-        if (root) {
-            root.goalText = 'Guide MinePal through a productive demo session.';
-            root.notes = 'Auto-generated sample data for the visualizer.';
-            root.hints = { priority: 'demo' };
-            root.touch();
-        }
-
-        const establishBase = createNLNode({
-            id: 'nl-establish-base',
-            label: 'Establish Base',
-            goalText: 'Secure essential shelter and starter tools.'
-        });
-        tree.addNode(establishBase);
-        tree.attachChild(root.id, establishBase.id);
-
-        const gatherWood = createActionNode({
-            id: 'act-gather-wood',
-            label: 'Gather Oak Logs',
-            command: 'gather_wood'
-        });
-        tree.addNode(gatherWood);
-        tree.attachChild(establishBase.id, gatherWood.id);
-
-        const craftTable = createActionNode({
-            id: 'act-craft-table',
-            label: 'Craft Crafting Table',
-            command: 'craft_crafting_table'
-        });
-        tree.addNode(craftTable);
-        tree.attachChild(establishBase.id, craftTable.id);
-
-        const craftTools = createActionNode({
-            id: 'act-craft-tools',
-            label: 'Craft Stone Tools',
-            command: 'craft_stone_tools'
-        });
-        tree.addNode(craftTools);
-        tree.attachChild(establishBase.id, craftTools.id);
-
-        const lightCamp = createActionNode({
-            id: 'act-light-camp',
-            label: 'Light Temporary Camp',
-            command: 'place_torch_ring'
-        });
-        tree.addNode(lightCamp);
-        tree.attachChild(establishBase.id, lightCamp.id);
-
-        const exploreArea = createNLNode({
-            id: 'nl-explore-area',
-            label: 'Scout Surroundings',
-            goalText: 'Map nearby resources and landmarks.',
-            policy: 'selector'
-        });
-        tree.addNode(exploreArea);
-        tree.attachChild(root.id, exploreArea.id);
-
-        const scoutLandmarks = createActionNode({
-            id: 'act-scout-landmarks',
-            label: 'Identify Landmarks',
-            command: 'scan_landmarks'
-        });
-        tree.addNode(scoutLandmarks);
-        tree.attachChild(exploreArea.id, scoutLandmarks.id);
-
-        const markPoints = createActionNode({
-            id: 'act-mark-points',
-            label: 'Mark Notable Points',
-            command: 'map_markers'
-        });
-        tree.addNode(markPoints);
-        tree.attachChild(exploreArea.id, markPoints.id);
-
-        const supportOwner = createNLNode({
-            id: 'nl-support-owner',
-            label: 'Support Owner',
-            goalText: 'Prepare to assist the owner with resources and intel.'
-        });
-        tree.addNode(supportOwner);
-        tree.attachChild(root.id, supportOwner.id);
-
-        const checkIn = createActionNode({
-            id: 'act-check-in',
-            label: 'Check In With Owner',
-            command: 'send_status_update'
-        });
-        tree.addNode(checkIn);
-        tree.attachChild(supportOwner.id, checkIn.id);
-
-        const stockChest = createActionNode({
-            id: 'act-stock-chest',
-            label: 'Stock Starter Chest',
-            command: 'deposit_supplies'
-        });
-        tree.addNode(stockChest);
-        tree.attachChild(supportOwner.id, stockChest.id);
-
-        tree.setStatus(root.id, 'running');
-        tree.setStatus(establishBase.id, 'running');
-        tree.setStatus(gatherWood.id, 'succeeded');
-        tree.setStatus(craftTable.id, 'succeeded');
-        tree.setStatus(craftTools.id, 'running');
-        tree.setStatus(lightCamp.id, 'pending');
-        tree.setStatus(exploreArea.id, 'pending');
-        tree.setStatus(scoutLandmarks.id, 'pending');
-        tree.setStatus(markPoints.id, 'pending');
-        tree.setStatus(supportOwner.id, 'pending');
-        tree.setStatus(checkIn.id, 'pending');
-        tree.setStatus(stockChest.id, 'pending');
-
-        const validation = tree.validate();
-        if (!validation.ok) {
-            console.warn(`[TaskTree] Demo task tree failed validation: ${validation.errors.join('; ')}`);
-        }
-
-        return tree;
+        this.failurePrompter = null;
     }
 
     /**
@@ -673,6 +554,7 @@ export class Agent {
         this.profile.lastBootDatetime = new Date().toISOString();
 
         this.prompter = createPrompter('gameEventDriven', this);
+        this.failurePrompter = createPrompter('failureHandler', this);
         this.name = this.prompter.getName();
         const settingsPath = `${this.userDataDir}/settings.json`;
         this.settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')); // Changed to instance variable
@@ -781,11 +663,16 @@ export class Agent {
                             console.log(`[Direct Command] Owner command ${message} finished. Result:`, execute_res);
                             
                             // Optionally report the result back
-                            if (execute_res !== undefined && execute_res !== null) {
-                                const truncatedResult = truncCommandMessage(String(execute_res));
+                            if (execute_res && typeof execute_res === 'object') {
+                                const truncatedResult = execute_res.message ? truncCommandMessage(String(execute_res.message)) : '';
                                 if (truncatedResult && truncatedResult.trim() !== '') {
-                                    await this.sendMessage(`Result: ${truncatedResult}`, true);
+                                    const prefix = execute_res.success ? 'Result' : 'Failed';
+                                    await this.sendMessage(`${prefix}: ${truncatedResult}`, true);
+                                } else if (!execute_res.success) {
+                                    await this.sendMessage(`Failed to execute ${command_name}.`, true);
                                 }
+                            } else if (!execute_res) {
+                                await this.sendMessage(`Failed to execute ${command_name}.`, true);
                             }
                         } catch (execError) {
                             console.error(`[Direct Command] Error executing owner command ${command_name}:`, execError);
@@ -1544,10 +1431,18 @@ export class Agent {
 
     async _writeTaskTreeSnapshot(runlogsDir) {
         if (!this.taskTree) return;
-        if (!runlogsDir) return;
+        if (!this.userDataDir) return;
 
-        if (!this._taskTreeOutputPath || path.dirname(this._taskTreeOutputPath) !== runlogsDir) {
-            this._taskTreeOutputPath = path.join(runlogsDir, 'latest_task_tree.json');
+        const resolvedRunlogsDir = runlogsDir ?? path.join(this.userDataDir, 'runlogs');
+        try {
+            await fs.mkdir(resolvedRunlogsDir, { recursive: true });
+        } catch (err) {
+            console.warn(`[TaskTree Snapshot] Unable to ensure runlogs directory: ${err.message}`);
+            return;
+        }
+
+        if (!this._taskTreeOutputPath || path.dirname(this._taskTreeOutputPath) !== resolvedRunlogsDir) {
+            this._taskTreeOutputPath = path.join(resolvedRunlogsDir, 'latest_task_tree.json');
             this._lastTaskTreeString = null;
         }
 
@@ -1776,6 +1671,8 @@ export class Agent {
     async _executeCommand(command, timeStr) {
         this.promptingState = `executing ${command}`;
         let followUpReason = null;
+        let actionSucceeded = false;
+        let failureContext = null;
 
         try {
             if (command.startsWith('/')) {
@@ -1799,25 +1696,115 @@ export class Agent {
             }
 
             try {
+                /* =====================================================================
+                 * ACTION EXECUTION RESULT HANDLING
+                 * ---------------------------------------------------------------------
+                 * - Run the command through the pipeline which now returns { success, message }.
+                 * - Capture the output so we can decide whether to branch into success or failure flow.
+                 * - Success: queue a normal follow-up prompt summarising completion.
+                 * - Failure: capture context so the failure handler can fabricate a recovery plan.
+                 * ===================================================================== */
                 const executeRes = await executeCommand(this, command);
                 console.log(`[_executeCommand] Command ${command} finished. Result:`, executeRes);
-                if (executeRes !== undefined && executeRes !== null) {
-                    this.history.add('system', `[EXEC_RES | ${timeStr}] Output of action ${command_name}: ${truncCommandMessage(String(executeRes))}`);
-                    followUpReason = `[system] Action ${command_name} completed`;
+                if (executeRes && typeof executeRes === 'object') {
+                    const messageOutput = executeRes.message ? truncCommandMessage(String(executeRes.message)) : '';
+                    if (messageOutput && messageOutput.trim() !== '') {
+                        const tag = executeRes.success ? 'EXEC_RES' : 'ERROR';
+                        this.history.add('system', `[${tag} | ${timeStr}] Output of action ${command_name}: ${messageOutput}`);
+                    } else if (!executeRes.success) {
+                        this.history.add('system', `[ERROR | ${timeStr}] Action ${command_name} failed without additional output.`);
+                    }
+                    if (executeRes.success) {
+                        actionSucceeded = true;
+                        followUpReason = `[system] Action ${command_name} completed`;
+                    } else {
+                        failureContext = {
+                            command,
+                            commandName: command_name,
+                            message: executeRes.message ?? '',
+                            output: messageOutput ?? '',
+                        };
+                    }
+                } else {
+                    failureContext = {
+                        command,
+                        commandName: command_name,
+                        message: executeRes ? String(executeRes) : 'Action returned no result.',
+                    };
                 }
             } catch (execError) {
                 console.error(`[_executeCommand] Error executing command ${command_name}:`, execError);
                 this.history.add('system', `[ERROR | ${timeStr}] Failed to execute action ${command_name}: ${execError.message}`);
-                followUpReason = `[system] Action ${command_name} failed`;
+                failureContext = {
+                    command,
+                    commandName: command_name,
+                    error: execError?.message ?? String(execError),
+                };
             }
         } finally {
             console.log('[idle state] Command processing finished. Resetting state to "idle".');
             this.promptingState = 'idle';
             this._ensureSilenceTimerRunning();
 
-            if (followUpReason) {
-                this._queuePrompt(followUpReason);
+            if (actionSucceeded) {
+                if (followUpReason) {
+                    this._queuePrompt(followUpReason);
+                }
+            } else {
+                const failureTree = await this._handleActionFailure(
+                    command_name,
+                    timeStr,
+                    failureContext ?? { command, commandName: command_name }
+                );
             }
+        }
+    }
+
+    async _handleActionFailure(command_name, timeStr, failureContext = {}) {
+        /* =====================================================================
+         * FAILURE HANDOFF TO LLM (SKELETON)
+         * ---------------------------------------------------------------------
+         * - Route failure summary and metadata to the dedicated failure handler.
+         * - The downstream logic that consumes the handler response will be
+         *   implemented later (placeholder intentionally left empty).
+         * ===================================================================== */
+        if (!this.failurePrompter) {
+            console.warn('[FailureHandler] Failure prompter not initialized; skipping handoff.');
+            return null;
+        }
+
+        const summaryMessage = failureContext?.message || failureContext?.error || `Action ${command_name} failed without additional details.`;
+        const metadata = {
+            command: failureContext?.command ?? null,
+            commandName: failureContext?.commandName ?? command_name,
+            message: failureContext?.message ?? null,
+            output: failureContext?.output ?? null,
+            error: failureContext?.error ?? null,
+        };
+
+        try {
+            const failureTree = await this.failurePrompter.generateRecoveryTree({
+                commandName: command_name,
+                failureSummary: `Action ${command_name} failed: ${summaryMessage}`,
+                metadata,
+                messages: this.history.getHistory()
+            });
+
+            if (failureTree) {
+                this.taskTree = failureTree;
+                try {
+                    await this._writeTaskTreeSnapshot();
+                } catch (snapshotErr) {
+                    console.warn(`[TaskTree Snapshot] Failed to persist failure tree: ${snapshotErr.message}`);
+                }
+            }
+
+            // TODO: Persist or act on failureTree.
+            return failureTree;
+        } catch (failureError) {
+            console.error(`[FailureHandler] Exception while handling ${command_name} failure:`, failureError);
+            // TODO: Decide how to surface failure handler exceptions.
+            return null;
         }
     }
 

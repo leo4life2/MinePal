@@ -2,25 +2,42 @@ import * as skills from "../library/skills.js";
 
 function wrapExecution(func, timeout = -1, resume_name = null) {
   return async function (agent, ...args) {
-    let code_return;
-    if (resume_name != null) { // not used afaik
-      code_return = await agent.coder.executeResume(
-        async () => {
-          await func(agent, ...args);
-        },
+    let actionResult;
+    const execWrapper = async () => {
+      actionResult = await func(agent, ...args);
+      return actionResult;
+    };
+
+    let codeReturn;
+    if (resume_name != null) {
+      codeReturn = await agent.coder.executeResume(
+        execWrapper,
         resume_name,
         timeout
       );
     } else {
-      code_return = await agent.coder.execute(async () => {
-        await func(agent, ...args);
-      }, timeout);
-    if (agent.followPlayerName) {
-      await skills.followPlayer(agent.bot, agent.followPlayerName);
+      codeReturn = await agent.coder.execute(execWrapper, timeout);
+      if (agent.followPlayerName) {
+        await skills.followPlayer(agent.bot, agent.followPlayerName);
+      }
     }
+
+    if (codeReturn.interrupted && !codeReturn.timedout) {
+      return { success: false, message: codeReturn.message || "Action interrupted." };
     }
-    if (code_return.interrupted && !code_return.timedout) return;
-    return code_return.message;
+
+    const message = codeReturn.message || "";
+    let success = codeReturn.success && !codeReturn.interrupted;
+
+    if (actionResult && typeof actionResult === "object" && "success" in actionResult) {
+      success = success && Boolean(actionResult.success);
+    } else if (typeof actionResult === "boolean") {
+      success = success && actionResult;
+    } else if (actionResult !== undefined && actionResult !== null) {
+      success = success && Boolean(actionResult);
+    }
+
+    return { success, message };
   };
 }
 
@@ -38,7 +55,7 @@ export const actionsList = [
       agent.coder.clear();
       agent.coder.cancelResume();
       agent.bot.emit("idle");
-      return "Agent stopped.";
+      return { success: true, message: "Agent stopped." };
     },
   },
   {
@@ -51,12 +68,14 @@ export const actionsList = [
     },
     perform: async function (agent, mode_name, on) {
       const modes = agent.bot.modes;
-      if (!modes.exists(mode_name))
-        return `Mode ${mode_name} does not exist.` + modes.getStr();
-      if (modes.isOn(mode_name) === on)
-        return `Mode ${mode_name} is already ${on ? "on" : "off"}.`;
+      if (!modes.exists(mode_name)) {
+        return { success: false, message: `Mode ${mode_name} does not exist.` + modes.getStr() };
+      }
+      if (modes.isOn(mode_name) === on) {
+        return { success: true, message: `Mode ${mode_name} is already ${on ? "on" : "off"}.` };
+      }
       modes.setOn(mode_name, on);
-      return `Mode ${mode_name} is now ${on ? "on" : "off"}.`;
+      return { success: true, message: `Mode ${mode_name} is now ${on ? "on" : "off"}.` };
     },
   },
   {
@@ -92,6 +111,7 @@ export const actionsList = [
         if (success) {
             agent.followPlayerName = player_name;
         }
+        return success;
       },
       -1,
       "followPlayer"
@@ -103,7 +123,7 @@ export const actionsList = [
       "Move away from the current location in any direction by a given distance.",
     params: { distance: "(number) The distance to move away." },
     perform: wrapExecution(async (agent, distance) => {
-      await skills.moveAway(agent.bot, distance);
+      return await skills.moveAway(agent.bot, distance);
     }),
   },
   {
@@ -113,6 +133,10 @@ export const actionsList = [
     perform: async function (agent, name) {
       const pos = agent.bot.entity.position;
       agent.memory_bank.rememberPlace(name, pos.x, pos.y, pos.z);
+      return {
+        success: true,
+        message: `Remembered location "${name}" at (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}).`,
+      };
     },
   },
   {
@@ -123,8 +147,12 @@ export const actionsList = [
       newName: "(string) The new name for the location.",
     },
     perform: async function (agent, oldName, newName) {
+      const existing = agent.memory_bank.recallPlace(oldName);
+      if (!existing) {
+        return { success: false, message: `Location "${oldName}" does not exist.` };
+      }
       agent.memory_bank.renamePlace(oldName, newName);
-      return `Location "${oldName}" has been renamed to "${newName}".`;
+      return { success: true, message: `Location "${oldName}" has been renamed to "${newName}".` };
     },
   },
   {
@@ -134,7 +162,9 @@ export const actionsList = [
       name: "(string) The name of the location to delete.",
     },
     perform: async function (agent, name) {
-      return agent.memory_bank.deletePlace(name);
+      const response = agent.memory_bank.deletePlace(name);
+      const success = response.includes("has been deleted");
+      return { success, message: response };
     },
   },
   {
@@ -149,9 +179,10 @@ export const actionsList = [
           agent.bot,
           `Could not find location "${name}", but we have: ${allLocations}`
         );
-        return;
+        return false;
       }
       await skills.goToPosition(agent.bot, pos[0], pos[1], pos[2], 1);
+      return true;
     }),
   },
   {
@@ -163,7 +194,7 @@ export const actionsList = [
       z: "(number) The z coordinate to navigate to.",
     },
     perform: wrapExecution(async (agent, x, y, z) => {
-      await skills.goToPosition(agent.bot, x, y, z);
+      return await skills.goToPosition(agent.bot, x, y, z);
     }),
   },
   {
@@ -174,7 +205,7 @@ export const actionsList = [
       items: "(string) The items to give in the format 'item1:quantity1,item2:quantity2,...'.",
     },
     perform: wrapExecution(async (agent, player_name, items) => {
-      await skills.giveToPlayer(agent.bot, player_name, items);
+      return await skills.giveToPlayer(agent.bot, player_name, items);
     }),
   },
   {
@@ -190,7 +221,7 @@ export const actionsList = [
     },
     perform: wrapExecution(async (agent, type, num, grownCropsOnly) => {
       if (grownCropsOnly === undefined) grownCropsOnly = true;
-      await skills.collectBlock(agent.bot, type, num, null, grownCropsOnly);
+      return await skills.collectBlock(agent.bot, type, num, null, grownCropsOnly);
     }, 10), // 10 minute timeout
   },
   {
@@ -201,7 +232,7 @@ export const actionsList = [
       num: "(number) The number of times to craft the recipe. This is NOT the number of output items, as it may craft many more items depending on the recipe.",
     },
     perform: wrapExecution(async (agent, recipe_name, num) => {
-      await skills.craftRecipe(agent.bot, recipe_name, num);
+      return await skills.craftRecipe(agent.bot, recipe_name, num);
     }),
   },
   {
@@ -217,7 +248,8 @@ export const actionsList = [
     perform: wrapExecution(async (agent, furnaceIdentifier, item_name, fuelItemName, fuelQuantity, num) => {
       const quantity = parseInt(fuelQuantity);
       if (isNaN(quantity) || quantity <= 0) {
-          return `Invalid fuelQuantity: ${fuelQuantity}. Must be a positive number.`;
+          skills.log(agent.bot, `Invalid fuelQuantity: ${fuelQuantity}. Must be a positive number.`);
+          return false;
       }
       return await skills.smeltWithFurnace(agent.bot, furnaceIdentifier, item_name, fuelItemName, quantity, num);
     }),
@@ -229,7 +261,7 @@ export const actionsList = [
     params: { type: "(string) The block type to place." },
     perform: wrapExecution(async (agent, type) => {
       let pos = agent.bot.entity.position;
-      await skills.placeBlock(agent.bot, type, pos.x, pos.y, pos.z);
+      return await skills.placeBlock(agent.bot, type, pos.x, pos.y, pos.z);
     }),
   },
   {
@@ -239,7 +271,7 @@ export const actionsList = [
       player_username: "(string) The username of the player to attack.",
     },
     perform: wrapExecution(async (agent, player_username) => {
-      await skills.attackNearest(agent.bot, player_username, true, true);
+      return await skills.attackNearest(agent.bot, player_username, true, true);
     }),
   },
   {
@@ -251,7 +283,10 @@ export const actionsList = [
     },
     perform: wrapExecution(async (agent, type, count = 1) => {
       const numAttacks = parseInt(count) || 1;
-      if (numAttacks <= 0) return "Attack count must be positive.";
+      if (numAttacks <= 0) {
+        skills.log(agent.bot, "Attack count must be positive.");
+        return false;
+      }
 
       return await skills.attackMultipleCreatures(agent.bot, type, numAttacks);
     }),
@@ -260,7 +295,7 @@ export const actionsList = [
     name: "!sleepOnBed",
     description: "Go to the nearest bed and sleep.",
     perform: wrapExecution(async (agent) => {
-      await skills.goToBed(agent.bot);
+      return await skills.goToBed(agent.bot);
     }),
   },
   {
@@ -269,7 +304,7 @@ export const actionsList = [
       "DO NOT use this with chests, furnace, or containers. Activate the nearest object of a given type.",
     params: { type: "(string) The type of object to activate." },
     perform: wrapExecution(async (agent, type) => {
-      await skills.activateNearestBlock(agent.bot, type);
+      return await skills.activateNearestBlock(agent.bot, type);
     }),
   },
   {
@@ -281,11 +316,7 @@ export const actionsList = [
         "(boolean, optional) Whether to activate the item in the off hand. Defaults to false (main hand).",
     },
     perform: wrapExecution(async (agent, offHand = false) => {
-      const success = await skills.activateItem(agent.bot, offHand);
-      const handName = offHand ? "off hand" : "main hand";
-      return success
-        ? `Activated item in ${handName}.`
-        : `Failed to activate item in ${handName}.`;
+      return await skills.activateItem(agent.bot, offHand);
     }),
   },
   {
@@ -357,24 +388,21 @@ export const actionsList = [
     name: "!dismount",
     description: "Dismount the bot from any entity it is currently riding.",
     perform: wrapExecution(async (agent) => {
-      const success = await skills.dismount(agent.bot);
-      return success
-        ? "Successfully dismounted."
-        : "Failed to dismount or not riding any entity.";
+      return await skills.dismount(agent.bot);
     }),
   },
   {
     name: "!startCrouching",
     description: "AKA sneak. Make the agent start crouching.",
     perform: wrapExecution(async (agent) => {
-      await skills.startCrouching(agent.bot);
+      return await skills.startCrouching(agent.bot);
     }),
   },
   {
     name: "!stopCrouching",
     description: "AKA sneak. Make the agent stop crouching.",
     perform: wrapExecution(async (agent) => {
-      await skills.stopCrouching(agent.bot);
+      return await skills.stopCrouching(agent.bot);
     }),
   },
   {
@@ -383,10 +411,7 @@ export const actionsList = [
       "Activate the nearest entity of a given type. E.g. boat, horse.",
     params: { type: "(string) The type of entity to activate." },
     perform: wrapExecution(async (agent, type) => {
-      const success = await skills.activateNearestEntity(agent.bot, type);
-      return success
-        ? `Activated nearest ${type}.`
-        : `No ${type} found nearby.`;
+      return await skills.activateNearestEntity(agent.bot, type);
     }),
   },
   {
@@ -445,7 +470,7 @@ export const actionsList = [
     description: "Finds the nearest Nether Portal and walks into it to trigger teleportation.",
     params: {}, // No parameters needed
     perform: wrapExecution(async (agent) => {
-      await skills.goIntoNetherPortal(agent.bot);
+      return await skills.goIntoNetherPortal(agent.bot);
     }),
   },
   {
@@ -453,7 +478,7 @@ export const actionsList = [
     description: "Finds the nearest End Portal and walks into it to trigger teleportation.",
     params: {}, // No parameters needed
     perform: wrapExecution(async (agent) => {
-      await skills.goIntoEndPortal(agent.bot);
+      return await skills.goIntoEndPortal(agent.bot);
     }),
   },
   {
@@ -494,7 +519,7 @@ export const actionsList = [
 
         if (errorMsg) {
             skills.log(agent.bot, errorMsg);
-            return errorMsg; // Return error message to agent history
+            return false;
         }
 
         // Call the skill function with the parsed arguments
@@ -517,7 +542,8 @@ export const actionsList = [
     description: "Double-check your HUD (inventory and environment) to verify explicitly that your intended actions are fully completed and correct. Only call this when you've confirmed your goal is completely achieved.",
     params: {},
     perform: wrapExecution(async (agent) => {
-      return "Your HUD has been updated. Now double-check your HUD to verify that your intended actions are fully completed and correct.";
+      skills.log(agent.bot, "HUD confirmation requested. Re-validate inventory and environment.");
+      return true;
     }),
   },
   {
@@ -526,7 +552,8 @@ export const actionsList = [
     params: {},
     perform: wrapExecution(async (agent) => {
       // This is a placebo for the LLM to know that the actions are complete.
-      return "Giving up on the current task and going idle.";
+      skills.log(agent.bot, "Giving up on the current task and going idle.");
+      return true;
     }),
   },
   {
