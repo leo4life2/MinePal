@@ -131,6 +131,10 @@ export class GameEventDrivenPrompter extends BasePrompter {
         writeFileSync(profilePath, JSON.stringify(this.profile, null, 4));
     }
 
+    getSourcePrompterId() {
+        return 'event_driven';
+    }
+
     getName() {
         return this.profile.name;
     }

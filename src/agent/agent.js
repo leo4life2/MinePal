@@ -1680,18 +1680,18 @@ export class Agent {
                 return; // Slash commands just dispatch to chat; no follow-up prompt unless output recorded
             }
 
-            const command_name = containsCommand(command);
-            if (!command_name) {
+            const commandName = containsCommand(command);
+            if (!commandName) {
                 console.error(`[_executeCommand] Invalid internal command format: ${command}`);
                 this.history.add('system', `[ERROR | ${timeStr}] Invalid internal command format: ${command}`);
                 followUpReason = `[system] Invalid command format for ${command}`;
                 return;
             }
 
-            if (!commandExists(command_name)) {
-                console.log(`[_executeCommand] Hallucinated command: ${command_name}`);
-                this.history.add('system', `[HALLUCINATION | ${timeStr}] Command ${command_name} does not exist.`);
-                followUpReason = `[system] Hallucinated command ${command_name}`;
+            if (!commandExists(commandName)) {
+                console.log(`[_executeCommand] Hallucinated command: ${commandName}`);
+                this.history.add('system', `[HALLUCINATION | ${timeStr}] Command ${commandName} does not exist.`);
+                followUpReason = `[system] Hallucinated command ${commandName}`;
                 return;
             }
 
@@ -1710,17 +1710,17 @@ export class Agent {
                     const messageOutput = executeRes.message ? truncCommandMessage(String(executeRes.message)) : '';
                     if (messageOutput && messageOutput.trim() !== '') {
                         const tag = executeRes.success ? 'EXEC_RES' : 'ERROR';
-                        this.history.add('system', `[${tag} | ${timeStr}] Output of action ${command_name}: ${messageOutput}`);
+                        this.history.add('system', `[${tag} | ${timeStr}] Output of action ${commandName}: ${messageOutput}`);
                     } else if (!executeRes.success) {
-                        this.history.add('system', `[ERROR | ${timeStr}] Action ${command_name} failed without additional output.`);
+                        this.history.add('system', `[ERROR | ${timeStr}] Action ${commandName} failed without additional output.`);
                     }
                     if (executeRes.success) {
                         actionSucceeded = true;
-                        followUpReason = `[system] Action ${command_name} completed`;
+                        followUpReason = `[system] Action ${commandName} completed`;
                     } else {
                         failureContext = {
                             command,
-                            commandName: command_name,
+                            commandName: commandName,
                             message: executeRes.message ?? '',
                             output: messageOutput ?? '',
                         };
@@ -1728,16 +1728,16 @@ export class Agent {
                 } else {
                     failureContext = {
                         command,
-                        commandName: command_name,
+                        commandName: commandName,
                         message: executeRes ? String(executeRes) : 'Action returned no result.',
                     };
                 }
             } catch (execError) {
-                console.error(`[_executeCommand] Error executing command ${command_name}:`, execError);
-                this.history.add('system', `[ERROR | ${timeStr}] Failed to execute action ${command_name}: ${execError.message}`);
+                console.error(`[_executeCommand] Error executing command ${commandName}:`, execError);
+                this.history.add('system', `[ERROR | ${timeStr}] Failed to execute action ${commandName}: ${execError.message}`);
                 failureContext = {
                     command,
-                    commandName: command_name,
+                    commandName: commandName,
                     error: execError?.message ?? String(execError),
                 };
             }
@@ -1750,11 +1750,12 @@ export class Agent {
                 if (followUpReason) {
                     this._queuePrompt(followUpReason);
                 }
-            } else {
-                const failureTree = await this._handleActionFailure(
-                    command_name,
+            } else if (failureContext) {
+                const failureCommandName = failureContext.commandName ?? containsCommand(command) ?? 'unknown';
+                await this._handleActionFailure(
+                    failureCommandName,
                     timeStr,
-                    failureContext ?? { command, commandName: command_name }
+                    failureContext
                 );
             }
         }
