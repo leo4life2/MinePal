@@ -2,23 +2,24 @@ import { BasePrompter } from './basePrompter.js';
 import { createTree, createNLNode, createActionNode } from '../taskTree.js';
 
 export const FAILURE_HANDLER_SYSTEM_PROMPT = `
-You are the MinePal agent's task decomposer. 
+You are the MinePal agent's task decomposer.
 
-The agent attempted an action in Minecraft that failed. 
+The agent attempted an action in Minecraft that failed.
 
-Your job is to analyze the failed action and its error message, 
-then decompose the problem into smaller subtasks that could allow 
-the original action to eventually succeed.
+Your task is to analyze the failed action and its error message,
+then identify the essential subtasks that must be completed
+to enable this action to succeed.
 
+Formulate these subtasks as a *disjoint set* S = { s₁, s₂, …, sₙ },
+where each sᵢ is a complete, independent requirement that can be executed
+in any order relative to the others. No subtask may depend on the outcome
+of another, and no conditional phrasing (if, then, else, after, when, otherwise) is allowed.
 
-Each subtask can be:
-- an "action": one of the robot's available commands (see list below), with parameters filled in if possible.
-- a "goal": a short natural-language objective when no single action fits yet.
+Each subtask must be one of the following:
+- An "action": a directly executable command available to the robot (see command docs below), with explicit parameters when possible.
+- A "goal": a concise natural-language description of a necessary subgoal if no single command fits yet.
 
-
-Always return a JSON list of children ordered in a logical execution sequence.
-Do not explain reasoning; output only the structured list.
-
+Output ONLY this disjoint set of subtasks as a JSON list; do not explain reasoning or predict future behavior.
 
 Command docs:
 $COMMAND_DOCS
@@ -47,24 +48,17 @@ export const FAILURE_HANDLER_RESPONSE_SCHEMA = {
                         type: {
                             type: 'string',
                             enum: ['action', 'goal'],
-                            description: 'Whether this is a concrete robot action or an abstract goal.'
+                            description: 'Whether this child is an executable command or a higher-level goal.'
                         },
-                        name: {
+                        content: {
                             type: 'string',
-                            description: 'Action command name if type=action, or short goal label if type=goal.'
-                        },
-                        args: {
-                            type: 'object',
-                            description: 'Parameters for the action; empty if type=goal.'
-                        },
-                        description: {
-                            type: 'string',
-                            description: 'One-line human-readable explanation of the subtask.'
+                            description: 'If type=action, provide a MinePal command string like !action(param1, param2,...). If type=goal, provide a concise natural-language goal description.'
                         }
                     },
-                    required: ['type', 'name'],
+                    required: ['type', 'content'],
                     additionalProperties: false
-                }
+                },
+                additionalProperties: false
             }
         },
         required: ['children'],
@@ -86,6 +80,10 @@ const formatMetadata = (metadata) => {
 };
 
 export class FailureHandlerPrompter extends BasePrompter {
+    getSourcePrompterId() {
+        return 'failure_handler';
+    }
+
     async _injectContext(basePrompt, failureSummary, metadata, messages) {
         const enrichedPrompt = await super.injectContext(basePrompt, { messages });
 
@@ -160,36 +158,25 @@ export class FailureHandlerPrompter extends BasePrompter {
         subtasks.forEach((child, index) => {
             if (!child || typeof child !== 'object') return;
             const childId = `child-${index + 1}`;
-            const description = child.description && child.description.trim().length > 0
-                ? child.description.trim()
-                : child.name ?? `Subtask ${index + 1}`;
+            const type = child.type;
+            const content = typeof child.content === 'string' ? child.content.trim() : '';
 
-            if (child.type === 'action') {
-                if (!child.name || typeof child.name !== 'string' || child.name.trim() === '') {
-                    return;
-                }
+            if (type === 'action' && content) {
                 const node = createActionNode({
                     id: childId,
-                    label: description,
-                    command: child.name,
-                    notes: description,
-                    meta: { args: child.args ?? {} }
+                    label: content,
+                    command: content
                 });
                 tree.addNode(node);
                 tree.attachChild(rootNode.id, node.id);
                 return;
             }
 
-            if (child.type === 'goal') {
-                const goalLabel = child.name && child.name.trim().length > 0
-                    ? child.name.trim()
-                    : description;
+            if (type === 'goal' && content) {
                 const node = createNLNode({
                     id: childId,
-                    label: goalLabel,
-                    goalText: description,
-                    notes: description,
-                    meta: { args: child.args ?? {} }
+                    label: content,
+                    goalText: content
                 });
                 tree.addNode(node);
                 tree.attachChild(rootNode.id, node.id);

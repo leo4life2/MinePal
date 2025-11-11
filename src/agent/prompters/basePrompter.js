@@ -3,11 +3,22 @@ import { getCommandDocs } from '../commands/index.js';
 
 export class BasePrompter {
     constructor(agent, options = {}) {
+        if (new.target === BasePrompter) {
+            throw new Error('BasePrompter is abstract and cannot be instantiated directly.');
+        }
         this.agent = agent;
         this.profile = agent.profile;
 
         const { proxyInstance = null } = options;
         this.proxy = proxyInstance ?? new Proxy(agent.userDataDir);
+
+        if (this.getSourcePrompterId === BasePrompter.prototype.getSourcePrompterId) {
+            throw new Error('Subclasses of BasePrompter must implement getSourcePrompterId().');
+        }
+    }
+
+    getSourcePrompterId() {
+        throw new Error('BasePrompter.getSourcePrompterId() must be overridden by subclasses.');
     }
 
     buildMessages(systemPrompt, turns = []) {
@@ -21,10 +32,12 @@ export class BasePrompter {
 
     async completeChat({ systemPrompt, turns, responseSchema, extraRequestFields = {} }) {
         const messages = this.buildMessages(systemPrompt, turns);
+        const sourcePrompter = this.getSourcePrompterId();
         return this.proxy.sendChatCompletion({
             messages,
             responseSchema,
-            extraRequestFields
+            extraRequestFields,
+            sourcePrompter
         });
     }
 

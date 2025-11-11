@@ -24,7 +24,7 @@ export class Proxy {
         return null;
     }
 
-    async sendChatCompletion({ messages, responseSchema = null, extraRequestFields = {} }) {
+    async sendChatCompletion({ messages, responseSchema = null, extraRequestFields = {}, sourcePrompter = 'unknown' }) {
         if (!Array.isArray(messages) || messages.length === 0) {
             throw new Error('sendChatCompletion requires a non-empty messages array.');
         }
@@ -44,7 +44,8 @@ export class Proxy {
 
             const requestBody = {
                 ...baseRequestBody,
-                ...extraRequestFields
+                ...extraRequestFields,
+                source_prompter: sourcePrompter
             };
 
             const response = await axios.post(`${HTTPS_BACKEND_URL}/openai/chat`, requestBody, {
