@@ -1774,6 +1774,11 @@ export class Agent {
             return null;
         }
 
+        console.log(`[FailureHandler] Triggered for ${command_name} at ${timeStr}.`, {
+            message: failureContext?.message ?? null,
+            error: failureContext?.error ?? null
+        });
+
         const summaryMessage = failureContext?.message || failureContext?.error || `Action ${command_name} failed without additional details.`;
         const metadata = {
             command: failureContext?.command ?? null,
@@ -1799,6 +1804,11 @@ export class Agent {
                     console.warn(`[TaskTree Snapshot] Failed to persist failure tree: ${snapshotErr.message}`);
                 }
             }
+
+            console.log(`[FailureHandler] Completed for ${command_name}.`, {
+                treeGenerated: Boolean(failureTree),
+                hasNodes: Boolean(failureTree?.nodes && Object.keys(failureTree.nodes).length > 0)
+            });
 
             // TODO: Persist or act on failureTree.
             return failureTree;
