@@ -42,7 +42,8 @@ export class BaseNode {
         notes,
         meta,
         createdAt,
-        updatedAt
+        updatedAt,
+        decompositionReasoning
     }) {
         if (new.target === BaseNode) {
             throw new Error('BaseNode is abstract and cannot be instantiated directly');
@@ -76,6 +77,13 @@ export class BaseNode {
             this.meta = meta;
         }
 
+        if (decompositionReasoning !== undefined) {
+            if (typeof decompositionReasoning !== 'string') {
+                throw new Error('BaseNode decompositionReasoning must be a string when provided');
+            }
+            this.decompositionReasoning = decompositionReasoning;
+        }
+
         const created = createdAt ?? nowMs();
         this.createdAt = created;
         if (updatedAt !== undefined) {
@@ -97,7 +105,8 @@ export class BaseNode {
             notes: this.notes,
             meta: isEmptyObject(this.meta) ? undefined : this.meta,
             createdAt: this.createdAt,
-            updatedAt: this.updatedAt
+            updatedAt: this.updatedAt,
+            decompositionReasoning: this.decompositionReasoning
         });
     }
 }
@@ -115,9 +124,10 @@ export class NLNode extends BaseNode {
         createdAt,
         updatedAt,
         children,
-        hints
+        hints,
+        decompositionReasoning
     }) {
-        super({ id, kind: 'NL', label, status, parentId, notes, meta, createdAt, updatedAt });
+        super({ id, kind: 'NL', label, status, parentId, notes, meta, createdAt, updatedAt, decompositionReasoning });
         assertString(goalText, 'NLNode goalText must be a non-empty string');
         assertEnum(policy, VALID_POLICY, `NLNode policy must be one of ${Array.from(VALID_POLICY).join(', ')}`);
 
@@ -171,15 +181,14 @@ export class ActionNode extends BaseNode {
         updatedAt,
         successCheck,
         preconditions,
-        children
+        children,
+        decompositionReasoning
     }) {
-        if (children !== undefined) {
-            throw new Error('ActionNode must not define children');
-        }
-        super({ id, kind: 'Action', label, status, parentId, notes, meta, createdAt, updatedAt });
+        super({ id, kind: 'Action', label, status, parentId, notes, meta, createdAt, updatedAt, decompositionReasoning });
         assertString(command, 'ActionNode command must be a non-empty string');
 
         this.command = command;
+        this.children = Array.isArray(children) ? [...children] : [];
 
         if (successCheck !== undefined) {
             if (!isObject(successCheck)) {
@@ -196,13 +205,27 @@ export class ActionNode extends BaseNode {
         }
     }
 
+    addChildId(childId) {
+        if (!this.children.includes(childId)) {
+            this.children.push(childId);
+        }
+    }
+
+    removeChildId(childId) {
+        const index = this.children.indexOf(childId);
+        if (index >= 0) {
+            this.children.splice(index, 1);
+        }
+    }
+
     toJSON() {
         const base = super.toJSON();
         return omitUndefined({
             ...base,
             command: this.command,
             successCheck: this.successCheck,
-            preconditions: this.preconditions
+            preconditions: this.preconditions,
+            children: this.children.length > 0 ? [...this.children] : undefined
         });
     }
 }
@@ -280,7 +303,7 @@ export class TaskTree {
 
         if (node.parentId) {
             const parent = this.getNode(node.parentId);
-            if (parent instanceof NLNode) {
+            if (parent instanceof NLNode || parent instanceof ActionNode) {
                 parent.removeChildId(node.id);
             }
         }
@@ -294,9 +317,6 @@ export class TaskTree {
         const node = this.getNode(rootId);
         if (!node) {
             throw new Error(`TaskTree rootId must reference an existing node, but "${rootId}" was not found`);
-        }
-        if (!(node instanceof NLNode)) {
-            throw new Error('TaskTree root must be an NLNode');
         }
         if (node.parentId !== undefined) {
             throw new Error('TaskTree root node cannot have a parentId');
@@ -338,8 +358,8 @@ export class TaskTree {
         if (!parent) {
             throw new Error(`attachChild failed: parent node "${parentId}" not found`);
         }
-        if (!(parent instanceof NLNode)) {
-            throw new Error('attachChild failed: parent must be an NLNode');
+        if (!(parent instanceof NLNode || parent instanceof ActionNode)) {
+            throw new Error('attachChild failed: parent must be an NLNode or ActionNode');
         }
 
         const child = this.getNode(childId);
@@ -357,7 +377,7 @@ export class TaskTree {
 
         if (child.parentId) {
             const previousParent = this.getNode(child.parentId);
-            if (previousParent instanceof NLNode) {
+            if (previousParent instanceof NLNode || previousParent instanceof ActionNode) {
                 previousParent.removeChildId(child.id);
             }
         }
@@ -425,9 +445,6 @@ export class TaskTree {
         if (!rootNode) {
             errors.push(`TaskTree root node "${this.rootId}" does not exist`);
         } else {
-            if (!(rootNode instanceof NLNode)) {
-                errors.push('Root node must be an NLNode');
-            }
             if (rootNode.parentId !== undefined) {
                 errors.push('Root node must not declare a parentId');
             }
@@ -455,8 +472,15 @@ export class TaskTree {
                 if (!node.command) {
                     errors.push(`ActionNode "${node.id}" must define a command`);
                 }
-                if (node.id === this.rootId) {
-                    errors.push('ActionNode cannot be the root');
+                for (const childId of node.children) {
+                    const child = this.getNode(childId);
+                    if (!child) {
+                        errors.push(`ActionNode "${node.id}" references missing child "${childId}"`);
+                        continue;
+                    }
+                    if (child.parentId !== node.id) {
+                        errors.push(`Child "${childId}" of parent "${node.id}" must declare parentId = "${node.id}"`);
+                    }
                 }
             }
 
@@ -464,8 +488,8 @@ export class TaskTree {
                 const parent = this.getNode(node.parentId);
                 if (!parent) {
                     errors.push(`Node "${node.id}" references missing parent "${node.parentId}"`);
-                } else if (!(parent instanceof NLNode)) {
-                    errors.push(`Node "${node.id}" references parent "${node.parentId}" that is not an NLNode`);
+                } else if (!(parent instanceof NLNode || parent instanceof ActionNode)) {
+                    errors.push(`Node "${node.id}" references parent "${node.parentId}" that is neither NLNode nor ActionNode`);
                 } else if (!parent.children.includes(node.id)) {
                     errors.push(`Parent "${node.parentId}" must list "${node.id}" as a child`);
                 }
@@ -489,7 +513,7 @@ export class TaskTree {
             stack.add(nodeId);
 
             const node = this.getNode(nodeId);
-            if (node instanceof NLNode) {
+            if (node instanceof NLNode || node instanceof ActionNode) {
                 for (const childId of node.children) {
                     if (!this.nodes[childId]) continue;
                     if (detectCycle(childId)) {
@@ -593,7 +617,7 @@ export function createNLNode(init) {
         throw new Error('createNLNode requires an init object');
     }
 
-    const { id, label, goalText, policy } = init;
+    const { id, label, goalText, policy, decompositionReasoning } = init;
     return new NLNode({
         id,
         label,
@@ -602,7 +626,8 @@ export function createNLNode(init) {
         status: init.status ?? 'pending',
         notes: init.notes,
         meta: init.meta,
-        hints: init.hints
+        hints: init.hints,
+        decompositionReasoning
     });
 }
 
@@ -611,7 +636,7 @@ export function createActionNode(init) {
         throw new Error('createActionNode requires an init object');
     }
 
-    const { id, label, command } = init;
+    const { id, label, command, decompositionReasoning, children } = init;
     return new ActionNode({
         id,
         label,
@@ -620,7 +645,9 @@ export function createActionNode(init) {
         notes: init.notes,
         meta: init.meta,
         successCheck: init.successCheck,
-        preconditions: init.preconditions
+        preconditions: init.preconditions,
+        children,
+        decompositionReasoning
     });
 }
 

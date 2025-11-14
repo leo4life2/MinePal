@@ -24,7 +24,7 @@ export class BasePrompter {
     buildMessages(systemPrompt, turns = []) {
         const systemMessage = { role: 'system', content: systemPrompt };
         const conversationMessages = Array.isArray(turns)
-            ? turns.map(turn => this._formatTurn(turn))
+            ? turns.map(turn => this._formatTurn(turn)).filter(Boolean)
             : [];
 
         return [systemMessage, ...conversationMessages];
@@ -76,18 +76,44 @@ export class BasePrompter {
 
     _formatTurn(turn) {
         if (!turn || typeof turn !== 'object') {
-            return turn;
+            return null;
         }
 
-        if (turn.role !== 'assistant') {
-            return { ...turn };
+        const role = turn.role ?? 'user';
+
+        if (role === 'assistant') {
+            const formattedContent = this._formatAssistantContent(turn);
+            return {
+                role: 'assistant',
+                content: formattedContent
+            };
         }
 
-        const formattedContent = this._formatAssistantContent(turn);
-        return {
-            ...turn,
-            content: formattedContent
-        };
+        if (role === 'system') {
+            const content = typeof turn.content === 'string' || Array.isArray(turn.content)
+                ? turn.content
+                : '';
+            return { role: 'system', content };
+        }
+
+        if (role === 'user') {
+            if (typeof turn.content === 'string') {
+                const { strippedContent } = this._stripSpeakerPrefix(turn.content);
+                return {
+                    role: 'user',
+                    content: strippedContent
+                };
+            }
+            return {
+                role: 'user',
+                content: turn.content
+            };
+        }
+
+        const fallbackContent = typeof turn.content === 'string' || Array.isArray(turn.content)
+            ? turn.content
+            : '';
+        return { role, content: fallbackContent };
     }
 
     _formatAssistantContent(turn) {
@@ -101,8 +127,34 @@ export class BasePrompter {
             formattedContent += this._stringifyGoalStatus(turn.current_goal_status);
         }
 
-        formattedContent += turn.content || '';
+        let assistantContent = turn.content;
+        if (typeof assistantContent === 'string') {
+            const { strippedContent } = this._stripSpeakerPrefix(assistantContent);
+            assistantContent = strippedContent;
+        }
+
+        if (assistantContent != null) {
+            formattedContent += assistantContent;
+        }
+
         return formattedContent;
+    }
+
+    _stripSpeakerPrefix(content) {
+        if (typeof content !== 'string') {
+            return { strippedContent: content, speakerName: undefined };
+        }
+
+        const speakerMatch = content.match(/^<([^>]+)>:\s*(.*)$/s);
+        if (!speakerMatch) {
+            return { strippedContent: content, speakerName: undefined };
+        }
+
+        const [, speaker, remainder] = speakerMatch;
+        return {
+            strippedContent: remainder,
+            speakerName: speaker
+        };
     }
 
     _stringifyGoalStatus(goalStatus) {
