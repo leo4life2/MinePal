@@ -1,5 +1,5 @@
 import { BasePrompter } from './basePrompter.js';
-import { createTree, createNLNode, createActionNode } from '../taskTree.js';
+import TaskTree, { createNLNode, createActionNode } from '../taskTree.js';
 
 export const FAILURE_HANDLER_SYSTEM_PROMPT = `
 You are the MinePal agent's task decomposer.
@@ -14,6 +14,7 @@ Formulate these subtasks as a *disjoint set* S = { s₁, s₂, …, sₙ },
 where each sᵢ is a complete, independent requirement that can be executed
 in any order relative to the others. No subtask may depend on the outcome
 of another, and no conditional phrasing (if, then, else, after, when, otherwise) is allowed.
+For each subtask, only include it if the parent action cannot possibly succeed without this requirement being met. Do not include exploratory steps, attempts, heuristics, or optional checks.
 
 Each subtask must be one of the following:
 - An "action": a directly executable command available to the robot (see command docs below), with explicit parameters when possible.
@@ -126,15 +127,23 @@ export class FailureHandlerPrompter extends BasePrompter {
 
         const treeId = `failure-${Date.now()}`;
         const treeLabel = `Failure: ${commandName}`;
-        const tree = createTree({ treeId, label: treeLabel });
-        const rootNode = tree.getNode(tree.rootId);
+        const tree = new TaskTree({ treeId, label: treeLabel });
+        const rootNode = createActionNode({
+            id: 'root',
+            label: treeLabel,
+            command: commandName,
+            status: 'failed',
+            notes: summary,
+            meta: { ...(metadata || {}), commandName }
+        });
 
-        tree.setLabel(rootNode.id, treeLabel);
-        rootNode.goalText = summary;
-        rootNode.meta = { ...(metadata || {}), commandName };
+        tree.addNode(rootNode);
+        tree.setRoot(rootNode.id);
         rootNode.touch();
+        tree.touch();
 
         let responseJson = null;
+        let reasoningSummary = null;
         try {
             const response = await this.promptFailure({
                 messages,
@@ -142,9 +151,19 @@ export class FailureHandlerPrompter extends BasePrompter {
                 metadata
             });
             responseJson = response?.json ?? null;
+            const rawReasoning = typeof response?.reasoning_summary === 'string' ? response.reasoning_summary.trim() : '';
+            if (rawReasoning.length > 0) {
+                reasoningSummary = rawReasoning;
+            }
         } catch (err) {
             rootNode.notes = `Failure handler invocation error: ${err.message}`;
             return tree;
+        }
+
+        if (reasoningSummary) {
+            rootNode.decompositionReasoning = reasoningSummary;
+            rootNode.touch();
+            tree.touch();
         }
 
         const subtasks = Array.isArray(responseJson?.children) ? responseJson.children : [];

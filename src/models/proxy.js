@@ -115,6 +115,7 @@ export class Proxy {
 
                     if (!parsedJson) throw new Error('No JSON part in multipart response');
                     const normalized = this._normalizeResponsesPayload(parsedJson);
+                    const reasoningSummary = this._extractReasoningSummaryText(parsedJson);
                     return {
                         json: normalized.structuredResult ?? parsedJson,
                         audio: audioWavData,
@@ -123,7 +124,8 @@ export class Proxy {
                         audio_status: normalized.audioStatus ?? parsedJson.audio_status,
                         audio_failed_but_text_ok: normalized.audioFailedButTextOk,
                         raw_response: normalized.rawResponsesPayload ?? null,
-                        raw_backend_response: parsedJson
+                        raw_backend_response: parsedJson,
+                        reasoning_summary: reasoningSummary
                     };
                 } catch (e) {
                     console.error('Multipart processing error:', e);
@@ -134,6 +136,7 @@ export class Proxy {
                     const jsonString = responseBuffer.toString('utf-8');
                     const parsedJson = JSON.parse(jsonString);
                     const normalized = this._normalizeResponsesPayload(parsedJson);
+                    const reasoningSummary = this._extractReasoningSummaryText(parsedJson);
 
                     if (parsedJson.audio_status === 'failed') {
                         console.error('Audio generation failed (reported by backend):');
@@ -149,7 +152,8 @@ export class Proxy {
                                 speech_metadata: normalized.speechMetadata,
                                 audio_status: normalized.audioStatus ?? parsedJson.audio_status,
                                 raw_response: normalized.rawResponsesPayload ?? null,
-                                raw_backend_response: parsedJson
+                                raw_backend_response: parsedJson,
+                                reasoning_summary: reasoningSummary
                             };
                         }
 
@@ -174,7 +178,8 @@ export class Proxy {
                         audio_status: normalized.audioStatus ?? parsedJson.audio_status,
                         raw_response: normalized.rawResponsesPayload ?? null,
                         raw_backend_response: parsedJson,
-                        audio_failed_but_text_ok: normalized.audioFailedButTextOk
+                        audio_failed_but_text_ok: normalized.audioFailedButTextOk,
+                        reasoning_summary: reasoningSummary
                     };
                 } catch (e) {
                     const truncatedJsonString = typeof responseBuffer === 'object' && responseBuffer
@@ -330,6 +335,46 @@ export class Proxy {
         return parts;
     }
 
+    _extractReasoningSummaryText(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return null;
+        }
+
+        const chunks = [];
+
+        const topLevelSummary = payload.reasoning_summary;
+        if (typeof topLevelSummary === 'string' && topLevelSummary.trim().length > 0) {
+            chunks.push(topLevelSummary.trim());
+        }
+
+        const responsesPayload = this._getResponsesPayload(payload);
+        if (responsesPayload && typeof responsesPayload === 'object') {
+            const outputItems = Array.isArray(responsesPayload.output) ? responsesPayload.output : [];
+            for (const item of outputItems) {
+                if (!item || item.type !== 'reasoning') {
+                    continue;
+                }
+
+                const summaries = Array.isArray(item.summary) ? item.summary : [];
+                for (const summaryEntry of summaries) {
+                    if (!summaryEntry || summaryEntry.type !== 'summary_text') {
+                        continue;
+                    }
+
+                    if (typeof summaryEntry.text === 'string' && summaryEntry.text.trim().length > 0) {
+                        chunks.push(summaryEntry.text.trim());
+                    }
+                }
+            }
+        }
+
+        if (chunks.length === 0) {
+            return null;
+        }
+
+        return chunks.join('\n');
+    }
+
     /**
      * Transform the backend Responses payload into the MinePal runtime interface.
      * This explicitly documents the "Responses -> MinePal" mapping for clarity.
@@ -367,13 +412,13 @@ export class Proxy {
         }
 
         const responsesPayload = this._getResponsesPayload(rawPayload);
-        const assistantText = this._extractAssistantText(responsesPayload);
-        const parsedFromText = this._maybeParseAssistantTextAsJson(assistantText);
+        const outputText = this._extractOutputText(responsesPayload);
+        const parsedFromOutputText = this._parseOutputTextAsJson(outputText);
 
         let structuredResult = this._extractResponseJson(responsesPayload);
 
-        if (!structuredResult && parsedFromText?.parsed && typeof parsedFromText.parsed === 'object') {
-            structuredResult = parsedFromText.parsed;
+        if (!structuredResult && parsedFromOutputText && typeof parsedFromOutputText === 'object') {
+            structuredResult = parsedFromOutputText;
         }
 
         if (!structuredResult && rawPayload.response_json && typeof rawPayload.response_json === 'object') {
@@ -391,7 +436,7 @@ export class Proxy {
             structuredResult = rawPayload;
         }
 
-        const speechMetadata = this._extractSpeechMetadata(structuredResult, parsedFromText?.parsed);
+        const speechMetadata = this._extractSpeechMetadata(structuredResult, parsedFromOutputText);
 
         const audioStatus = rawPayload.audio_status ?? responsesPayload?.audio_status ?? null;
         const audioFailedButTextOk = audioStatus === 'failed'
@@ -405,7 +450,7 @@ export class Proxy {
 
         return {
             structuredResult: structuredResult ?? null,
-            assistantText,
+            assistantText: outputText,
             speechMetadata,
             audioStatus,
             rawResponsesPayload: this._isResponsesPayload(responsesPayload) ? responsesPayload : null,
@@ -453,7 +498,7 @@ export class Proxy {
         return false;
     }
 
-    _extractAssistantText(responsesPayload) {
+    _extractOutputText(responsesPayload) {
         const payload = responsesPayload && typeof responsesPayload === 'object'
             ? responsesPayload
             : null;
@@ -540,12 +585,12 @@ export class Proxy {
         }, {});
     }
 
-    _maybeParseAssistantTextAsJson(assistantText) {
-        if (typeof assistantText !== 'string') {
+    _parseOutputTextAsJson(outputText) {
+        if (typeof outputText !== 'string') {
             return null;
         }
 
-        let trimmed = assistantText.trim();
+        let trimmed = outputText.trim();
         if (!trimmed) {
             return null;
         }
@@ -561,7 +606,7 @@ export class Proxy {
 
         const parsed = this._safeJsonParse(trimmed);
         if (parsed && typeof parsed === 'object') {
-            return { parsed };
+            return parsed;
         }
 
         return null;
