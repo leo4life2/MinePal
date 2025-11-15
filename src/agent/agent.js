@@ -5,6 +5,7 @@ import { createPrompter } from './prompters/index.js';
 import { initModes } from './modes.js';
 import MCData from '../utils/mcdata.js';
 import { containsCommand, commandExists, executeCommand, truncCommandMessage, getAllCommands } from './commands/index.js';
+import { ActionNode, NLNode, createActionNode, createNLNode } from './taskTree.js';
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
@@ -250,6 +251,10 @@ export class Agent {
         // --- End HUD Snapshot Tracking ---
 
         this.failurePrompter = null;
+        this.nlDecomposerPrompter = null;
+        this._pendingYesNoPrompt = null;
+        this._taskNodeCounter = 0;
+        this.ownerMessageEventName = null;
     }
 
     /**
@@ -554,7 +559,8 @@ export class Agent {
         this.profile.lastBootDatetime = new Date().toISOString();
 
         this.prompter = createPrompter('gameEventDriven', this);
-        this.failurePrompter = createPrompter('failureHandler', this);
+        this.failurePrompter = createPrompter('failureDecomposer', this);
+        this.nlDecomposerPrompter = createPrompter('nlDecomposer', this);
         this.name = this.prompter.getName();
         const settingsPath = `${this.userDataDir}/settings.json`;
         this.settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')); // Changed to instance variable
@@ -608,6 +614,7 @@ export class Agent {
                 "Gamerule "
             ];
             const eventname = this.settings.profiles.length > 1 ? 'whisper' : 'chat'; // Updated to use instance variable
+            this.ownerMessageEventName = eventname;
             
             // Set up listener for owner messages
             this.bot.on(eventname, async (username, message) => {
@@ -1244,8 +1251,29 @@ export class Agent {
         }
         // --- End Silence Timer Management ---
 
+        let suppressPromptQueue = false;
+        if (source === this.owner && this._pendingYesNoPrompt) {
+            const pending = this._pendingYesNoPrompt;
+            if (!pending.settled) {
+                const normalized = typeof message === 'string' ? message.trim().toLowerCase() : '';
+                if (pending.yesSet.has(normalized)) {
+                    this._pendingYesNoPrompt = null;
+                    pending.settle({ approved: true, reason: 'yes' });
+                    suppressPromptQueue = true;
+                } else if (pending.noSet.has(normalized)) {
+                    this._pendingYesNoPrompt = null;
+                    pending.settle({ approved: false, reason: 'no' });
+                    suppressPromptQueue = true;
+                }
+            }
+        }
+
         // Add the message to history
         await this.history.add(source, message);
+
+        if (suppressPromptQueue) {
+            return;
+        }
 
         // Queue a prompt processing cycle, storing the reason
         this._queuePrompt(`[${source}] ${message}`);
@@ -1470,6 +1498,17 @@ export class Agent {
             } catch (_) {
                 // noop
             }
+        }
+    }
+
+    async _safeWriteTaskTreeSnapshot() {
+        if (!this.taskTree) {
+            return;
+        }
+        try {
+            await this._writeTaskTreeSnapshot();
+        } catch (snapshotErr) {
+            console.warn(`[TaskTree Snapshot] Failed to persist task tree: ${snapshotErr.message}`);
         }
     }
 
@@ -1702,7 +1741,7 @@ export class Agent {
                  * - Run the command through the pipeline which now returns { success, message }.
                  * - Capture the output so we can decide whether to branch into success or failure flow.
                  * - Success: queue a normal follow-up prompt summarising completion.
-                 * - Failure: capture context so the failure handler can fabricate a recovery plan.
+                 * - Failure: capture context so the failure decomposer can fabricate a recovery plan.
                  * ===================================================================== */
                 const executeRes = await executeCommand(this, command);
                 console.log(`[_executeCommand] Command ${command} finished. Result:`, executeRes);
@@ -1765,16 +1804,16 @@ export class Agent {
         /* =====================================================================
          * FAILURE HANDOFF TO LLM (SKELETON)
          * ---------------------------------------------------------------------
-         * - Route failure summary and metadata to the dedicated failure handler.
+         * - Route failure summary and metadata to the dedicated failure decomposer.
          * - The downstream logic that consumes the handler response will be
          *   implemented later (placeholder intentionally left empty).
          * ===================================================================== */
         if (!this.failurePrompter) {
-            console.warn('[FailureHandler] Failure prompter not initialized; skipping handoff.');
+            console.warn('[FailureDecomposer] Failure prompter not initialized; skipping handoff.');
             return null;
         }
 
-        console.log(`[FailureHandler] Triggered for ${command_name} at ${timeStr}.`, {
+        console.log(`[FailureDecomposer] Triggered for ${command_name} at ${timeStr}.`, {
             message: failureContext?.message ?? null,
             error: failureContext?.error ?? null
         });
@@ -1798,14 +1837,16 @@ export class Agent {
 
             if (failureTree) {
                 this.taskTree = failureTree;
+                await this._safeWriteTaskTreeSnapshot();
                 try {
-                    await this._writeTaskTreeSnapshot();
-                } catch (snapshotErr) {
-                    console.warn(`[TaskTree Snapshot] Failed to persist failure tree: ${snapshotErr.message}`);
+                    await this._processTaskTreePostOrder(failureTree);
+                } catch (processingErr) {
+                    console.warn(`[FailureDecomposer] Post-order processing failed: ${processingErr.message}`);
                 }
+                await this._safeWriteTaskTreeSnapshot();
             }
 
-            console.log(`[FailureHandler] Completed for ${command_name}.`, {
+            console.log(`[FailureDecomposer] Completed for ${command_name}.`, {
                 treeGenerated: Boolean(failureTree),
                 hasNodes: Boolean(failureTree?.nodes && Object.keys(failureTree.nodes).length > 0)
             });
@@ -1813,10 +1854,225 @@ export class Agent {
             // TODO: Persist or act on failureTree.
             return failureTree;
         } catch (failureError) {
-            console.error(`[FailureHandler] Exception while handling ${command_name} failure:`, failureError);
-            // TODO: Decide how to surface failure handler exceptions.
+            console.error(`[FailureDecomposer] Exception while handling ${command_name} failure:`, failureError);
+            // TODO: Decide how to surface failure decomposer exceptions.
             return null;
         }
+    }
+
+    _nextTaskNodeId(prefix = 'node') {
+        this._taskNodeCounter += 1;
+        return `auto-${prefix}-${this._taskNodeCounter}`;
+    }
+
+    _getTaskNodeChildIds(node) {
+        if (!node) {
+            return [];
+        }
+        if (node instanceof NLNode || node instanceof ActionNode) {
+            return Array.isArray(node.children) ? [...node.children] : [];
+        }
+        return [];
+    }
+
+    _isLeafTaskNode(node) {
+        return this._getTaskNodeChildIds(node).length === 0;
+    }
+
+    async _processTaskTreePostOrder(taskTree) {
+        if (!taskTree || !taskTree.rootId) {
+            return;
+        }
+
+        const visited = new Set();
+
+        const traverse = async (nodeId) => {
+            if (!nodeId || visited.has(nodeId)) {
+                return;
+            }
+            const node = taskTree.getNode(nodeId);
+            if (!node) {
+                return;
+            }
+
+            const childIdsSnapshot = this._getTaskNodeChildIds(node);
+            for (const childId of childIdsSnapshot) {
+                await traverse(childId);
+            }
+
+            if (this._isLeafTaskNode(node)) {
+                if (node instanceof ActionNode) {
+                    await this.sendMessage(`pretending i finished executing ${node.command}`, true);
+                } else if (node instanceof NLNode) {
+                    const decision = await this._promptToDecomposeNLNode(node);
+                    if (decision.approved) {
+                        const newChildIds = await this._decomposeNLNodeIntoTree(taskTree, node);
+                        for (const childId of newChildIds) {
+                            await traverse(childId);
+                        }
+                    }
+                }
+            }
+
+            visited.add(nodeId);
+        };
+
+        await traverse(taskTree.rootId);
+    }
+
+    async _promptToDecomposeNLNode(node) {
+        const goalText = typeof node.goalText === 'string' && node.goalText.trim().length > 0
+            ? node.goalText.trim()
+            : node.label;
+
+        await this.sendMessage(`should i decompose "${goalText}"? (y/n)`, true);
+        const decision = await this._waitForOwnerConfirmation();
+
+        if (decision.approved) {
+            await this.sendMessage(`decomposing "${goalText}" now.`, true);
+        } else {
+            const reason = decision.reason ?? 'no';
+            if (reason === 'no') {
+                await this.sendMessage(`skipping decomposition for "${goalText}".`, true);
+            } else if (reason === 'timeout') {
+                await this.sendMessage(`no response. skipping decomposition for "${goalText}".`, true);
+            }
+        }
+
+        return decision;
+    }
+
+    async _decomposeNLNodeIntoTree(taskTree, node) {
+        if (!this.nlDecomposerPrompter) {
+            console.warn('[NLDecomposer] Prompter not initialized; cannot decompose node.');
+            return [];
+        }
+
+        let responseJson = null;
+        let reasoningSummary = null;
+        try {
+            const decomposition = await this.nlDecomposerPrompter.decompose({
+                summary: node.goalText ?? node.label ?? '',
+                metadata: node.meta ?? {}
+            });
+            responseJson = decomposition.responseJson ?? null;
+            reasoningSummary = decomposition.reasoningSummary ?? null;
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            node.notes = `NL decomposer invocation error: ${message}`;
+            node.touch();
+            taskTree.touch();
+            return [];
+        }
+
+        if (reasoningSummary) {
+            node.decompositionReasoning = reasoningSummary;
+            node.touch();
+            taskTree.touch();
+        }
+
+        const subtasks = Array.isArray(responseJson?.children) ? responseJson.children : [];
+        if (subtasks.length === 0) {
+            if (responseJson?.error) {
+                node.notes = `NL decomposer returned error: ${responseJson.error}`;
+                node.touch();
+                taskTree.touch();
+            }
+            return [];
+        }
+
+        const addedChildIds = [];
+
+        for (const child of subtasks) {
+            if (!child || typeof child !== 'object') continue;
+            const content = typeof child.content === 'string' ? child.content.trim() : '';
+            if (!content) continue;
+
+            const childId = this._nextTaskNodeId('nl');
+            let childNode = null;
+
+            if (child.type === 'action') {
+                try {
+                    childNode = createActionNode({
+                        id: childId,
+                        label: content,
+                        command: content
+                    });
+                } catch (nodeErr) {
+                    console.warn(`[NLDecomposer] Failed to create action node for "${content}": ${nodeErr.message}`);
+                    continue;
+                }
+            } else if (child.type === 'goal') {
+                try {
+                    childNode = createNLNode({
+                        id: childId,
+                        label: content,
+                        goalText: content
+                    });
+                } catch (nodeErr) {
+                    console.warn(`[NLDecomposer] Failed to create NL node for "${content}": ${nodeErr.message}`);
+                    continue;
+                }
+            } else {
+                console.warn(`[NLDecomposer] Unknown child type "${child.type}" for content "${content}".`);
+                continue;
+            }
+
+            try {
+                taskTree.addNode(childNode);
+                taskTree.attachChild(node.id, childNode.id);
+                addedChildIds.push(childNode.id);
+            } catch (attachErr) {
+                console.warn(`[NLDecomposer] Failed to attach child node "${childNode.id}": ${attachErr.message}`);
+            }
+        }
+
+        if (addedChildIds.length > 0) {
+            await this._safeWriteTaskTreeSnapshot();
+        }
+
+        return addedChildIds;
+    }
+
+    async _waitForOwnerConfirmation(timeoutMs = 60000) {
+        if (!this.owner || !this.bot) {
+            return { approved: false, reason: 'no_owner' };
+        }
+
+        if (this._pendingYesNoPrompt && !this._pendingYesNoPrompt.settled) {
+            const previous = this._pendingYesNoPrompt;
+            this._pendingYesNoPrompt = null;
+            previous.settle({ approved: false, reason: 'superseded' });
+        }
+
+        return new Promise((resolve) => {
+            const yesSet = new Set(['y', 'yes']);
+            const noSet = new Set(['n', 'no']);
+
+            const pending = {
+                yesSet,
+                noSet,
+                settled: false,
+                timeoutId: null,
+                settle: (result) => {
+                    if (pending.settled) return;
+                    pending.settled = true;
+                    if (pending.timeoutId) {
+                        clearTimeout(pending.timeoutId);
+                    }
+                    resolve(result);
+                }
+            };
+
+            pending.timeoutId = setTimeout(() => {
+                if (this._pendingYesNoPrompt === pending) {
+                    this._pendingYesNoPrompt = null;
+                }
+                pending.settle({ approved: false, reason: 'timeout' });
+            }, timeoutMs);
+
+            this._pendingYesNoPrompt = pending;
+        });
     }
 
     /**
