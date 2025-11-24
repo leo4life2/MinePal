@@ -1,5 +1,5 @@
 import { BasePrompter } from './basePrompter.js';
-import { createNLNode, createActionNode } from '../taskTree.js';
+import { createNLNode, createActionNode, createMissingActionNode } from '../taskTree.js';
 
 const COMMON_INSTRUCTIONS = `
 Formulate these subtasks as a *disjoint set* S = { s₁, s₂, …, sₙ },
@@ -15,9 +15,15 @@ Do NOT assume the contents of any container unless the HUD explicitly lists thos
 Do NOT include exploratory actions, checks, searches, attempts, or heuristics.
 Include a subtask only if the parent action cannot possibly succeed without it.
 
+If you cannot produce any valid decomposition, output a single child 
+with type="missing_action" and a concise reason. Never repeat the parent 
+goal verbatim, and never rephrase it. Repetition of the parent goal is 
+not considered a valid subtask.
+
 Each subtask must be one of the following:
 - An "action": a directly executable command available to the robot (see command docs below), with explicit parameters when possible.
 - A "goal": a concise natural-language description of a necessary subgoal if no single command fits yet.
+- A "missing_action": only when no available command can accomplish the remaining requirement. Explain why no action fits and explicitly state what capability or resource is missing.
 
 Output ONLY this disjoint set of universal subtasks as a JSON list; do not explain reasoning or predict future behavior.
 
@@ -73,12 +79,12 @@ export function createDecomposerResponseSchema({
                         properties: {
                             type: {
                                 type: 'string',
-                                enum: ['action', 'goal'],
-                                description: 'Whether this child is an executable command or a higher-level goal.'
+                                enum: ['action', 'goal', 'missing_action'],
+                                description: 'Whether this child is an executable command, a higher-level goal, or a missing action explanation.'
                             },
                             content: {
                                 type: 'string',
-                                description: 'If type=action, provide a MinePal command string like !action(param1, param2,...). If type=goal, provide a concise natural-language goal description.'
+                                description: 'If type=action, provide a MinePal command string like !action(param1, param2,...). If type=goal, provide a concise natural-language goal description. If type=missing_action, explain why no action fits and what capability or resource is missing.'
                             }
                         },
                         required: ['type', 'content'],
@@ -219,6 +225,12 @@ export class BaseDecomposerPrompter extends BasePrompter {
                     id: childId,
                     label: content,
                     goalText: content
+                });
+            } else if (child.type === 'missing_action') {
+                node = createMissingActionNode({
+                    id: childId,
+                    label: content,
+                    reason: content
                 });
             } else {
                 return;

@@ -209,6 +209,30 @@ export const actionsList = [
     }),
   },
   {
+    name: "!searchForBlock",
+
+  },
+  // {
+  //   name: "!searchForBlock",
+  //   description: "Search the world for the nearest reachable instance of a given block type. Returns coordinates if found; fails otherwise.",
+  //   params: {
+  //     type: "(string) The block type to search for, e.g. 'oak_log', 'coal_ore', 'sand'.",
+  //     maxDistance: "(number, optional) Maximum search radius in blocks. Defaults to 128.",
+  //   },
+  //   paramDefaults: {
+  //     maxDistance: 128,
+  //   },
+  //   perform: wrapExecution(async (agent, type, maxDistance) => {
+  //     // PLACEHOLDER — unimplemented, for cognition/prototyping only.
+  //     // The LLM will reason as if this action exists.
+  //     // Always fail until a real search implementation is added.
+  //     return {
+  //       success: false,
+  //       message: `searchForBlock not yet implemented: no search performed for ${type}.`,
+  //     };
+  //   }, 10), // 10 minute timeout (placeholder)
+  // },
+  {
     name: "!collectBlocks",
     description: "Collect the nearest blocks of a given type.",
     params: {
