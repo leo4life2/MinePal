@@ -5,7 +5,7 @@ import { createPrompter } from './prompters/index.js';
 import { initModes } from './modes.js';
 import MCData from '../utils/mcdata.js';
 import { containsCommand, commandExists, executeCommand, truncCommandMessage, getAllCommands } from './commands/index.js';
-import { ActionNode, NLNode, createActionNode, createNLNode } from './taskTree.js';
+import { ActionNode, NLNode, MissingActionNode, createActionNode, createNLNode, createMissingActionNode } from './taskTree.js';
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import fs from 'fs/promises';
@@ -1988,7 +1988,7 @@ export class Agent {
             const content = typeof child.content === 'string' ? child.content.trim() : '';
             if (!content) continue;
 
-            const childId = this._nextTaskNodeId('nl');
+            const childId = this._nextTaskNodeId(child.type === 'missing_action' ? 'missing' : 'nl');
             let childNode = null;
 
             if (child.type === 'action') {
@@ -2011,6 +2011,17 @@ export class Agent {
                     });
                 } catch (nodeErr) {
                     console.warn(`[NLDecomposer] Failed to create NL node for "${content}": ${nodeErr.message}`);
+                    continue;
+                }
+            } else if (child.type === 'missing_action') {
+                try {
+                    childNode = createMissingActionNode({
+                        id: childId,
+                        label: content,
+                        reason: content
+                    });
+                } catch (nodeErr) {
+                    console.warn(`[NLDecomposer] Failed to create missing action node for "${content}": ${nodeErr.message}`);
                     continue;
                 }
             } else {

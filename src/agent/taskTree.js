@@ -1,4 +1,4 @@
-const VALID_KINDS = new Set(['NL', 'Action']);
+const VALID_KINDS = new Set(['NL', 'Action', 'MissingAction']);
 const VALID_STATUS = new Set(['pending', 'running', 'succeeded', 'failed']);
 const VALID_POLICY = new Set(['sequence', 'selector']);
 
@@ -226,6 +226,33 @@ export class ActionNode extends BaseNode {
             successCheck: this.successCheck,
             preconditions: this.preconditions,
             children: this.children.length > 0 ? [...this.children] : undefined
+        });
+    }
+}
+
+export class MissingActionNode extends BaseNode {
+    constructor({
+        id,
+        label,
+        reason,
+        status,
+        parentId,
+        notes,
+        meta,
+        createdAt,
+        updatedAt,
+        decompositionReasoning
+    }) {
+        super({ id, kind: 'MissingAction', label, status, parentId, notes, meta, createdAt, updatedAt, decompositionReasoning });
+        assertString(reason, 'MissingActionNode reason must be a non-empty string');
+        this.reason = reason;
+    }
+
+    toJSON() {
+        const base = super.toJSON();
+        return omitUndefined({
+            ...base,
+            reason: this.reason
         });
     }
 }
@@ -568,6 +595,8 @@ export class TaskTree {
                 node = new NLNode(data);
             } else if (data.kind === 'Action') {
                 node = new ActionNode(data);
+            } else if (data.kind === 'MissingAction') {
+                node = new MissingActionNode(data);
             } else {
                 throw new Error(`TaskTree.deserialize encountered unknown node kind for "${nodeId}"`);
             }
@@ -647,6 +676,23 @@ export function createActionNode(init) {
         successCheck: init.successCheck,
         preconditions: init.preconditions,
         children,
+        decompositionReasoning
+    });
+}
+
+export function createMissingActionNode(init) {
+    if (!init || typeof init !== 'object') {
+        throw new Error('createMissingActionNode requires an init object');
+    }
+
+    const { id, label, reason, decompositionReasoning } = init;
+    return new MissingActionNode({
+        id,
+        label,
+        reason,
+        status: init.status ?? 'pending',
+        notes: init.notes,
+        meta: init.meta,
         decompositionReasoning
     });
 }
