@@ -245,7 +245,7 @@ export class Agent {
 
         // --- HUD Snapshot Tracking ---
         this._hudOutputPath = null;
-        this._lastHudString = null;
+        this._lastHudJsonString = null;
         this._taskTreeOutputPath = null;
         this._lastTaskTreeString = null;
         // --- End HUD Snapshot Tracking ---
@@ -723,43 +723,59 @@ export class Agent {
     }
 
     /**
-     * Generates a detailed heads-up display (HUD) string in Markdown format.
-     * Also prepares a simpler newHUD object for diff tracking.
-     * @returns {{hudString: string, diffText: string | null}} An object containing the newHUD for diffing and the formatted Markdown HUD string.
+     * Generates a detailed heads-up display (HUD) payload in JSON format.
+     * Also prepares a structured snapshot for diff tracking.
+     * @returns {{hudJson: string, diffText: string | null}} JSON payload and diff summary.
      */
     async headsUpDisplay() {
-        if (!this.bot.entity) {
-            return {
-                hudString: "# 🎮 MINEPAL HUD\n\nWaiting for bot to spawn...",
-                diffText: null // No diff on initial wait
-            };
-        }
-
-        // --- Helper Functions ---
-        const getFacingDirection = (yaw) => {
-            const angle = yaw * (180 / Math.PI); // Convert radians to degrees
-            const adjustedAngle = (angle % 360 + 360) % 360; // Normalize angle to 0-360
-            if (adjustedAngle >= 315 || adjustedAngle < 45) return "South"; // +Z
-            if (adjustedAngle >= 45 && adjustedAngle < 135) return "West";  // +X
-            if (adjustedAngle >= 135 && adjustedAngle < 225) return "North"; // -Z
-            if (adjustedAngle >= 225 && adjustedAngle < 315) return "East";  // -X
-            return "Unknown";
+        const toFixedNumber = (value, digits = 2) => {
+            if (typeof value !== 'number' || Number.isNaN(value)) return 0;
+            return Number(value.toFixed(digits));
         };
 
-        const formatMinecraftTime = (ticks) => {
-            const timeStr = formatMinecraftTimeSimple(ticks); // Use simple helper for HH:MM
-            let description = "Day";
-            if (ticks >= 23000 || ticks < 500) description = "Sunrise"; // Approx range
-            else if (ticks >= 11500 && ticks < 13000) description = "Sunset"; // Approx range
-            else if (ticks >= 13000 && ticks < 23000) description = "Night";
+        const formatItemEntry = (item) => {
+            if (!item) return null;
+            return { item: item.name, count: item.count };
+        };
 
-            return `${timeStr} (${description})`;
+        const toPositionObject = (vec3) => ({
+            x: toFixedNumber(vec3.x),
+            y: toFixedNumber(vec3.y),
+            z: toFixedNumber(vec3.z)
+        });
+
+        const describeTimeOfDay = (ticks) => {
+            if (ticks >= 23000 || ticks < 500) return 'sunrise';
+            if (ticks >= 11500 && ticks < 13000) return 'sunset';
+            if (ticks >= 13000 && ticks < 23000) return 'night';
+            return 'day';
+        };
+
+        const getFacingDirection = (yaw) => {
+            const angle = yaw * (180 / Math.PI);
+            const adjustedAngle = (angle % 360 + 360) % 360;
+            if (adjustedAngle >= 315 || adjustedAngle < 45) return 'south';
+            if (adjustedAngle >= 45 && adjustedAngle < 135) return 'west';
+            if (adjustedAngle >= 135 && adjustedAngle < 225) return 'north';
+            if (adjustedAngle >= 225 && adjustedAngle < 315) return 'east';
+            return 'unknown';
         };
 
         const calculateDistance = (pos1, pos2) => {
-             if (!pos1 || !pos2) return Infinity;
-             return pos1.distanceTo(pos2);
+            if (!pos1 || !pos2) return Infinity;
+            return pos1.distanceTo(pos2);
         };
+
+        if (!this.bot.entity) {
+            const fallbackHud = {
+                status: {
+                    state: 'waiting_for_spawn',
+                    message: 'Waiting for bot to spawn...'
+                }
+            };
+            const hudJsonString = JSON.stringify(fallbackHud, null, 2);
+            return { hudJson: hudJsonString, diffText: null };
+        }
 
         // --- Data Fetching ---
         const botPos = this.bot.entity.position;
@@ -768,332 +784,269 @@ export class Agent {
         const visibleEntities = await world.getVisibleEntities(this.bot);
         const nearbyPlayers = await world.getNearbyPlayers(this.bot, 16);
 
-        // --- Initialize STRUCTURED newHUD for diffing ---        
+        // --- Initialize STRUCTURED newHUD for diffing ---
         let newHUD = {
-            inventory: new Map(), // name -> count
-            trackedBlocks: new Map(), // key (name@coords) -> full display string for easy check?
-            mobs: new Map(), // name -> count
-            players: new Map(), // name -> { distance }
+            inventory: new Map(),
+            trackedBlocks: new Map(),
+            mobs: new Map(),
+            players: new Map(),
             health: Math.round(this.bot.health),
             hunger: Math.round(this.bot.food),
-            effects: new Map(), // name -> { amplifier, durationTicks }
+            effects: new Map(),
             empty: false
         };
 
-        // --- Build HUD String AND Populate Structured newHUD ---        
-        let hud = ["# 🎮 MINEPAL HUD"];
-
-        // == STATUS == (Populate newHUD.health/hunger/effects here)
-        hud.push("\n## 📍 STATUS");
-        const facing = getFacingDirection(this.bot.entity.yaw);
-        const positionStr = `(${botPos.x.toFixed(2)}, ${botPos.y.toFixed(2)}, ${botPos.z.toFixed(2)})`;
-        hud.push(`- **Position:** ${positionStr}, Facing: ${facing}`);
         const dimensionStr = this.bot.game.dimension;
-        let biomeStr; // Declare biomeStr here
+        const timeTicks = this.bot.time.timeOfDay;
+        const timeClock = formatMinecraftTimeSimple(timeTicks);
+        const timeOfDay = describeTimeOfDay(timeTicks);
+        let biomeStr;
         try {
-            biomeStr = world.getBiomeName(this.bot); // Get biome name
+            biomeStr = world.getBiomeName(this.bot);
         } catch (error) {
             console.warn(`[headsUpDisplay] Error fetching biome name: ${error.message}`);
-            biomeStr = "Unknown"; // Default value on error
+            biomeStr = 'unknown';
         }
-        hud.push(`- **Dimension:** ${dimensionStr.charAt(0).toUpperCase() + dimensionStr.slice(1)} | **Biome:** ${biomeStr || "Unknown"}`); // Use || "Unknown" as fallback
-        const timeStrFull = formatMinecraftTime(this.bot.time.timeOfDay); // Keep for full display
-        const timeStrSimple = formatMinecraftTimeSimple(this.bot.time.timeOfDay); // Use helper for simple HH:MM
-        let weatherStr = "N/A";
+        let weatherStr = 'N/A';
         if (dimensionStr === 'overworld') {
-             if (this.bot.thunderState > 0) weatherStr = `Thunderstorm (${(this.bot.thunderState * 100).toFixed(0)}%)`;
-             else if (this.bot.rainState > 0) weatherStr = `Rain (${(this.bot.rainState * 100).toFixed(0)}%)`;
-             else weatherStr = "Clear";
+            if (this.bot.thunderState > 0) weatherStr = `thunderstorm (${(this.bot.thunderState * 100).toFixed(0)}%)`;
+            else if (this.bot.rainState > 0) weatherStr = `rain (${(this.bot.rainState * 100).toFixed(0)}%)`;
+            else weatherStr = 'clear';
         }
-        hud.push(`- **Time:** ${timeStrFull} | **Weather:** ${weatherStr}`); // Display full time with description
-        hud.push(`- **Health:** ❤️ ${newHUD.health}/20 | **Hunger:** 🍖 ${newHUD.hunger}/20`);
 
-        // Status Effects - Populate newHUD.effects and build display string
-        let effectsDisplayString = "None";
-        const activeEffectsDisplay = [];
+        // Status Effects
+        const statusEffects = [];
         if (this.bot.entity.effects) {
             for (const effectData of Object.values(this.bot.entity.effects)) {
-                if (effectData && typeof effectData.id !== 'undefined') {
-                    const effectInfo = this.mcdata.getEffectById(effectData.id);
-                    if (effectInfo) {
-                        const name = effectInfo.displayName || effectInfo.name;
-                        const amplifier = effectData.amplifier;
-                        const durationTicks = effectData.duration;
-                        newHUD.effects.set(name, { amplifier, durationTicks }); // Populate structured HUD
-                        
-                        const amplifierLevel = amplifier > 0 ? ` ${amplifier + 1}` : '';
-                        const durationStr = formatDurationDiff(durationTicks); // Use helper for display
-                        activeEffectsDisplay.push(`${name}${amplifierLevel} ${durationStr}`.trim());
-        } else {
-                         console.warn(`[HUD Effects] Unknown effect ID: ${effectData.id}`);
-                         // Optionally handle display of unknown effects
-                    }
+                if (!effectData || typeof effectData.id === 'undefined') continue;
+                const effectInfo = this.mcdata.getEffectById(effectData.id);
+                if (!effectInfo) {
+                    console.warn(`[HUD Effects] Unknown effect ID: ${effectData.id}`);
+                    continue;
                 }
+                const name = effectInfo.displayName || effectInfo.name;
+                const amplifier = effectData.amplifier;
+                const durationTicks = effectData.duration;
+                newHUD.effects.set(name, { amplifier, durationTicks });
+                statusEffects.push({
+                    name,
+                    level: amplifier + 1,
+                    duration_seconds: Math.max(0, Math.floor(durationTicks / 20)),
+                    duration_ticks: durationTicks
+                });
             }
         }
-        if (activeEffectsDisplay.length > 0) {
-            effectsDisplayString = activeEffectsDisplay.join(', ');
+
+        const statusSection = {
+            position: toPositionObject(botPos),
+            facing: getFacingDirection(this.bot.entity.yaw),
+            dimension: dimensionStr,
+            biome: biomeStr || 'unknown',
+            time_clock: timeClock,
+            time_of_day: timeOfDay,
+            time_ticks: timeTicks,
+            weather: weatherStr,
+            health: { current: newHUD.health, max: 20 },
+            hunger: { current: newHUD.hunger, max: 20 },
+            effects: statusEffects
+        };
+
+        // Equipment
+        const armorSlots = { head: 5, torso: 6, legs: 7, feet: 8 };
+        let armor = {};
+        for (const [slotName, slotIndex] of Object.entries(armorSlots)) {
+            armor[slotName] = formatItemEntry(inventory.slots[slotIndex]);
         }
-        hud.push(`- **Status Effects:** ${effectsDisplayString}`);
-
-
-        // == EQUIPMENT == (Display only)
-        hud.push("\n## 🛡️ EQUIPMENT");
-        const armorSlots = { Head: 5, Torso: 6, Legs: 7, Feet: 8 };
-        let armorStrings = [];
-        for (const [name, slotIndex] of Object.entries(armorSlots)) {
-             const item = inventory.slots[slotIndex];
-             armorStrings.push(`${name}: ${item ? item.name : "empty"}`);
-        }
-        hud.push(`- **Armor:** ${armorStrings.join(' | ')}`);
-        const offHandItem = this.bot.supportFeature("doesntHaveOffHandSlot") ? null : inventory.slots[45];
-        hud.push(`- **Off-Hand:** ${offHandItem ? offHandItem.name : "empty"}`);
-
-
-
-        // == INVENTORY == (Populate newHUD.inventory)
-        hud.push("\n## 🎒 INVENTORY");
-        const backpackSlots = { start: 9, end: 35 };
+        const offHandItem = this.bot.supportFeature('doesntHaveOffHandSlot') ? null : inventory.slots[45];
         const hotbarSlots = { start: 36, end: 44 };
-        
-        // Use newHUD.inventory directly for tallying
-        newHUD.inventory.clear(); // Ensure it's empty before tallying
+        const mainHandSlotIndex = this.bot.quickBarSlot;
+        const mainHandInvSlot = hotbarSlots.start + mainHandSlotIndex;
+        const mainHandItem = inventory.slots[mainHandInvSlot];
+        const equipmentSection = {
+            armor,
+            main_hand: formatItemEntry(mainHandItem),
+            off_hand: formatItemEntry(offHandItem)
+        };
 
-        // Tally backpack items into newHUD.inventory
+        // Inventory
+        const backpackSlots = { start: 9, end: 35 };
+        newHUD.inventory.clear();
+        const backpackCounts = {};
         for (let i = backpackSlots.start; i <= backpackSlots.end; i++) {
             const item = inventory.slots[i];
             if (item) {
                 newHUD.inventory.set(item.name, (newHUD.inventory.get(item.name) || 0) + item.count);
+                backpackCounts[item.name] = (backpackCounts[item.name] || 0) + item.count;
             }
         }
-        // Tally hotbar items into newHUD.inventory and prepare display strings
-        let hotbarDisplayStrings = [];
+        const hotbarEntries = [];
         for (let i = 0; i < 9; i++) {
             const slotIndex = hotbarSlots.start + i;
             const item = inventory.slots[slotIndex];
-            let itemStr = "empty";
             if (item) {
                 newHUD.inventory.set(item.name, (newHUD.inventory.get(item.name) || 0) + item.count);
-                itemStr = `${item.name} ×${item.count}`;
             }
-            hotbarDisplayStrings.push(`[${i + 1}] ${itemStr}`);
+            hotbarEntries.push({
+                slot: i + 1,
+                item: item ? item.name : null,
+                count: item ? item.count : 0
+            });
         }
+        const backpackEntries = Object.keys(backpackCounts)
+            .sort()
+            .map(name => ({ item: name, count: backpackCounts[name] }));
+        let totalItems = 0;
+        newHUD.inventory.forEach(count => { totalItems += count; });
+        const inventorySection = {
+            hotbar: hotbarEntries,
+            backpack: backpackEntries,
+            total_items: totalItems,
+            unique_stacks: newHUD.inventory.size
+        };
 
-        // Format Backpack for display (requires iterating again or using a temp map)
-        let displayBackpackItems = {};
-        let backpackItemCount = 0;
-        for (let i = backpackSlots.start; i <= backpackSlots.end; i++) { 
-            const item = inventory.slots[i];
-            if (item) {
-                displayBackpackItems[item.name] = (displayBackpackItems[item.name] || 0) + item.count;
-                backpackItemCount += item.count;
-            }
-        }
-        hud.push(`**Backpack:** (${Object.keys(displayBackpackItems).length} unique stacks, ${backpackItemCount} total items)`);
-        Object.keys(displayBackpackItems).sort().forEach(name => hud.push(`- ${name} ×${displayBackpackItems[name]}`));
-
-        // Main Hand (display as before)
-        const mainHandSlotIndex = this.bot.quickBarSlot;
-        const mainHandInvSlot = hotbarSlots.start + mainHandSlotIndex;
-        const mainHandItem = inventory.slots[mainHandInvSlot];
-        hud.push(`**Main Hand:** Slot [${mainHandSlotIndex + 1}] ${mainHandItem ? `${mainHandItem.name} ×${mainHandItem.count}` : 'empty'}`);
-
-        // Hotbar (display as before)
-        hud.push(`**Hotbar:** (9 slots)`);
-        hud.push(hotbarDisplayStrings.join(' | '));
-
-
-        // == NEARBY BLOCKS == (Populate newHUD.trackedBlocks)
-        hud.push("\n## 🌳 VISIBLE BLOCKS");
-        const uniquelyTrackedBlockTypes = ["sign", "chest", "barrel", "shulker_box", "lectern", "furnace", "jukebox"];
-        let signBlocksDisplay = [];
-        let containerBlocksDisplay = [];
-        let otherTrackedBlocksDisplay = [];
-        let aggregatedBlocksDisplay = {}; // For display only
-
-        newHUD.trackedBlocks.clear(); // Ensure empty
+        // Visible Blocks
+        const uniquelyTrackedBlockTypes = ['sign', 'chest', 'barrel', 'shulker_box', 'lectern', 'furnace', 'jukebox'];
+        const signEntries = [];
+        let containerEntries = [];
+        const otherTrackedEntries = [];
+        const aggregatedBlocksDisplay = {};
+        newHUD.trackedBlocks.clear();
 
         nearbyBlockObjects.forEach(block => {
             if (!block || !block.name || !block.position) return;
             const dist = parseFloat(calculateDistance(botPos, block.position).toFixed(0));
-            // Store raw coords for comparison
             const x = Math.round(block.position.x);
             const y = Math.round(block.position.y);
             const z = Math.round(block.position.z);
-            const posCoordsDisplay = `(${x},${y},${z})`; // For display key/string
-            const posStr = `@${posCoordsDisplay}`; // Includes @ for display string
-            const blockKey = `${block.name}${posStr}`; // Unique key for map
-            let isSign = false;
-            let isContainer = false;
+            const coords = `@(${x},${y},${z})`;
+            const blockKey = `${block.name}${coords}`;
             let textFront = null;
             let textBack = null;
-            let isUniquelyTracked = false;
+            let isTracked = false;
 
             if (block.name.includes('sign')) {
-                isUniquelyTracked = true;
-                isSign = true;
+                isTracked = true;
                 try {
                     const signTexts = block.getSignText();
                     if (signTexts && Array.isArray(signTexts)) {
                         textFront = signTexts[0]?.trim() || null;
                         textBack = signTexts[1]?.trim() || null;
                     }
-                } catch (err) { /* Ignore */ }
-                let textSuffix = '';
-                if (textFront) textSuffix += ` | Front: "${textFront}"`;
-                if (textBack) textSuffix += ` | Back: "${textBack}"`;
-                const displayString = `[${block.name}${posStr}]${textSuffix}, Distance: ${dist}`;
-                // Store numeric coords in value
-                newHUD.trackedBlocks.set(blockKey, { name: block.name, x, y, z, isSign, isContainer, textFront, textBack });
-                signBlocksDisplay.push(`- ${displayString}`); // Add full string for direct display
-            } else if (uniquelyTrackedBlockTypes.some(sub => block.name.includes(sub))) {
-                isUniquelyTracked = true;
-                 isContainer = block.name.includes('chest') || block.name.includes('barrel') || block.name.includes('shulker_box');
-                 const displayString = `[${block.name}${posStr}], Distance: ${dist}`;
-                 // Store numeric coords in value
-                 newHUD.trackedBlocks.set(blockKey, { name: block.name, x, y, z, isSign, isContainer, textFront, textBack });
-                 if (isContainer) {
-                     containerBlocksDisplay.push(`- ${displayString}`); // Add initial string
-                 } else {
-                     otherTrackedBlocksDisplay.push(`- ${displayString}`);
-                 }
+                } catch (_) {
+                    // ignore read errors
+                }
+                signEntries.push({
+                    type: block.name,
+                    position: { x, y, z },
+                    distance: dist,
+                    text: { front: textFront, back: textBack }
+                });
+                newHUD.trackedBlocks.set(blockKey, { name: block.name, coords, x, y, z, textFront, textBack });
+                return;
             }
 
-            if (!isUniquelyTracked) {
-                if (!aggregatedBlocksDisplay[block.name]) aggregatedBlocksDisplay[block.name] = { count: 0, minDist: Infinity };
-                aggregatedBlocksDisplay[block.name].count++;
+            if (uniquelyTrackedBlockTypes.some(sub => block.name.includes(sub))) {
+                isTracked = true;
+                const isContainer = block.name.includes('chest') || block.name.includes('barrel') || block.name.includes('shulker_box');
+                const trackedEntry = { type: block.name, position: { x, y, z }, distance: dist };
+                newHUD.trackedBlocks.set(blockKey, { name: block.name, coords, x, y, z });
+                if (isContainer) {
+                    containerEntries.push({ ...trackedEntry, label: null });
+                } else {
+                    otherTrackedEntries.push(trackedEntry);
+                }
+            }
+
+            if (!isTracked) {
+                if (!aggregatedBlocksDisplay[block.name]) {
+                    aggregatedBlocksDisplay[block.name] = { count: 0, minDist: Infinity };
+                }
+                aggregatedBlocksDisplay[block.name].count += 1;
                 aggregatedBlocksDisplay[block.name].minDist = Math.min(aggregatedBlocksDisplay[block.name].minDist, dist);
             }
         });
 
-        // Post-process container display strings to add labels
-        containerBlocksDisplay = containerBlocksDisplay.map(containerString => {
-            const match = containerString.match(/-\s*\[(.*?)@\((.*?),(.*?),(.*?)\)\]/); // Match name and coords
-            if (!match) return containerString;
-
-            const [, containerName, xStr, yStr, zStr] = match;
-            const containerX = parseInt(xStr);
-            const containerY = parseInt(yStr);
-            const containerZ = parseInt(zStr);
-
-            // Iterate through the collected sign data in newHUD.trackedBlocks
-            let adjacentSignTexts = [];
-            for (const blockData of newHUD.trackedBlocks.values()) {
-                // Check if it's a sign and adjacent horizontally (same Y, adjacent X or Z)
-                if (blockData.isSign && blockData.y === containerY) {
-                    const isAdjacentX = blockData.z === containerZ && (blockData.x === containerX + 1 || blockData.x === containerX - 1);
-                    const isAdjacentZ = blockData.x === containerX && (blockData.z === containerZ + 1 || blockData.z === containerZ - 1);
-
-                    if (isAdjacentX || isAdjacentZ) {
-                        if (blockData.textFront) adjacentSignTexts.push(blockData.textFront);
-                        if (blockData.textBack) adjacentSignTexts.push(blockData.textBack);
-                    }
-                }
-            }
-
-            let labelString = "";
-            const distancePartIndex = containerString.lastIndexOf(', Distance:');
-            if (adjacentSignTexts.length > 0) {
-                // Join all collected texts with '|'
-                labelString = ` | Name: ${adjacentSignTexts.join('|')}`;
-            } else {
-                labelString = " | Unnamed";
-            }
-
-            if (distancePartIndex !== -1) {
-                // Insert label before distance
-                return containerString.substring(0, distancePartIndex) + labelString + containerString.substring(distancePartIndex);
-            } else {
-                return containerString + labelString; // Fallback append
-            }
+        containerEntries = containerEntries.map(container => {
+            const adjacentTexts = signEntries
+                .filter(sign => sign.position.y === container.position.y && (
+                    (sign.position.x === container.position.x && Math.abs(sign.position.z - container.position.z) === 1) ||
+                    (sign.position.z === container.position.z && Math.abs(sign.position.x - container.position.x) === 1)
+                ))
+                .flatMap(sign => [sign.text.front, sign.text.back].filter(Boolean));
+            return {
+                ...container,
+                label: adjacentTexts.length ? adjacentTexts.join('|') : null
+            };
         });
 
-        // Format block display sections (using potentially modified containerBlocksDisplay)
-        if (signBlocksDisplay.length > 0) { hud.push("- Signs:"); signBlocksDisplay.sort().forEach(s => hud.push(`  ${s}`)); }
-        if (containerBlocksDisplay.length > 0) { hud.push("- Containers:"); containerBlocksDisplay.sort().forEach(c => hud.push(`  ${c}`)); }
-        if (otherTrackedBlocksDisplay.length > 0) { hud.push("- Other Tracked:"); otherTrackedBlocksDisplay.sort().forEach(o => hud.push(`  ${o}`)); }
-        const sortedOtherNamesDisplay = Object.keys(aggregatedBlocksDisplay).sort(); // Renamed for clarity
-        if (sortedOtherNamesDisplay.length > 0) {
-            hud.push("- Others:");
-            sortedOtherNamesDisplay.forEach(name => {
-                const data = aggregatedBlocksDisplay[name];
-                hud.push(`  - ${name} ×${data.count}, Nearest Distance: ${data.minDist === Infinity ? 'N/A' : data.minDist}`);
-            });
-        }
-        // Check if any blocks were detected at all
-        if (!signBlocksDisplay.length && !containerBlocksDisplay.length && !otherTrackedBlocksDisplay.length && !sortedOtherNamesDisplay.length) {
-            hud.push("- none detected");
-        }
+        const aggregatedBlocksSummary = {};
+        Object.keys(aggregatedBlocksDisplay).sort().forEach(name => {
+            const data = aggregatedBlocksDisplay[name];
+            aggregatedBlocksSummary[name] = {
+                count: data.count,
+                nearest_distance: data.minDist === Infinity ? null : data.minDist
+            };
+        });
 
-        // == NEARBY MOBS == (Populate newHUD.mobs)
-        hud.push("\n## 🐾 VISIBLE MOBS");
-        let passiveMobsDisplayMap = {}; // Temp map for display aggregation
+        const visibleBlocksSection = {
+            notable: {
+                signs: signEntries,
+                containers: containerEntries,
+                tracked: otherTrackedEntries
+            },
+            aggregated: aggregatedBlocksSummary
+        };
+
+        // Visible mobs
+        let passiveMobsDisplayMap = {};
         let hostileMobsDisplayMap = {};
-        newHUD.mobs.clear(); // Ensure empty
-
+        newHUD.mobs.clear();
         visibleEntities.filter(e => e.type !== 'player').forEach(entity => {
             const name = entity.name || 'unknown_entity';
             const dist = parseFloat(calculateDistance(botPos, entity.position).toFixed(0));
             const isHostile = this.mcdata.isHostile(entity);
-            
-            // Populate structured newHUD
             newHUD.mobs.set(name, (newHUD.mobs.get(name) || 0) + 1);
-
-            // Aggregate for display string
             const displayMap = isHostile ? hostileMobsDisplayMap : passiveMobsDisplayMap;
             if (!displayMap[name]) {
                 displayMap[name] = { count: 0, minDist: Infinity };
             }
-            displayMap[name].count++;
+            displayMap[name].count += 1;
             displayMap[name].minDist = Math.min(displayMap[name].minDist, dist);
         });
 
-        // Format Passive Mobs Display
-        const sortedPassiveNames = Object.keys(passiveMobsDisplayMap).sort();
-        if (sortedPassiveNames.length > 0) {
-            hud.push("- Passive:");
-            sortedPassiveNames.forEach(name => {
-                const data = passiveMobsDisplayMap[name];
-                hud.push(`  - ${name} ×${data.count}, Nearest Distance: ${data.minDist === Infinity ? 'N/A' : data.minDist}`);
-            });
-        } else {
-            hud.push("- Passive: none detected");
-        }
-        // Format Hostile Mobs Display
-        const sortedHostileNames = Object.keys(hostileMobsDisplayMap).sort();
-        if (sortedHostileNames.length > 0) {
-            hud.push("- Hostile:");
-            sortedHostileNames.forEach(name => {
-                const data = hostileMobsDisplayMap[name];
-                hud.push(`  - ${name} ×${data.count}, Nearest Distance: ${data.minDist === Infinity ? 'N/A' : data.minDist}`);
-            });
-        } else {
-            hud.push("- Hostile: none detected");
-        }
+        const passiveMobEntries = Object.keys(passiveMobsDisplayMap).sort().map(name => ({
+            type: name,
+            count: passiveMobsDisplayMap[name].count,
+            nearest_distance: passiveMobsDisplayMap[name].minDist === Infinity ? null : passiveMobsDisplayMap[name].minDist
+        }));
+        const hostileMobEntries = Object.keys(hostileMobsDisplayMap).sort().map(name => ({
+            type: name,
+            count: hostileMobsDisplayMap[name].count,
+            nearest_distance: hostileMobsDisplayMap[name].minDist === Infinity ? null : hostileMobsDisplayMap[name].minDist
+        }));
+        const visibleMobsSection = { passive: passiveMobEntries, hostile: hostileMobEntries };
 
-
-        // == NEARBY PLAYERS == (Populate newHUD.players)
-        hud.push("\n## 👥 VISIBLE PLAYERS");
-        newHUD.players.clear(); // Ensure empty
+        // Visible players
+        const visiblePlayersSection = [];
+        newHUD.players.clear();
         if (nearbyPlayers.length > 0) {
             nearbyPlayers.forEach(player => {
                 const dist = calculateDistance(botPos, player.position);
                 const name = player.username;
-                newHUD.players.set(name, { distance: dist }); // Populate structured HUD
-                const prefix = (name === this.owner) ? "**Your Owner:** " : "";
-                hud.push(`- ${prefix}${name}, Distance: ${dist.toFixed(0)}`);
+                newHUD.players.set(name, { distance: dist });
+                visiblePlayersSection.push({
+                    name,
+                    role: name === this.owner ? 'owner' : 'player',
+                    distance: Number.isFinite(dist) ? parseFloat(dist.toFixed(0)) : null
+                });
             });
-        } else {
-            hud.push("- none detected");
         }
 
-
-        // --- Calculate DETAILED Diff Text ---        
+        // --- Calculate DETAILED Diff Text ---
         let diffText = null;
-        let diffSections = []; // Store sections like ["📦 Inventory Changes:", "- item x 1"]
+        let diffSections = [];
 
-        if (!this.latestHUD.empty) { // Only calculate diff if not the first run
-            
+        if (!this.latestHUD.empty) {
             // Inventory Changes
             let inventoryChanges = [];
             const oldInv = this.latestHUD.inventory;
@@ -1110,11 +1063,11 @@ export class Agent {
                 }
             });
             if (inventoryChanges.length > 0) {
-                diffSections.push("📦 **Inventory Changes:**");
+                diffSections.push('📦 **Inventory Changes:**');
                 diffSections.push(...inventoryChanges.sort());
             }
 
-            // Environment (Tracked Blocks) Changes
+            // Environment Changes
             let envChanges = [];
             const oldBlocks = this.latestHUD.trackedBlocks;
             const newBlocks = newHUD.trackedBlocks;
@@ -1122,15 +1075,18 @@ export class Agent {
             allBlockKeys.forEach(key => {
                 const oldBlockData = oldBlocks.get(key);
                 const newBlockData = newBlocks.get(key);
-                if (oldBlockData && !newBlockData) { // Removed
+                if (oldBlockData && !newBlockData) {
                     envChanges.push(`- [${oldBlockData.name}${oldBlockData.coords}] *(removed)*`);
-                } else if (!oldBlockData && newBlockData) { // Added
-                    const textPart = newBlockData.text ? ` *(${newBlockData.text.substring(3)})*` : ""; // Remove leading ' | ' 
+                } else if (!oldBlockData && newBlockData) {
+                    let labelParts = [];
+                    if (newBlockData.textFront) labelParts.push(`Front: "${newBlockData.textFront}"`);
+                    if (newBlockData.textBack) labelParts.push(`Back: "${newBlockData.textBack}"`);
+                    const textPart = labelParts.length ? ` *(${labelParts.join(' | ')})*` : '';
                     envChanges.push(`+ [${newBlockData.name}${newBlockData.coords}]${textPart} *(new)*`);
                 }
             });
             if (envChanges.length > 0) {
-                diffSections.push("\n🌳 **Environment Changes:**");
+                diffSections.push('\n🌳 **Environment Changes:**');
                 diffSections.push(...envChanges.sort());
             }
 
@@ -1148,7 +1104,7 @@ export class Agent {
                 }
             });
             if (mobChanges.length > 0) {
-                diffSections.push("\n🐾 **Mob Changes:**");
+                diffSections.push('\n🐾 **Mob Changes:**');
                 diffSections.push(...mobChanges.sort());
             }
 
@@ -1164,63 +1120,62 @@ export class Agent {
                 else if (oldPlayerData && !newPlayerData) playerChanges.push(`- Player left: ${player}`);
             });
             if (playerChanges.length > 0) {
-                diffSections.push("\n👥 **Player Changes:**");
+                diffSections.push('\n👥 **Player Changes:**');
                 diffSections.push(...playerChanges.sort());
             }
 
-            // Status Updates (Health, Hunger, Effects)
+            // Status Updates
             let statusUpdates = [];
             const healthDiff = newHUD.health - this.latestHUD.health;
             const hungerDiff = newHUD.hunger - this.latestHUD.hunger;
             if (healthDiff !== 0) statusUpdates.push(`- Health: ❤️ ${this.latestHUD.health} ➜ ❤️ ${newHUD.health} *${formatDiff(healthDiff)}*`);
             if (hungerDiff !== 0) statusUpdates.push(`- Hunger: 🍖 ${this.latestHUD.hunger} ➜ 🍖 ${newHUD.hunger} *${formatDiff(hungerDiff)}*`);
-            
             const oldEffects = this.latestHUD.effects;
             const newEffects = newHUD.effects;
             const allEffectNames = new Set([...oldEffects.keys(), ...newEffects.keys()]);
             allEffectNames.forEach(name => {
                 const oldEffectData = oldEffects.get(name);
                 const newEffectData = newEffects.get(name);
-                if (!oldEffectData && newEffectData) { // New effect
+                if (!oldEffectData && newEffectData) {
                     const amplifierLevel = newEffectData.amplifier > 0 ? ` ${newEffectData.amplifier + 1}` : '';
-                    const durationStr = formatDurationDiff(newEffectData.durationTicks); // Use renamed helper
-                    statusUpdates.push(`- Status Effect: ${name}${amplifierLevel} *(new, ${durationStr.slice(1, -1)})*`); // Adjusted format
-                } else if (oldEffectData && !newEffectData) { // Removed effect
+                    const durationStr = formatDurationDiff(newEffectData.durationTicks);
+                    statusUpdates.push(`- Status Effect: ${name}${amplifierLevel} *(new, ${durationStr.slice(1, -1)})*`);
+                } else if (oldEffectData && !newEffectData) {
                     const amplifierLevel = oldEffectData.amplifier > 0 ? ` ${oldEffectData.amplifier + 1}` : '';
                     statusUpdates.push(`- Status Effect: ${name}${amplifierLevel} *(removed)*`);
                 }
-                // Duration / amplifier change diffing can be added here if needed
             });
             if (statusUpdates.length > 0) {
-                diffSections.push("\n✨ **Status Updates:**");
-                diffSections.push(...statusUpdates.sort()); 
+                diffSections.push('\n✨ **Status Updates:**');
+                diffSections.push(...statusUpdates.sort());
             }
 
-            // Combine sections if any changes occurred
             if (diffSections.length > 0) {
                 diffText = diffSections.join('\n');
             }
         }
 
-        // --- Update latestHUD (with structured data) --- 
+        // --- Update latestHUD (with structured data) ---
         this.latestHUD = newHUD;
 
-        // --- Final Assembly ---
-        const finalHudString = hud.join('\n');
+        const hudData = {
+            status: statusSection,
+            equipment: equipmentSection,
+            inventory: inventorySection,
+            visible_blocks: visibleBlocksSection,
+            visible_mobs: visibleMobsSection,
+            visible_players: visiblePlayersSection
+        };
 
-        await this._writeHudSnapshot(finalHudString);
+        const hudJsonString = JSON.stringify(hudData, null, 2);
+        await this._writeHudSnapshot(hudJsonString);
 
-        // console.log(`\n\n[HUD DEBUG] HUD:\n${finalHudString}\n\n`); // Log full HUD
-        // if (diffText) {
-        //      console.log(`\n\n[DEBUG] HUD Diff:\n${diffText}\n\n`); // Log detailed diff
-        // }
-
-        // Return the formatted string and the calculated detailed diff text
         return {
-            hudString: finalHudString,
-            diffText: diffText 
+            hudJson: hudJsonString,
+            diffText
         };
     }
+
     
     /**
      * Handles incoming messages by adding them to history and queuing a prompt.
@@ -1417,9 +1372,9 @@ export class Agent {
     /**
      * Writes the latest HUD snapshot to disk for external visualization.
      * Uses an atomic rename and only updates when the content changes.
-     * @param {string} hudString - Rendered Markdown HUD string.
+     * @param {string} hudJsonString - Rendered JSON HUD string.
      */
-    async _writeHudSnapshot(hudString) {
+    async _writeHudSnapshot(hudJsonString) {
         if (!this.userDataDir) return; // Agent not fully initialized
 
         let runlogsDir;
@@ -1431,22 +1386,22 @@ export class Agent {
                 console.warn(`[HUD Snapshot] Unable to ensure runlogs directory: ${err.message}`);
                 return;
             }
-            this._hudOutputPath = path.join(runlogsDir, 'latest_hud.md');
+            this._hudOutputPath = path.join(runlogsDir, 'latest_hud.json');
         } else {
             runlogsDir = path.dirname(this._hudOutputPath);
         }
 
         await this._writeTaskTreeSnapshot(runlogsDir);
 
-        if (this._lastHudString === hudString) {
+        if (this._lastHudJsonString === hudJsonString) {
             return;
         }
 
         const tmpPath = `${this._hudOutputPath}.tmp`;
         try {
-            await fs.writeFile(tmpPath, hudString, 'utf8');
+            await fs.writeFile(tmpPath, hudJsonString, 'utf8');
             await fs.rename(tmpPath, this._hudOutputPath);
-            this._lastHudString = hudString;
+            this._lastHudJsonString = hudJsonString;
         } catch (err) {
             console.warn(`[HUD Snapshot] Failed to write HUD snapshot: ${err.message}`);
             try {

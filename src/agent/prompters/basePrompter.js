@@ -63,8 +63,8 @@ export class BasePrompter {
         }
 
         if (populated.includes('$HUD')) {
-            const { hudString } = await this.agent.headsUpDisplay();
-            populated = populated.replaceAll('$HUD', `Your heads up display:\n${hudString}`);
+            const { hudJson } = await this.agent.headsUpDisplay();
+            populated = populated.replaceAll('$HUD', `Current HUD (JSON):\n${hudJson}`);
         }
 
         if (populated.includes('$COMMAND_DOCS')) {
