@@ -251,8 +251,9 @@ export function pruneCandidates(candidates, isCollecting, currentTargetKey, isVa
   return { removed: before - after, remaining: after };
 }
 
-export function scanForCandidates(bot, world, blocktypes, candidates, isExcluded, isValidTarget, scanRadius, MAX_CANDIDATES, tickIndex, excludedReason, scanSummaryOut) {
-  const found = world.getNearestBlocks(bot, blocktypes, scanRadius) || [];
+export function scanForCandidates(bot, world, blocktypes, candidates, isExcluded, isValidTarget, scanRadius, MAX_CANDIDATES, tickIndex, excludedReason, scanSummaryOut, maxFound = null) {
+  const limit = maxFound != null ? maxFound : MAX_CANDIDATES * 4;
+  const found = world.getNearestBlocks(bot, blocktypes, scanRadius, limit) || [];
   const summary = {
     tickIndex,
     scanRadius,

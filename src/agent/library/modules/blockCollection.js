@@ -167,7 +167,8 @@ export async function collectBlocks(
           MAX_CANDIDATES,
           tickIndex,
           excludedReason,
-          scanSummaryOut
+          scanSummaryOut,
+          MAX_CANDIDATES * 4
         );
         added = res.added;
         try {
