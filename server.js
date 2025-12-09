@@ -370,7 +370,9 @@ function startServer() {
         const profilesDir = path.join(userDataDir, 'profiles');
         const updatedProfiles = [];
         const ethanTemplatePath = path.join(electronApp.getAppPath(), 'ethan.json');
+        const systemPromptPath = path.join(electronApp.getAppPath(), 'system_prompt.md');
         const ethanTemplate = JSON.parse(fs.readFileSync(ethanTemplatePath, 'utf8'));
+        const systemPrompt = fs.readFileSync(systemPromptPath, 'utf8');
     
         fs.readdirSync(profilesDir).forEach(file => {
             if (file.endsWith('.json')) {
@@ -378,7 +380,7 @@ function startServer() {
                 const profileData = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
                 
                 // Replace fields with those from ethanTemplate
-                profileData.conversing = ethanTemplate.conversing;
+                profileData.conversing = systemPrompt;
                 profileData.coding = ethanTemplate.coding;
                 profileData.saving_memory = ethanTemplate.saving_memory;
                 
