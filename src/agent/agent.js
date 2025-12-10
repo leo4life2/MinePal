@@ -24,6 +24,10 @@ const STD_FACTOR = 10; // STD is MEAN_i / STD_FACTOR
 const R = 3.5;    // Exponential factor for increasing mean silence duration
 // --- End Silence Timer Constants ---
 
+// --- Experimental Feature Flags ---
+const ENABLE_FAILURE_DECOMPOSER = false; // Set to true to route action failures to the task decomposer
+// --- End Experimental Feature Flags ---
+
 // Helper function to generate descriptive time difference string
 function timeAgo(pastDate) {
     const now = new Date();
@@ -1746,11 +1750,16 @@ export class Agent {
                 }
             } else if (failureContext) {
                 const failureCommandName = failureContext.commandName ?? containsCommand(command) ?? 'unknown';
-                await this._handleActionFailure(
-                    failureCommandName,
-                    timeStr,
-                    failureContext
-                );
+                if (ENABLE_FAILURE_DECOMPOSER) {
+                    await this._handleActionFailure(
+                        failureCommandName,
+                        timeStr,
+                        failureContext
+                    );
+                } else {
+                    // Just re-prompt the LLM with the failure context (already in history)
+                    this._queuePrompt(`[system] Action ${failureCommandName} failed`);
+                }
             }
         }
     }
